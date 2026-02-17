@@ -49,6 +49,8 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Il pulsante "Next" appare quando mancano circa 90 secondi alla fine e passa al prossimo episodio; se esiste una stagione successiva apre il primo episodio.
 - Per AnimeUnity, il pulsante "Skip Intro" appare quando AniSkip fornisce un intervallo OP/mixed-op e permette di saltare l'intro.
 - Su Android e disponibile l'apertura in player esterno (es. VLC).
+- E disponibile il cast tramite Web Video Caster (WVC) dal player e dalla selezione server; il flusso passa URL stream + headers/sottotitoli quando disponibili.
+- Per usare il cast WVC, l'app Web Video Caster deve essere installata sul telefono. In caso contrario l'app apre automaticamente lo store.
 - L'app resta in verticale fuori dal player; il player blocca l'orizzontale.
 
 5) Watchlist e Cronologia

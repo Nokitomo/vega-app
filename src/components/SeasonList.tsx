@@ -44,6 +44,7 @@ import useThemeStore from '../lib/zustand/themeStore';
 import SkeletonLoader from './Skeleton';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {openInWebVideoCaster} from '../lib/cast/webVideoCaster';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -865,6 +866,68 @@ const SeasonList: React.FC<SeasonListProps> = ({
     }
   }, []);
 
+  const openWebVideoCaster = useCallback(
+    async (stream: {
+      link?: string;
+      headers?: Record<string, string>;
+      subtitles?: Array<{uri?: string; title?: string}>;
+    }) => {
+      const streamUrl = stream?.link;
+      if (!streamUrl) {
+        ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
+        return;
+      }
+
+      setShowServerModal(false);
+      setVlcLoading(true);
+
+      try {
+        const result = await openInWebVideoCaster({
+          videoUrl: streamUrl,
+          headers:
+            stream.headers && typeof stream.headers === 'object'
+              ? stream.headers
+              : undefined,
+          subtitles: Array.isArray(stream.subtitles) ? stream.subtitles : [],
+          title: metaTitle,
+          subtitle: activeSeason?.title || '',
+          poster: poster?.poster || poster?.background || '',
+          secureUri: true,
+        });
+
+        if (result === 'store_opened') {
+          ToastAndroid.show(
+            t('Install Web Video Caster to cast'),
+            ToastAndroid.SHORT,
+          );
+          return;
+        }
+
+        if (result === 'failed') {
+          ToastAndroid.show(
+            t('Failed to open Web Video Caster'),
+            ToastAndroid.SHORT,
+          );
+          return;
+        }
+
+        ToastAndroid.show(
+          t('Casting started in Web Video Caster'),
+          ToastAndroid.SHORT,
+        );
+      } catch (error) {
+        console.error('Error opening Web Video Caster:', error);
+        ToastAndroid.show(
+          t('Failed to open Web Video Caster'),
+          ToastAndroid.SHORT,
+        );
+      } finally {
+        setVlcLoading(false);
+      }
+    },
+    [activeSeason?.title, metaTitle, poster?.background, poster?.poster, t],
+  );
+
   // Memoized play handler
   const playHandler = useCallback(
     async ({
@@ -1490,12 +1553,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
   // Memoized server render item
   const renderServerItem = useCallback(
     (item: any, index: number) => (
-      <TouchableOpacity
+      <View
         key={`server-${index}-${item.server}`}
         className="bg-black/30 p-3 rounded-lg mb-2 flex-row justify-between items-center"
-        style={{borderColor: primary, borderWidth: 1}}
-        onPress={() => openExternalPlayer(item.link)}>
-        <View>
+        style={{borderColor: primary, borderWidth: 1}}>
+        <TouchableOpacity
+          className="flex-1"
+          onPress={() => openExternalPlayer(item.link)}>
           <Text className="text-white text-lg capitalize font-bold">
             {item.server || t('Server {{number}}', {number: index + 1})}
           </Text>
@@ -1504,11 +1568,22 @@ const SeasonList: React.FC<SeasonListProps> = ({
               ? t('Format: {{format}}', {format: item.type.toUpperCase()})
               : ''}
           </Text>
+        </TouchableOpacity>
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            className="bg-black/30 px-2 py-2 rounded-md"
+            onPress={() => openExternalPlayer(item.link)}>
+            <MaterialCommunityIcons name="vlc" size={22} color={primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="bg-black/30 px-2 py-2 rounded-md"
+            onPress={() => openWebVideoCaster(item)}>
+            <MaterialCommunityIcons name="cast" size={22} color={primary} />
+          </TouchableOpacity>
         </View>
-        <MaterialCommunityIcons name="vlc" size={24} color={primary} />
-      </TouchableOpacity>
+      </View>
     ),
-    [openExternalPlayer, primary, t],
+    [openExternalPlayer, openWebVideoCaster, primary, t],
   );
 
   // Show loading skeleton while episodes are loading

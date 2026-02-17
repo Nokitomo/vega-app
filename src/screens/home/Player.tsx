@@ -51,6 +51,7 @@ import {StatusBar} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {extensionManager} from '../../lib/services/ExtensionManager';
 import {providerManager} from '../../lib/services/ProviderManager';
+import {openInWebVideoCaster} from '../../lib/cast/webVideoCaster';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -872,6 +873,85 @@ const Player = ({route}: Props): React.JSX.Element => {
     [videoPositionRef],
   );
 
+  const getCastSubtitleTracks = useCallback(() => {
+    const selectedTrack = mergedTextTracks.find(
+      track => track.index === selectedTextTrackIndex,
+    );
+    if (selectedTrack?.uri && /^https?:\/\//i.test(selectedTrack.uri)) {
+      return [{uri: selectedTrack.uri, title: selectedTrack.title}];
+    }
+
+    if (!Array.isArray(selectedStream?.subtitles)) {
+      return [];
+    }
+
+    return selectedStream.subtitles
+      .map(track => ({
+        uri: track?.uri,
+        title: track?.title,
+      }))
+      .filter(track => !!track.uri && /^https?:\/\//i.test(track.uri));
+  }, [mergedTextTracks, selectedStream?.subtitles, selectedTextTrackIndex]);
+
+  const handleWebVideoCasterCast = useCallback(async () => {
+    if (!selectedStream?.link) {
+      ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
+      return;
+    }
+
+    try {
+      const result = await openInWebVideoCaster({
+        videoUrl: selectedStream.link,
+        headers:
+          selectedStream.headers && typeof selectedStream.headers === 'object'
+            ? selectedStream.headers
+            : undefined,
+        subtitles: getCastSubtitleTracks(),
+        title: route.params?.primaryTitle || '',
+        subtitle: activeEpisode?.title || route.params?.secondaryTitle || '',
+        poster:
+          route.params?.poster?.poster ||
+          route.params?.poster?.background ||
+          '',
+        secureUri: true,
+      });
+
+      if (result === 'store_opened') {
+        ToastAndroid.show(
+          t('Install Web Video Caster to cast'),
+          ToastAndroid.SHORT,
+        );
+        return;
+      }
+
+      if (result === 'failed') {
+        ToastAndroid.show(
+          t('Failed to open Web Video Caster'),
+          ToastAndroid.SHORT,
+        );
+        return;
+      }
+
+      ToastAndroid.show(
+        t('Casting started in Web Video Caster'),
+        ToastAndroid.SHORT,
+      );
+    } catch (error) {
+      console.error('Error opening Web Video Caster:', error);
+      ToastAndroid.show(t('Failed to open Web Video Caster'), ToastAndroid.SHORT);
+    }
+  }, [
+    activeEpisode?.title,
+    getCastSubtitleTracks,
+    route.params?.poster?.background,
+    route.params?.poster?.poster,
+    route.params?.primaryTitle,
+    route.params?.secondaryTitle,
+    selectedStream?.headers,
+    selectedStream?.link,
+    t,
+  ]);
+
   // Memoized cast effect
   // useEffect(() => {
   //   if (remoteMediaClient && !Platform.isTV && selectedStream?.link) {
@@ -1492,6 +1572,15 @@ const Player = ({route}: Props): React.JSX.Element => {
             className="opacity-70 p-2 rounded-full">
             <MaterialIcons
               name={isFullScreen ? 'fullscreen-exit' : 'fullscreen'}
+              color={'hsl(0, 0%, 70%)'}
+              size={24}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleWebVideoCasterCast}
+            className="opacity-70 p-2 rounded-full">
+            <MaterialIcons
+              name={'cast'}
               color={'hsl(0, 0%, 70%)'}
               size={24}
             />
