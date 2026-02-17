@@ -8,11 +8,30 @@ File: app.config.js
 - firebase: @react-native-firebase/app e crashlytics sono opzionali. In Gradle i plugin Firebase sono commentati per default; per abilitarli serve decommentare i classpath in `android/build.gradle`, gli apply plugin in `android/app/build.gradle` e aggiungere i file `google-services.json`/`GoogleService-Info.plist`.
 - android: minSdkVersion 24, edgeToEdgeEnabled true, supportsPictureInPicture true, launchMode singleTask, queries per http/https/vlc.
 
-## Cast Web Video Caster (WVC)
+## Cast (Android)
+### Cast nativo Google Cast (default)
+- Dipendenza: `react-native-google-cast`.
+- Inizializzazione Android:
+  - `AndroidManifest.xml`: metadata cast options provider + receiver app id.
+  - `MainActivity.kt`: `RNGCCastContext.getSharedInstance(this)` in `onCreate`.
+- Receiver App ID configurato via placeholder Gradle:
+  - variabile ambiente build: `VEGA_CAST_RECEIVER_APP_ID`
+  - fallback: `CC1AD845`
+- In `app.config.js` sono esposti anche:
+  - `extra.castReceiverAppId`
+  - `extra.castReceiverWebUrl`
+
+### Cast Web Video Caster (fallback/alternativa)
 - Android: integrazione via `Intent ACTION_VIEW` con package `com.instantbits.cast.webvideo`.
 - iOS: integrazione via URL scheme `wvc-x-callback://open?...`.
-- L'integrazione supporta passaggio URL stream, headers HTTP e sottotitoli (quando disponibili dallo stream provider).
-- Se Web Video Caster non e installata, l'app apre automaticamente lo store della piattaforma.
+- Supporta passaggio URL stream, headers HTTP e sottotitoli (quando disponibili).
+- Se WVC non e installata, l'app tenta apertura store (market/play store URL).
+
+### Scelta provider cast
+- Impostazione utente: `Preferences -> Player -> Cast Provider`.
+- Valori supportati:
+  - `native` (default)
+  - `wvc`
 
 ## Signing release
 - La build release usa `signingConfigs.release`. Le credenziali (keystore path/password/alias) devono essere presenti nelle variabili d'ambiente o in `gradle.properties`.

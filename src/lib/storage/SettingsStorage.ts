@@ -33,6 +33,7 @@ export enum SettingsKeys {
   SUBTITLE_FONT_SIZE = 'subtitleFontSize',
   SUBTITLE_OPACITY = 'subtitleOpacity',
   SUBTITLE_BOTTOM_PADDING = 'subtitleBottomPadding',
+  CAST_PROVIDER = 'castProvider',
 
   LIST_VIEW_TYPE = 'viewType',
 
@@ -217,6 +218,15 @@ export class SettingsStorage {
 
   setSubtitleBottomPadding(padding: number): void {
     mainStorage.setNumber(SettingsKeys.SUBTITLE_BOTTOM_PADDING, padding);
+  }
+
+  getCastProvider(): 'native' | 'wvc' {
+    const provider = mainStorage.getString(SettingsKeys.CAST_PROVIDER);
+    return provider === 'wvc' ? 'wvc' : 'native';
+  }
+
+  setCastProvider(provider: 'native' | 'wvc'): void {
+    mainStorage.setString(SettingsKeys.CAST_PROVIDER, provider);
   }
 
   getListViewType(): number {

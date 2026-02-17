@@ -98,6 +98,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 160
         versionName "3.3.2"
+        manifestPlaceholders = [
+            googleCastReceiverAppId: (System.getenv('VEGA_CAST_RECEIVER_APP_ID') ?: 'CC1AD845')
+        ]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   ToastAndroid,
+  Alert,
   Modal,
   FlatList,
   ActivityIndicator,
@@ -45,6 +46,13 @@ import SkeletonLoader from './Skeleton';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {openInWebVideoCaster} from '../lib/cast/webVideoCaster';
+import GoogleCast, {
+  CastButton,
+  CastState,
+  useCastState,
+  useRemoteMediaClient,
+} from 'react-native-google-cast';
+import {prepareNativeCastQueue} from '../lib/cast/nativeCast';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -97,6 +105,14 @@ interface PendingPlay {
   episodeNumber?: number;
   episodeTitle?: string;
   episodeLink?: string;
+  seasonNumber?: number;
+  seasonEpisodesLink?: string;
+}
+
+interface ExternalPlayerContext {
+  currentEpisodeLink: string;
+  episodeList: EpisodeLink[];
+  seasonTitle?: string;
   seasonNumber?: number;
   seasonEpisodesLink?: string;
 }
@@ -544,6 +560,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
   // External player state
   const [showServerModal, setShowServerModal] = useState<boolean>(false);
   const [externalPlayerStreams, setExternalPlayerStreams] = useState<any[]>([]);
+  const [externalPlayerContext, setExternalPlayerContext] =
+    useState<ExternalPlayerContext | null>(null);
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+    settingsStorage.getCastProvider(),
+  );
+  const [pendingNativeCastStream, setPendingNativeCastStream] = useState<any>(
+    null,
+  );
+  const [isStartingNativeCast, setIsStartingNativeCast] = useState(false);
   const [isLoadingStreams, setIsLoadingStreams] = useState<boolean>(false);
   const [resumeProgress, setResumeProgress] = useState<ResumeProgress | null>(
     null,
@@ -552,6 +577,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
     Record<string, number>
   >({});
   const [pendingPlay, setPendingPlay] = useState<PendingPlay | null>(null);
+  const remoteMediaClient = useRemoteMediaClient();
+  const castState = useCastState();
 
   const normalizedEpisodes = useMemo(() => {
     if (!episodeList || !Array.isArray(episodeList)) {
@@ -810,11 +837,28 @@ const SeasonList: React.FC<SeasonListProps> = ({
     }, [refreshProgressData]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      setCastProvider(settingsStorage.getCastProvider());
+      return () => {};
+    }, []),
+  );
+
   // Memoized external player handler
   const handleExternalPlayer = useCallback(
-    async (link: string, streamType: string) => {
+    async (
+      link: string,
+      streamType: string,
+      context?: ExternalPlayerContext,
+    ) => {
       setVlcLoading(true);
       setIsLoadingStreams(true);
+      setExternalPlayerContext(
+        context || {
+          currentEpisodeLink: link,
+          episodeList: [],
+        },
+      );
 
       try {
         const streams = await fetchStreams(link, streamType, providerValue);
@@ -928,6 +972,208 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [activeSeason?.title, metaTitle, poster?.background, poster?.poster, t],
   );
 
+  const askWvcFallback = useCallback((): Promise<boolean> => {
+    return new Promise(resolve => {
+      let isResolved = false;
+      const safeResolve = (value: boolean) => {
+        if (isResolved) {
+          return;
+        }
+        isResolved = true;
+        resolve(value);
+      };
+
+      Alert.alert(
+        t('Native cast not ready'),
+        t('Native cast could not start. Open Web Video Caster instead?'),
+        [
+          {
+            text: t('Cancel'),
+            style: 'cancel',
+            onPress: () => safeResolve(false),
+          },
+          {
+            text: t('Open Web Video Caster'),
+            onPress: () => safeResolve(true),
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => safeResolve(false),
+        },
+      );
+    });
+  }, [t]);
+
+  const startNativeCastForStream = useCallback(
+    async (stream: any) => {
+      if (!remoteMediaClient || !stream?.link || isStartingNativeCast) {
+        return false;
+      }
+
+      setIsStartingNativeCast(true);
+      setVlcLoading(true);
+      try {
+        const contextEpisodeList =
+          externalPlayerContext?.episodeList && externalPlayerContext.episodeList.length > 0
+            ? externalPlayerContext.episodeList
+            : (sortedEpisodes.length > 0 ? sortedEpisodes : sortedDirectLinks);
+        const fallbackEpisodeTitle =
+          activeSeason?.title || t('Episode {{number}}', {number: 1});
+        const fallbackEpisodeLink =
+          externalPlayerContext?.currentEpisodeLink || stream.link;
+        const normalizedEpisodeList =
+          contextEpisodeList && contextEpisodeList.length > 0
+            ? contextEpisodeList
+            : [
+                {
+                  link: fallbackEpisodeLink,
+                  title: fallbackEpisodeTitle,
+                },
+              ];
+
+        const {request, itemCount} = await prepareNativeCastQueue({
+          currentEpisodeLink: fallbackEpisodeLink,
+          episodeList: normalizedEpisodeList,
+          selectedStream: stream,
+          providerValue,
+          contentType: type,
+          context: {
+            primaryTitle: metaTitle,
+            secondaryTitle:
+              externalPlayerContext?.seasonTitle || activeSeason?.title || '',
+            seasonNumber:
+              externalPlayerContext?.seasonNumber ?? activeSeasonNumber,
+            infoUrl: routeParams.link,
+            posterUrl: poster?.poster || poster?.background || '',
+          },
+        });
+
+        await remoteMediaClient.loadMedia(request);
+        setShowServerModal(false);
+        setPendingNativeCastStream(null);
+        ToastAndroid.show(
+          t('Native cast started with {{count}} episodes', {count: itemCount}),
+          ToastAndroid.SHORT,
+        );
+        try {
+          await GoogleCast.showExpandedControls();
+        } catch (error) {
+          console.warn('Failed to open cast expanded controls:', error);
+        }
+        return true;
+      } catch (error) {
+        console.error('Native cast start failed from list:', error);
+        ToastAndroid.show(t('Failed to start native cast'), ToastAndroid.SHORT);
+        return false;
+      } finally {
+        setIsStartingNativeCast(false);
+        setVlcLoading(false);
+      }
+    },
+    [
+      activeSeason?.title,
+      activeSeasonNumber,
+      externalPlayerContext?.currentEpisodeLink,
+      externalPlayerContext?.episodeList,
+      externalPlayerContext?.seasonNumber,
+      externalPlayerContext?.seasonTitle,
+      isStartingNativeCast,
+      metaTitle,
+      poster?.background,
+      poster?.poster,
+      providerValue,
+      remoteMediaClient,
+      routeParams.link,
+      sortedDirectLinks,
+      sortedEpisodes,
+      t,
+      type,
+    ],
+  );
+
+  const openCastForStream = useCallback(
+    async (stream: any) => {
+      if (castProvider === 'wvc') {
+        await openWebVideoCaster(stream);
+        return;
+      }
+
+      if (!remoteMediaClient) {
+        setPendingNativeCastStream(stream);
+        try {
+          const shown = await GoogleCast.showCastDialog();
+          if (!shown) {
+            setPendingNativeCastStream(null);
+            const fallback = await askWvcFallback();
+            if (fallback) {
+              await openWebVideoCaster(stream);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to open cast dialog from list:', error);
+          setPendingNativeCastStream(null);
+          const fallback = await askWvcFallback();
+          if (fallback) {
+            await openWebVideoCaster(stream);
+          }
+        }
+        return;
+      }
+
+      const started = await startNativeCastForStream(stream);
+      if (!started) {
+        const fallback = await askWvcFallback();
+        if (fallback) {
+          await openWebVideoCaster(stream);
+        }
+      }
+    },
+    [
+      askWvcFallback,
+      castProvider,
+      openWebVideoCaster,
+      remoteMediaClient,
+      startNativeCastForStream,
+    ],
+  );
+
+  useEffect(() => {
+    if (
+      castProvider !== 'native' ||
+      !pendingNativeCastStream ||
+      !remoteMediaClient
+    ) {
+      return;
+    }
+
+    startNativeCastForStream(pendingNativeCastStream).then(async started => {
+      if (!started) {
+        const fallback = await askWvcFallback();
+        if (fallback) {
+          await openWebVideoCaster(pendingNativeCastStream);
+        }
+      }
+    });
+  }, [
+    askWvcFallback,
+    castProvider,
+    openWebVideoCaster,
+    pendingNativeCastStream,
+    remoteMediaClient,
+    startNativeCastForStream,
+  ]);
+
+  useEffect(() => {
+    if (!pendingNativeCastStream) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setPendingNativeCastStream(null);
+    }, 30000);
+    return () => clearTimeout(timeout);
+  }, [pendingNativeCastStream]);
+
   // Memoized play handler
   const playHandler = useCallback(
     async ({
@@ -988,7 +1234,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
           );
           return;
         }
-        handleExternalPlayer(link, contentType);
+        handleExternalPlayer(link, contentType, {
+          currentEpisodeLink: link,
+          episodeList: (episodeData || []) as EpisodeLink[],
+          seasonTitle,
+          seasonNumber: resolvedSeasonNumber,
+          seasonEpisodesLink,
+        });
         return;
       }
 
@@ -1068,9 +1320,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const handleStickyMenuExternalPlayer = useCallback(() => {
     setStickyMenu({active: false});
     if (stickyMenu.link && stickyMenu.type) {
-      handleExternalPlayer(stickyMenu.link, stickyMenu.type);
+      handleExternalPlayer(stickyMenu.link, stickyMenu.type, {
+        currentEpisodeLink: stickyMenu.link,
+        episodeList: (getPlayableList() || []) as EpisodeLink[],
+      });
     }
-  }, [stickyMenu.link, stickyMenu.type, handleExternalPlayer]);
+  }, [getPlayableList, stickyMenu.link, stickyMenu.type, handleExternalPlayer]);
 
   const getPlayableList = useCallback(() => {
     if (sortedEpisodes.length > 0) {
@@ -1552,38 +1807,52 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   // Memoized server render item
   const renderServerItem = useCallback(
-    (item: any, index: number) => (
-      <View
-        key={`server-${index}-${item.server}`}
-        className="bg-black/30 p-3 rounded-lg mb-2 flex-row justify-between items-center"
-        style={{borderColor: primary, borderWidth: 1}}>
-        <TouchableOpacity
-          className="flex-1"
-          onPress={() => openExternalPlayer(item.link)}>
-          <Text className="text-white text-lg capitalize font-bold">
-            {item.server || t('Server {{number}}', {number: index + 1})}
-          </Text>
-          <Text className="text-white text-xs opacity-80">
-            {item.type
-              ? t('Format: {{format}}', {format: item.type.toUpperCase()})
-              : ''}
-          </Text>
-        </TouchableOpacity>
-        <View className="flex-row items-center gap-2">
+    (item: any, index: number) => {
+      const castColor =
+        castProvider === 'native' && castState === CastState.CONNECTED
+          ? '#4ade80'
+          : primary;
+
+      return (
+        <View
+          key={`server-${index}-${item.server}`}
+          className="bg-black/30 p-3 rounded-lg mb-2 flex-row justify-between items-center"
+          style={{borderColor: primary, borderWidth: 1}}>
           <TouchableOpacity
-            className="bg-black/30 px-2 py-2 rounded-md"
+            className="flex-1"
             onPress={() => openExternalPlayer(item.link)}>
-            <MaterialCommunityIcons name="vlc" size={22} color={primary} />
+            <Text className="text-white text-lg capitalize font-bold">
+              {item.server || t('Server {{number}}', {number: index + 1})}
+            </Text>
+            <Text className="text-white text-xs opacity-80">
+              {item.type
+                ? t('Format: {{format}}', {format: item.type.toUpperCase()})
+                : ''}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            className="bg-black/30 px-2 py-2 rounded-md"
-            onPress={() => openWebVideoCaster(item)}>
-            <MaterialCommunityIcons name="cast" size={22} color={primary} />
-          </TouchableOpacity>
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              className="bg-black/30 px-2 py-2 rounded-md"
+              onPress={() => openExternalPlayer(item.link)}>
+              <MaterialCommunityIcons name="vlc" size={22} color={primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-black/30 px-2 py-2 rounded-md"
+              onPress={() => openCastForStream(item)}>
+              <MaterialCommunityIcons name="cast" size={22} color={castColor} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    ),
-    [openExternalPlayer, openWebVideoCaster, primary, t],
+      );
+    },
+    [
+      castProvider,
+      castState,
+      openCastForStream,
+      openExternalPlayer,
+      primary,
+      t,
+    ],
   );
 
   // Show loading skeleton while episodes are loading
@@ -1673,6 +1942,18 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   return (
     <View>
+      {castProvider === 'native' && (
+        <CastButton
+          style={{
+            width: 1,
+            height: 1,
+            opacity: 0,
+            position: 'absolute',
+            top: -100,
+            left: -100,
+          }}
+        />
+      )}
       {/* Season Selector */}
       {LinkList.length > 1 ? (
         <Dropdown

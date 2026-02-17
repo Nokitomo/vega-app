@@ -7,6 +7,7 @@ import {
   View,
   Platform,
   TouchableNativeFeedback,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -18,7 +19,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../App';
-import {cacheStorage, settingsStorage} from '../../lib/storage';
+import {
+  cacheStorage,
+  mainStorage,
+  settingsStorage,
+  watchHistoryStorage,
+} from '../../lib/storage';
 import VideoPlayer from '../../vendor/media-console';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -32,9 +38,13 @@ import {
   SelectedTrackType,
 } from 'react-native-video';
 import useContentStore from '../../lib/zustand/contentStore';
-// import {CastButton, useRemoteMediaClient} from 'react-native-google-cast';
+import GoogleCast, {
+  CastButton,
+  CastState,
+  useCastState,
+  useRemoteMediaClient,
+} from 'react-native-google-cast';
 import {SafeAreaView} from 'react-native-safe-area-context';
-// import GoogleCast from 'react-native-google-cast';
 import * as DocumentPicker from 'expo-document-picker';
 import useThemeStore from '../../lib/zustand/themeStore';
 import {FlashList} from '@shopify/flash-list';
@@ -52,6 +62,10 @@ import {useTranslation} from 'react-i18next';
 import {extensionManager} from '../../lib/services/ExtensionManager';
 import {providerManager} from '../../lib/services/ProviderManager';
 import {openInWebVideoCaster} from '../../lib/cast/webVideoCaster';
+import {
+  prepareNativeCastQueue,
+  resolveCastSubtitleUri,
+} from '../../lib/cast/nativeCast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -441,8 +455,20 @@ const Player = ({route}: Props): React.JSX.Element => {
       type: SelectedVideoTrackType.AUTO,
     });
 
-  // Remote media client for casting
-  // const remoteMediaClient = Platform.isTV ? null : useRemoteMediaClient();
+  const remoteMediaClient = useRemoteMediaClient();
+  const castState = useCastState();
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+    settingsStorage.getCastProvider(),
+  );
+  const [pendingNativeCast, setPendingNativeCast] = useState(false);
+  const [isStartingNativeCast, setIsStartingNativeCast] = useState(false);
+  const lastCastProgressWriteRef = useRef(0);
+  const currentCastEpisodeRef = useRef<{
+    link?: string;
+    title?: string;
+    episodeNumber?: number;
+    seasonNumber?: number;
+  }>({});
 
   // Memoized format quality function
   const formatQuality = useCallback(
@@ -893,6 +919,39 @@ const Player = ({route}: Props): React.JSX.Element => {
       .filter(track => !!track.uri && /^https?:\/\//i.test(track.uri));
   }, [mergedTextTracks, selectedStream?.subtitles, selectedTextTrackIndex]);
 
+  const askWvcFallback = useCallback((): Promise<boolean> => {
+    return new Promise(resolve => {
+      let isResolved = false;
+      const safeResolve = (value: boolean) => {
+        if (isResolved) {
+          return;
+        }
+        isResolved = true;
+        resolve(value);
+      };
+
+      Alert.alert(
+        t('Native cast not ready'),
+        t('Native cast could not start. Open Web Video Caster instead?'),
+        [
+          {
+            text: t('Cancel'),
+            style: 'cancel',
+            onPress: () => safeResolve(false),
+          },
+          {
+            text: t('Open Web Video Caster'),
+            onPress: () => safeResolve(true),
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => safeResolve(false),
+        },
+      );
+    });
+  }, [t]);
+
   const handleWebVideoCasterCast = useCallback(async () => {
     if (!selectedStream?.link) {
       ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
@@ -952,43 +1011,326 @@ const Player = ({route}: Props): React.JSX.Element => {
     t,
   ]);
 
-  // Memoized cast effect
-  // useEffect(() => {
-  //   if (remoteMediaClient && !Platform.isTV && selectedStream?.link) {
-  //     remoteMediaClient.loadMedia({
-  //       startTime: watchedDuration,
-  //       playbackRate: playbackRate,
-  //       autoplay: true,
-  //       mediaInfo: {
-  //         contentUrl: selectedStream.link,
-  //         contentType: 'video/x-matroska',
-  //         metadata: {
-  //           title: route.params?.primaryTitle,
-  //           subtitle: route.params?.secondaryTitle,
-  //           type: 'movie',
-  //           images: [
-  //             {
-  //               url: route.params?.poster?.poster || '',
-  //             },
-  //           ],
-  //         },
-  //       },
-  //     });
-  //     playerRef?.current?.pause();
-  //     GoogleCast.showExpandedControls();
-  //   }
-  //   return () => {
-  //     if (remoteMediaClient) {
-  //       remoteMediaClient?.stop();
-  //     }
-  //   };
-  // }, [
-  //   remoteMediaClient,
-  //   selectedStream,
-  //   watchedDuration,
-  //   playbackRate,
-  //   route.params,
-  // ]);
+  const storeRemoteCastProgress = useCallback(
+    (currentTime: number, duration: number) => {
+      const episodeLink = currentCastEpisodeRef.current.link || activeEpisode?.link;
+      if (!episodeLink) {
+        return;
+      }
+      if (
+        !Number.isFinite(currentTime) ||
+        !Number.isFinite(duration) ||
+        duration <= 0
+      ) {
+        return;
+      }
+      if (Math.abs(currentTime - lastCastProgressWriteRef.current) < 2) {
+        return;
+      }
+      lastCastProgressWriteRef.current = currentTime;
+
+      updatePlaybackInfo(episodeLink, {
+        currentTime,
+        duration,
+        playbackRate,
+      });
+      cacheStorage.setString(
+        episodeLink,
+        JSON.stringify({
+          position: currentTime,
+          duration,
+        }),
+      );
+
+      const historyKey = route.params?.infoUrl || episodeLink;
+      const episodeTitle =
+        currentCastEpisodeRef.current.title ||
+        activeEpisode?.title ||
+        route.params?.secondaryTitle ||
+        '';
+      const progressData = {
+        currentTime,
+        duration,
+        percentage: (currentTime / duration) * 100,
+        infoUrl: route.params?.infoUrl || '',
+        title: route.params?.primaryTitle || '',
+        episodeTitle,
+        episodeNumber:
+          currentCastEpisodeRef.current.episodeNumber ??
+          route.params?.episodeNumber,
+        episodeLink,
+        seasonTitle: route.params?.secondaryTitle || '',
+        seasonNumber:
+          currentCastEpisodeRef.current.seasonNumber ??
+          route.params?.seasonNumber,
+        seasonEpisodesLink: route.params?.seasonEpisodesLink || '',
+        updatedAt: Date.now(),
+      };
+      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      mainStorage.setString(historyProgressKey, JSON.stringify(progressData));
+      watchHistoryStorage.addProgressKey(historyProgressKey);
+      if (episodeTitle) {
+        const episodeKey = `watch_history_progress_${historyKey}_${episodeTitle.replace(
+          /\s+/g,
+          '_',
+        )}`;
+        mainStorage.setString(episodeKey, JSON.stringify(progressData));
+        watchHistoryStorage.addProgressKey(episodeKey);
+      }
+      watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
+    },
+    [
+      activeEpisode?.link,
+      activeEpisode?.title,
+      playbackRate,
+      route.params?.episodeNumber,
+      route.params?.infoUrl,
+      route.params?.primaryTitle,
+      route.params?.seasonEpisodesLink,
+      route.params?.seasonNumber,
+      route.params?.secondaryTitle,
+      updatePlaybackInfo,
+    ],
+  );
+
+  const startNativeCast = useCallback(async () => {
+    if (!remoteMediaClient || !selectedStream?.link || isStartingNativeCast) {
+      return false;
+    }
+
+    setIsStartingNativeCast(true);
+    try {
+      const selectedSubtitleUri = resolveCastSubtitleUri(getCastSubtitleTracks(), 0);
+      const startTime = Math.max(
+        0,
+        videoPositionRef.current?.position || watchedDuration || 0,
+      );
+
+      const {request, itemCount} = await prepareNativeCastQueue({
+        currentEpisodeLink: activeEpisode?.link || selectedStream.link,
+        episodeList: route.params?.episodeList || [],
+        selectedStream,
+        providerValue: route.params?.providerValue || providerValue,
+        contentType: route.params?.type || 'series',
+        context: {
+          primaryTitle: route.params?.primaryTitle || '',
+          secondaryTitle: route.params?.secondaryTitle || '',
+          posterUrl:
+            route.params?.poster?.poster || route.params?.poster?.background || '',
+          infoUrl: route.params?.infoUrl || '',
+          seasonNumber: route.params?.seasonNumber,
+          playbackRate,
+          startTime,
+          preferredSubtitleUri: selectedSubtitleUri,
+        },
+      });
+
+      await remoteMediaClient.loadMedia(request);
+      playerRef?.current?.pause();
+      setPendingNativeCast(false);
+      currentCastEpisodeRef.current = {
+        link: activeEpisode?.link,
+        title: activeEpisode?.title,
+        episodeNumber: activeEpisode?.episodeNumber,
+        seasonNumber: activeEpisode?.seasonNumber ?? route.params?.seasonNumber,
+      };
+      ToastAndroid.show(
+        t('Native cast started with {{count}} episodes', {count: itemCount}),
+        ToastAndroid.SHORT,
+      );
+
+      try {
+        await GoogleCast.showExpandedControls();
+      } catch (error) {
+        console.warn('Failed to open cast expanded controls:', error);
+      }
+      return true;
+    } catch (error) {
+      console.error('Native cast start failed:', error);
+      ToastAndroid.show(t('Failed to start native cast'), ToastAndroid.SHORT);
+      return false;
+    } finally {
+      setIsStartingNativeCast(false);
+    }
+  }, [
+    activeEpisode?.episodeNumber,
+    activeEpisode?.link,
+    activeEpisode?.seasonNumber,
+    activeEpisode?.title,
+    getCastSubtitleTracks,
+    isStartingNativeCast,
+    playbackRate,
+    providerValue,
+    remoteMediaClient,
+    route.params?.episodeList,
+    route.params?.infoUrl,
+    route.params?.poster?.background,
+    route.params?.poster?.poster,
+    route.params?.primaryTitle,
+    route.params?.providerValue,
+    route.params?.seasonNumber,
+    route.params?.secondaryTitle,
+    route.params?.type,
+    selectedStream,
+    t,
+    videoPositionRef,
+    watchedDuration,
+  ]);
+
+  const handleNativeCast = useCallback(async () => {
+    if (!selectedStream?.link) {
+      ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
+      return;
+    }
+
+    if (remoteMediaClient) {
+      const started = await startNativeCast();
+      if (!started) {
+        const fallback = await askWvcFallback();
+        if (fallback) {
+          await handleWebVideoCasterCast();
+        }
+      }
+      return;
+    }
+
+    setPendingNativeCast(true);
+    try {
+      const shown = await GoogleCast.showCastDialog();
+      if (!shown) {
+        setPendingNativeCast(false);
+        const fallback = await askWvcFallback();
+        if (fallback) {
+          await handleWebVideoCasterCast();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to show cast dialog:', error);
+      setPendingNativeCast(false);
+      const fallback = await askWvcFallback();
+      if (fallback) {
+        await handleWebVideoCasterCast();
+      }
+    }
+  }, [
+    askWvcFallback,
+    handleWebVideoCasterCast,
+    remoteMediaClient,
+    selectedStream?.link,
+    startNativeCast,
+    t,
+  ]);
+
+  const handleCastPress = useCallback(async () => {
+    if (castProvider === 'wvc') {
+      await handleWebVideoCasterCast();
+      return;
+    }
+    await handleNativeCast();
+  }, [castProvider, handleNativeCast, handleWebVideoCasterCast]);
+
+  useEffect(() => {
+    if (!pendingNativeCast || !remoteMediaClient || castProvider !== 'native') {
+      return;
+    }
+    startNativeCast().then(async started => {
+      if (!started) {
+        const fallback = await askWvcFallback();
+        if (fallback) {
+          await handleWebVideoCasterCast();
+        }
+      }
+    });
+  }, [
+    askWvcFallback,
+    castProvider,
+    handleWebVideoCasterCast,
+    pendingNativeCast,
+    remoteMediaClient,
+    startNativeCast,
+  ]);
+
+  useEffect(() => {
+    if (!pendingNativeCast) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setPendingNativeCast(false);
+    }, 30000);
+    return () => clearTimeout(timeout);
+  }, [pendingNativeCast]);
+
+  useEffect(() => {
+    if (!remoteMediaClient) {
+      return;
+    }
+
+    const statusSubscription = remoteMediaClient.onMediaStatusUpdated(status => {
+      const customData = (status?.mediaInfo?.customData || {}) as {
+        episodeLink?: string;
+        episodeTitle?: string;
+        episodeNumber?: number;
+        seasonNumber?: number;
+      };
+      const castEpisodeLink =
+        typeof customData.episodeLink === 'string'
+          ? customData.episodeLink
+          : undefined;
+      if (castEpisodeLink) {
+        currentCastEpisodeRef.current = {
+          link: castEpisodeLink,
+          title:
+            typeof customData.episodeTitle === 'string'
+              ? customData.episodeTitle
+              : activeEpisode?.title,
+          episodeNumber:
+            typeof customData.episodeNumber === 'number'
+              ? customData.episodeNumber
+              : activeEpisode?.episodeNumber,
+          seasonNumber:
+            typeof customData.seasonNumber === 'number'
+              ? customData.seasonNumber
+              : route.params?.seasonNumber,
+        };
+
+        if (castEpisodeLink !== activeEpisode?.link) {
+          const matchingEpisode = route.params?.episodeList?.find(
+            item => item?.link === castEpisodeLink,
+          );
+          if (matchingEpisode) {
+            setActiveEpisode(matchingEpisode);
+          }
+        }
+      }
+    });
+
+    const progressSubscription = remoteMediaClient.onMediaProgressUpdated(
+      (progress, duration) => {
+        storeRemoteCastProgress(progress, duration);
+      },
+      2,
+    );
+
+    return () => {
+      statusSubscription.remove();
+      progressSubscription.remove();
+    };
+  }, [
+    activeEpisode?.episodeNumber,
+    activeEpisode?.link,
+    activeEpisode?.title,
+    remoteMediaClient,
+    route.params?.episodeList,
+    route.params?.seasonNumber,
+    storeRemoteCastProgress,
+  ]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setCastProvider(settingsStorage.getCastProvider());
+      return () => {};
+    }, []),
+  );
 
   // Exit fullscreen on back
   useFocusEffect(
@@ -1482,6 +1824,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     currentPosition >=
       Math.max(0, skipIntroInterval.startTime - SKIP_INTRO_LEAD_SECONDS) &&
     currentPosition < skipIntroInterval.endTime;
+  const castIconColor =
+    castProvider === 'native' && castState === CastState.CONNECTED
+      ? primary
+      : 'hsl(0, 0%, 70%)';
 
   // Show loading state
   if (isPreparingPlayer) {
@@ -1540,6 +1886,18 @@ const Player = ({route}: Props): React.JSX.Element => {
       }}
       className="bg-black flex-1 relative">
       <StatusBar translucent={true} hidden={true} />
+      {!Platform.isTV && castProvider === 'native' && (
+        <CastButton
+          style={{
+            width: 1,
+            height: 1,
+            opacity: 0,
+            position: 'absolute',
+            top: -100,
+            left: -100,
+          }}
+        />
+      )}
 
       {/* Video Player */}
       <VideoPlayer key={videoReloadNonce} {...videoPlayerProps} />
@@ -1577,19 +1935,14 @@ const Player = ({route}: Props): React.JSX.Element => {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={handleWebVideoCasterCast}
+            onPress={handleCastPress}
             className="opacity-70 p-2 rounded-full">
             <MaterialIcons
               name={'cast'}
-              color={'hsl(0, 0%, 70%)'}
+              color={castIconColor}
               size={24}
             />
           </TouchableOpacity>
-          {/* {!isPlayerLocked && (
-            <CastButton
-              style={{width: 40, height: 40, opacity: 0.5, tintColor: 'white'}}
-            />
-          )} */}
         </Animated.View>
       )}
 

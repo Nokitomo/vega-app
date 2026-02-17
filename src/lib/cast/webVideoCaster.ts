@@ -90,14 +90,23 @@ const buildIosCallbackUrl = ({
 
 const openAndroidStore = async (): Promise<boolean> => {
   try {
-    await Linking.openURL(WVC_ANDROID_MARKET_URL);
+    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+      data: WVC_ANDROID_MARKET_URL,
+    });
     return true;
   } catch (_error) {
     try {
-      await Linking.openURL(WVC_ANDROID_PLAY_STORE_URL);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: WVC_ANDROID_PLAY_STORE_URL,
+      });
       return true;
     } catch (_fallbackError) {
-      return false;
+      try {
+        await Linking.openURL(WVC_ANDROID_PLAY_STORE_URL);
+        return true;
+      } catch (_linkingError) {
+        return false;
+      }
     }
   }
 };

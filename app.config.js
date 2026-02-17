@@ -2,6 +2,9 @@ const fs = require('fs');
 
 const hasAndroidGoogleServices = fs.existsSync('./google-services.json');
 const hasIosGooglePlist = fs.existsSync('./GoogleService-Info.plist');
+const castReceiverAppId =
+  process.env.EXPO_PUBLIC_CAST_RECEIVER_APP_ID || 'CC1AD845';
+const castReceiverWebUrl = process.env.EXPO_PUBLIC_CAST_RECEIVER_WEB_URL || '';
 
 module.exports = () => {
   const plugins = [
@@ -145,6 +148,8 @@ module.exports = () => {
       platforms: ['ios', 'android'],
       extra: {
         hasFirebase: hasAndroidGoogleServices || hasIosGooglePlist,
+        castReceiverAppId,
+        castReceiverWebUrl,
       },
     },
   };

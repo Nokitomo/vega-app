@@ -96,6 +96,13 @@ const Preferences = () => {
   const [OpenExternalPlayer, setOpenExternalPlayer] = useState(
     settingsStorage.getBool('useExternalPlayer', false),
   );
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+    settingsStorage.getCastProvider(),
+  );
+  const castProviderOptions = [
+    {label: t('Native Cast (Recommended)'), value: 'native'},
+    {label: t('Web Video Caster'), value: 'wvc'},
+  ];
 
   const [hapticFeedback, setHapticFeedback] = useState(
     settingsStorage.isHapticFeedbackEnabled(),
@@ -396,6 +403,51 @@ const Preferences = () => {
         <View className="mb-6">
           <Text className="text-gray-400 text-sm mb-3">{t('Player')}</Text>
           <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
+            {/* Cast Provider */}
+            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+              <Text className="text-white text-base">{t('Cast Provider')}</Text>
+              <View className="w-44">
+                <Dropdown
+                  selectedTextStyle={{
+                    color: 'white',
+                    fontSize: 14,
+                    fontWeight: '500',
+                    textAlign: 'right',
+                  }}
+                  containerStyle={{
+                    backgroundColor: '#262626',
+                    borderRadius: 8,
+                    borderWidth: 0,
+                    marginTop: 4,
+                  }}
+                  itemTextStyle={{color: 'white'}}
+                  activeColor="#3A3A3A"
+                  itemContainerStyle={{
+                    backgroundColor: '#262626',
+                    borderWidth: 0,
+                  }}
+                  style={{
+                    backgroundColor: '#262626',
+                    borderWidth: 0,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                  }}
+                  iconStyle={{tintColor: 'white'}}
+                  placeholderStyle={{color: 'white'}}
+                  labelField="label"
+                  valueField="value"
+                  data={castProviderOptions}
+                  value={castProvider}
+                  onChange={item => {
+                    const nextProvider = item.value as 'native' | 'wvc';
+                    setCastProvider(nextProvider);
+                    settingsStorage.setCastProvider(nextProvider);
+                  }}
+                />
+              </View>
+            </View>
+
             {/* External Player */}
             <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
               <Text className="text-white text-base flex-1">

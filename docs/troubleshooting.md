@@ -61,6 +61,34 @@ Sintomo: build iOS in GitHub Actions fallisce con "Could not get GOOGLE_APP_ID i
 Se Expo segnala che Expo Go non e installato in offline mode:
 - Usa un dev client (`expo run:android`); Expo Go non e supportato per funzionalita native.
 
+## Cast nativo: nessun device / dialog non si apre
+Sintomi tipici:
+- il pulsante cast non mostra device
+- il cast dialog non si apre
+
+Verifiche:
+1) Assicurati che telefono e Chromecast/TV siano sulla stessa rete LAN.
+2) Verifica Google Play Services aggiornato sul device Android.
+3) Controlla metadata cast in `android/app/src/main/AndroidManifest.xml`.
+4) Ricostruisci il dev client dopo modifiche native:
+```
+npx expo run:android --device "Medium_phone_API_35"
+```
+5) Se usi receiver custom, verifica App ID:
+- variabile `VEGA_CAST_RECEIVER_APP_ID` valorizzata
+- receiver registrato in Google Cast Developer Console
+- URL receiver HTTPS raggiungibile.
+
+## Cast nativo: stream non parte con alcuni provider
+Possibili cause:
+- stream richiede header HTTP (Referer/Cookie/Auth) non passati correttamente
+- URL stream scaduto/tokenizzato
+
+Verifiche:
+1) Controlla che il receiver custom applichi `customData.headers` in `manifestRequestHandler/segmentRequestHandler`.
+2) Avvia cast subito dopo fetch stream (evita URL scaduti).
+3) Prova fallback WVC per confermare che il problema e specifico del receiver nativo.
+
 ## Stringhe non tradotte / chiavi visibili
 Sintomo: testi in inglese o chiavi raw (es. `Some Key`).
 - Verifica che la chiave esista in `src/i18n/en.json` e `src/i18n/it.json`.

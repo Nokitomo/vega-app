@@ -8,6 +8,7 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.reactnative.googlecast.api.RNGCCastContext
 
 import expo.modules.ReactActivityDelegateWrapper
 
@@ -21,6 +22,7 @@ class MainActivity : ReactActivity() {
     RNBootSplash.init(this, R.style.BootTheme)
     // @generated end bootsplash-init
     super.onCreate(null)
+    RNGCCastContext.getSharedInstance(this)
   }
 
   /**

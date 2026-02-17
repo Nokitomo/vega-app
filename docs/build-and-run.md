@@ -23,6 +23,11 @@ npx expo run:android --device "Medium_phone_API_35"
 Nota: non usare l'emulatore Pixel_6_Pro_API_35.
 Nota: il wrapper Gradle usa 8.14.3; se vedi errori di versione minima, verifica `android/gradle/wrapper/gradle-wrapper.properties`.
 Nota: la New Architecture e' disattivata.
+Nota (cast nativo custom receiver): puoi impostare l'App ID con variabile ambiente prima della build:
+```powershell
+$env:VEGA_CAST_RECEIVER_APP_ID="ABCD1234"
+npx expo run:android --device "Medium_phone_API_35"
+```
 
 ## Prebuild (rigenera android/ios)
 Attenzione: non eseguire `npx expo prebuild` per Android (sovrascrive customizzazioni in `android/`).
