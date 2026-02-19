@@ -9,7 +9,6 @@ import {
   TouchableNativeFeedback,
   Alert,
 } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -73,6 +72,7 @@ import {
   prepareVegaCastLaunchData,
   VegaCastTracking,
 } from '../../lib/cast/vegaCast';
+import {setClipboardString} from '../../lib/utils/clipboard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -1086,7 +1086,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           {
             text: launchMode === 'pairing' ? t('Copy Code') : t('Copy Link'),
             onPress: () => {
-              Clipboard.setString(
+              setClipboardString(
                 launchMode === 'pairing' ? sessionCode : receiverUrl,
               );
               ToastAndroid.show(

@@ -12,7 +12,6 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -60,6 +59,7 @@ import {
   prepareVegaCastLaunchData,
   VegaCastTracking,
 } from '../lib/cast/vegaCast';
+import {setClipboardString} from '../lib/utils/clipboard';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -1065,7 +1065,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
             {
               text: launchMode === 'pairing' ? t('Copy Code') : t('Copy Link'),
               onPress: () => {
-                Clipboard.setString(
+                setClipboardString(
                   launchMode === 'pairing' ? sessionCode : receiverUrl,
                 );
                 ToastAndroid.show(
