@@ -1329,7 +1329,38 @@ const SeasonList: React.FC<SeasonListProps> = ({
       }
       lastVegaProgressWriteRef.current = currentTime;
 
-      updatePlaybackInfo(episodeLink, {
+      const historyKey = routeParams.link || episodeLink;
+      const episodeTitle = String(progress.episodeTitle || '');
+      const episodeNumber =
+        typeof progress.episodeNumber === 'number'
+          ? progress.episodeNumber
+          : undefined;
+      const seasonNumber =
+        typeof progress.seasonNumber === 'number'
+          ? progress.seasonNumber
+          : activeSeasonNumber;
+
+      const hasHistoryEntry = watchHistoryStorage
+        .getWatchHistory()
+        .some(item => item.link === historyKey);
+      if (!hasHistoryEntry) {
+        addItem({
+          id: historyKey,
+          link: historyKey,
+          title: metaTitle || '',
+          poster: poster?.poster || poster?.background,
+          provider: providerValue,
+          lastPlayed: Date.now(),
+          currentTime,
+          duration,
+          playbackRate: 1,
+          episodeTitle,
+          episodeNumber,
+          seasonNumber,
+        });
+      }
+
+      updatePlaybackInfo(historyKey, {
         currentTime,
         duration,
         playbackRate: 1,
@@ -1342,8 +1373,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }),
       );
 
-      const historyKey = routeParams.link || episodeLink;
-      const episodeTitle = String(progress.episodeTitle || '');
       const progressData = {
         currentTime,
         duration,
@@ -1351,16 +1380,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
         infoUrl: routeParams.link || '',
         title: metaTitle || '',
         episodeTitle,
-        episodeNumber:
-          typeof progress.episodeNumber === 'number'
-            ? progress.episodeNumber
-            : undefined,
+        episodeNumber,
         episodeLink,
         seasonTitle: activeSeason?.title || '',
-        seasonNumber:
-          typeof progress.seasonNumber === 'number'
-            ? progress.seasonNumber
-            : activeSeasonNumber,
+        seasonNumber,
         seasonEpisodesLink: activeSeason?.episodesLink || '',
         updatedAt: Date.now(),
       };
@@ -1378,10 +1401,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
       watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
     },
     [
+      addItem,
       activeSeason?.episodesLink,
       activeSeason?.title,
       activeSeasonNumber,
       metaTitle,
+      poster?.background,
+      poster?.poster,
+      providerValue,
       routeParams.link,
       updatePlaybackInfo,
     ],

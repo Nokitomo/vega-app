@@ -1165,7 +1165,40 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
       lastCastProgressWriteRef.current = currentTime;
 
-      updatePlaybackInfo(episodeLink, {
+      const historyKey = route.params?.infoUrl || episodeLink;
+      const episodeTitle =
+        currentCastEpisodeRef.current.title ||
+        activeEpisode?.title ||
+        route.params?.secondaryTitle ||
+        '';
+      const episodeNumber =
+        currentCastEpisodeRef.current.episodeNumber ??
+        route.params?.episodeNumber;
+      const seasonNumber =
+        currentCastEpisodeRef.current.seasonNumber ??
+        route.params?.seasonNumber;
+
+      const hasHistoryEntry = watchHistoryStorage
+        .getWatchHistory()
+        .some(item => item.link === historyKey);
+      if (!hasHistoryEntry) {
+        addItem({
+          id: historyKey,
+          link: historyKey,
+          title: route.params?.primaryTitle || '',
+          poster: route.params?.poster?.poster || route.params?.poster?.background,
+          provider: route.params?.providerValue || providerValue,
+          lastPlayed: Date.now(),
+          currentTime,
+          duration,
+          playbackRate,
+          episodeTitle,
+          episodeNumber,
+          seasonNumber,
+        });
+      }
+
+      updatePlaybackInfo(historyKey, {
         currentTime,
         duration,
         playbackRate,
@@ -1178,12 +1211,6 @@ const Player = ({route}: Props): React.JSX.Element => {
         }),
       );
 
-      const historyKey = route.params?.infoUrl || episodeLink;
-      const episodeTitle =
-        currentCastEpisodeRef.current.title ||
-        activeEpisode?.title ||
-        route.params?.secondaryTitle ||
-        '';
       const progressData = {
         currentTime,
         duration,
@@ -1191,14 +1218,10 @@ const Player = ({route}: Props): React.JSX.Element => {
         infoUrl: route.params?.infoUrl || '',
         title: route.params?.primaryTitle || '',
         episodeTitle,
-        episodeNumber:
-          currentCastEpisodeRef.current.episodeNumber ??
-          route.params?.episodeNumber,
+        episodeNumber,
         episodeLink,
         seasonTitle: route.params?.secondaryTitle || '',
-        seasonNumber:
-          currentCastEpisodeRef.current.seasonNumber ??
-          route.params?.seasonNumber,
+        seasonNumber,
         seasonEpisodesLink: route.params?.seasonEpisodesLink || '',
         updatedAt: Date.now(),
       };
@@ -1216,11 +1239,15 @@ const Player = ({route}: Props): React.JSX.Element => {
       watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
     },
     [
+      addItem,
       activeEpisode?.link,
       activeEpisode?.title,
       playbackRate,
+      providerValue,
       route.params?.episodeNumber,
       route.params?.infoUrl,
+      route.params?.poster?.background,
+      route.params?.poster?.poster,
       route.params?.primaryTitle,
       route.params?.seasonEpisodesLink,
       route.params?.seasonNumber,
