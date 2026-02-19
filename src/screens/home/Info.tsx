@@ -947,6 +947,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         <SeasonList
                           refreshing={false}
                           providerValue={providerValue}
+                          aniSkipMalId={
+                            Number.isFinite(Number(info?.extra?.ids?.malId)) &&
+                            Number(info?.extra?.ids?.malId) > 0
+                              ? Number(info?.extra?.ids?.malId)
+                              : undefined
+                          }
                           LinkList={filteredLinkList}
                           poster={{
                             logo: meta?.logo,

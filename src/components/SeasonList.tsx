@@ -71,6 +71,7 @@ interface SeasonListProps {
   type: string;
   metaTitle: string;
   providerValue: string;
+  aniSkipMalId?: number;
   refreshing?: boolean;
   routeParams: Readonly<{
     link: string;
@@ -278,6 +279,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   type,
   metaTitle,
   providerValue,
+  aniSkipMalId,
   refreshing: _refreshing,
   routeParams,
 }) => {
@@ -1027,6 +1029,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
               externalPlayerContext?.seasonNumber ?? activeSeasonNumber,
             infoUrl: routeParams.link,
             posterUrl: poster?.poster || poster?.background || '',
+            ...(typeof aniSkipMalId === 'number' && aniSkipMalId > 0
+              ? {aniSkipMalId}
+              : {}),
           },
         });
         if (launchMode === 'pairing' && tracking) {
@@ -1102,6 +1107,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [
       activeSeason?.title,
       activeSeasonNumber,
+      aniSkipMalId,
       externalPlayerContext?.currentEpisodeLink,
       externalPlayerContext?.episodeList,
       externalPlayerContext?.seasonNumber,
