@@ -859,13 +859,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
       const providerFromSettings = settingsStorage.getCastProvider();
       setCastProvider(providerFromSettings);
       if (providerFromSettings === 'vega') {
-        const persistedTracking = getActiveVegaCastTracking();
+        const persistedTracking = getActiveVegaCastTracking(
+          String(routeParams.link || '').trim(),
+        );
         if (persistedTracking) {
           setVegaTracking(persistedTracking);
         }
       }
       return () => {};
-    }, []),
+    }, [routeParams.link]),
   );
 
   // Memoized external player handler
@@ -1048,7 +1050,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           lastVegaProgressUpdatedRef.current = 0;
           lastVegaProgressWriteRef.current = 0;
           setVegaTracking(tracking);
-          saveActiveVegaCastTracking(tracking);
+          saveActiveVegaCastTracking(tracking, routeParams.link);
         } else {
           setVegaTracking(null);
           clearActiveVegaCastTracking();
@@ -1421,7 +1423,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
       return;
     }
 
-    const resolvedTracking = vegaTracking || getActiveVegaCastTracking();
+    const expectedInfoUrl = String(routeParams.link || '').trim();
+    const resolvedTracking =
+      vegaTracking || getActiveVegaCastTracking(expectedInfoUrl);
     if (!vegaTracking && resolvedTracking) {
       setVegaTracking(resolvedTracking);
     }
@@ -1440,6 +1444,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
       try {
         const progress = await fetchVegaCastProgress(resolvedTracking);
         if (cancelled || !progress) {
+          return;
+        }
+        const progressInfoUrl = String(progress.infoUrl || '').trim();
+        if (expectedInfoUrl && progressInfoUrl && progressInfoUrl !== expectedInfoUrl) {
           return;
         }
 
@@ -1473,6 +1481,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   }, [
     castProvider,
     refreshProgressData,
+    routeParams.link,
     storeVegaProgress,
     vegaTracking,
   ]);

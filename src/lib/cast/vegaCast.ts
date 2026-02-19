@@ -320,7 +320,10 @@ export const fetchVegaCastProgress = async (
   return payload.progress as VegaCastProgressSnapshot;
 };
 
-export const saveActiveVegaCastTracking = (tracking: VegaCastTracking): void => {
+export const saveActiveVegaCastTracking = (
+  tracking: VegaCastTracking,
+  infoUrl?: string,
+): void => {
   if (!isValidTracking(tracking)) {
     return;
   }
@@ -328,12 +331,15 @@ export const saveActiveVegaCastTracking = (tracking: VegaCastTracking): void => 
     VEGA_CAST_TRACKING_STORAGE_KEY,
     JSON.stringify({
       ...tracking,
+      infoUrl: typeof infoUrl === 'string' ? infoUrl : '',
       updatedAt: Date.now(),
     }),
   );
 };
 
-export const getActiveVegaCastTracking = (): VegaCastTracking | null => {
+export const getActiveVegaCastTracking = (
+  expectedInfoUrl?: string,
+): VegaCastTracking | null => {
   const raw = mainStorage.getString(VEGA_CAST_TRACKING_STORAGE_KEY);
   if (!raw) {
     return null;
@@ -353,6 +359,14 @@ export const getActiveVegaCastTracking = (): VegaCastTracking | null => {
     ) {
       mainStorage.delete(VEGA_CAST_TRACKING_STORAGE_KEY);
       return null;
+    }
+
+    const normalizedExpected = String(expectedInfoUrl || '').trim();
+    if (normalizedExpected) {
+      const normalizedStored = String(parsed.infoUrl || '').trim();
+      if (!normalizedStored || normalizedStored !== normalizedExpected) {
+        return null;
+      }
     }
 
     return {

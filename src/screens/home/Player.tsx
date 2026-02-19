@@ -1062,7 +1062,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         lastVegaProgressSyncRef.current = 0;
         lastCastProgressWriteRef.current = 0;
         setVegaTracking(tracking);
-        saveActiveVegaCastTracking(tracking);
+        saveActiveVegaCastTracking(tracking, route.params?.infoUrl || '');
       } else {
         setVegaTracking(null);
         clearActiveVegaCastTracking();
@@ -1499,7 +1499,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       return;
     }
 
-    const resolvedTracking = vegaTracking || getActiveVegaCastTracking();
+    const expectedInfoUrl = String(route.params?.infoUrl || '').trim();
+    const resolvedTracking =
+      vegaTracking || getActiveVegaCastTracking(expectedInfoUrl);
     if (!vegaTracking && resolvedTracking) {
       setVegaTracking(resolvedTracking);
     }
@@ -1518,6 +1520,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       try {
         const progress = await fetchVegaCastProgress(resolvedTracking);
         if (cancelled || !progress) {
+          return;
+        }
+        const progressInfoUrl = String(progress.infoUrl || '').trim();
+        if (expectedInfoUrl && progressInfoUrl && progressInfoUrl !== expectedInfoUrl) {
           return;
         }
 
@@ -1593,6 +1599,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     activeEpisode?.title,
     castProvider,
     route.params?.episodeList,
+    route.params?.infoUrl,
     route.params?.seasonNumber,
     storeRemoteCastProgress,
     vegaTracking,
@@ -1603,13 +1610,15 @@ const Player = ({route}: Props): React.JSX.Element => {
       const providerFromSettings = settingsStorage.getCastProvider();
       setCastProvider(providerFromSettings);
       if (providerFromSettings === 'vega') {
-        const persistedTracking = getActiveVegaCastTracking();
+        const persistedTracking = getActiveVegaCastTracking(
+          String(route.params?.infoUrl || '').trim(),
+        );
         if (persistedTracking) {
           setVegaTracking(persistedTracking);
         }
       }
       return () => {};
-    }, []),
+    }, [route.params?.infoUrl]),
   );
 
   // Exit fullscreen on back
