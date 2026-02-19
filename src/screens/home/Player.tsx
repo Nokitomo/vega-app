@@ -67,9 +67,12 @@ import {
   resolveCastSubtitleUri,
 } from '../../lib/cast/nativeCast';
 import {
+  clearActiveVegaCastTracking,
   fetchVegaCastProgress,
+  getActiveVegaCastTracking,
   openVegaCastReceiverUrl,
   prepareVegaCastLaunchData,
+  saveActiveVegaCastTracking,
   VegaCastTracking,
 } from '../../lib/cast/vegaCast';
 import {setClipboardString} from '../../lib/utils/clipboard';
@@ -1059,8 +1062,10 @@ const Player = ({route}: Props): React.JSX.Element => {
         lastVegaProgressSyncRef.current = 0;
         lastCastProgressWriteRef.current = 0;
         setVegaTracking(tracking);
+        saveActiveVegaCastTracking(tracking);
       } else {
         setVegaTracking(null);
+        clearActiveVegaCastTracking();
       }
       const expiryMinutes =
         typeof expiresAt === 'number'
@@ -1463,10 +1468,20 @@ const Player = ({route}: Props): React.JSX.Element => {
   useEffect(() => {
     if (castProvider !== 'vega') {
       setVegaTracking(null);
+      clearActiveVegaCastTracking();
       return;
     }
 
-    if (!vegaTracking?.apiBaseUrl || !vegaTracking?.sessionId || !vegaTracking?.progressToken) {
+    const resolvedTracking = vegaTracking || getActiveVegaCastTracking();
+    if (!vegaTracking && resolvedTracking) {
+      setVegaTracking(resolvedTracking);
+    }
+
+    if (
+      !resolvedTracking?.apiBaseUrl ||
+      !resolvedTracking?.sessionId ||
+      !resolvedTracking?.progressToken
+    ) {
       return;
     }
 
@@ -1474,7 +1489,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     const syncProgress = async () => {
       try {
-        const progress = await fetchVegaCastProgress(vegaTracking);
+        const progress = await fetchVegaCastProgress(resolvedTracking);
         if (cancelled || !progress) {
           return;
         }
@@ -1558,7 +1573,14 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   useFocusEffect(
     useCallback(() => {
-      setCastProvider(settingsStorage.getCastProvider());
+      const providerFromSettings = settingsStorage.getCastProvider();
+      setCastProvider(providerFromSettings);
+      if (providerFromSettings === 'vega') {
+        const persistedTracking = getActiveVegaCastTracking();
+        if (persistedTracking) {
+          setVegaTracking(persistedTracking);
+        }
+      }
       return () => {};
     }, []),
   );

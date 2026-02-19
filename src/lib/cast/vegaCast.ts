@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import {Buffer} from 'buffer';
 import {Linking} from 'react-native';
+import {mainStorage} from '../storage';
 import {
   PrepareVegaCastSessionInput,
   VegaCastSessionPayload,
@@ -15,6 +16,8 @@ const VEGA_CAST_PAIR_API_QUERY_KEY = 'vegaApi';
 const VEGA_CAST_MAX_URL_LENGTH = 7500;
 const VEGA_CAST_PAIR_TTL_SECONDS = 600;
 const VEGA_CAST_PAIR_REQUEST_TIMEOUT_MS = 12000;
+const VEGA_CAST_TRACKING_STORAGE_KEY = 'vega_cast_tracking_v1';
+const VEGA_CAST_TRACKING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type VegaCastLaunchMode = 'pairing' | 'inline';
 
@@ -102,6 +105,21 @@ const buildTelemetryTracking = (
   progressToken: createRandomToken(18),
   apiBaseUrl: pairApiBaseUrl,
 });
+
+const isValidTracking = (value: unknown): value is VegaCastTracking => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as VegaCastTracking;
+  return (
+    typeof candidate.sessionId === 'string' &&
+    candidate.sessionId.length > 0 &&
+    typeof candidate.progressToken === 'string' &&
+    candidate.progressToken.length > 0 &&
+    typeof candidate.apiBaseUrl === 'string' &&
+    candidate.apiBaseUrl.length > 0
+  );
+};
 
 export const buildVegaCastSessionCode = (
   session: VegaCastSessionPayload,
@@ -300,4 +318,54 @@ export const fetchVegaCastProgress = async (
   }
 
   return payload.progress as VegaCastProgressSnapshot;
+};
+
+export const saveActiveVegaCastTracking = (tracking: VegaCastTracking): void => {
+  if (!isValidTracking(tracking)) {
+    return;
+  }
+  mainStorage.setString(
+    VEGA_CAST_TRACKING_STORAGE_KEY,
+    JSON.stringify({
+      ...tracking,
+      updatedAt: Date.now(),
+    }),
+  );
+};
+
+export const getActiveVegaCastTracking = (): VegaCastTracking | null => {
+  const raw = mainStorage.getString(VEGA_CAST_TRACKING_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isValidTracking(parsed)) {
+      return null;
+    }
+
+    const updatedAt = Number(parsed.updatedAt || 0);
+    if (
+      Number.isFinite(updatedAt) &&
+      updatedAt > 0 &&
+      Date.now() - updatedAt > VEGA_CAST_TRACKING_MAX_AGE_MS
+    ) {
+      mainStorage.delete(VEGA_CAST_TRACKING_STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      sessionId: parsed.sessionId,
+      progressToken: parsed.progressToken,
+      apiBaseUrl: parsed.apiBaseUrl,
+    };
+  } catch (_error) {
+    mainStorage.delete(VEGA_CAST_TRACKING_STORAGE_KEY);
+    return null;
+  }
+};
+
+export const clearActiveVegaCastTracking = (): void => {
+  mainStorage.delete(VEGA_CAST_TRACKING_STORAGE_KEY);
 };
