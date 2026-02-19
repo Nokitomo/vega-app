@@ -8,6 +8,7 @@ import {
   Platform,
   TouchableNativeFeedback,
   Alert,
+  AppState,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -26,7 +27,11 @@ import {
   watchHistoryStorage,
 } from '../../lib/storage';
 import VideoPlayer from '../../vendor/media-console';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import {BlurView} from 'expo-blur';
 import {
@@ -204,8 +209,21 @@ const Player = ({route}: Props): React.JSX.Element => {
   const {t} = useTranslation();
   const {provider} = useContentStore();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
+  const [isAppActive, setIsAppActive] = useState(
+    AppState.currentState === 'active',
+  );
   const {addItem, updatePlaybackInfo, updateItemWithInfo} =
     useWatchHistoryStore();
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Player ref
   const playerRef: React.RefObject<VideoRef> = useRef(null);
@@ -1498,6 +1516,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       clearActiveVegaCastTracking();
       return;
     }
+    if (!isFocused || !isAppActive) {
+      return;
+    }
 
     const expectedInfoUrl = String(route.params?.infoUrl || '').trim();
     const resolvedTracking =
@@ -1598,6 +1619,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     activeEpisode?.link,
     activeEpisode?.title,
     castProvider,
+    isAppActive,
+    isFocused,
     route.params?.episodeList,
     route.params?.infoUrl,
     route.params?.seasonNumber,

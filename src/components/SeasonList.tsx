@@ -11,9 +11,14 @@ import {
   Pressable,
   ScrollView,
   TextInput,
+  AppState,
 } from 'react-native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Feather from '@expo/vector-icons/Feather';
@@ -288,6 +293,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
 }) => {
   const {primary} = useThemeStore(state => state);
   const {t, i18n} = useTranslation();
+  const isFocused = useIsFocused();
+  const [isAppActive, setIsAppActive] = useState(
+    AppState.currentState === 'active',
+  );
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -596,6 +605,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const [pendingPlay, setPendingPlay] = useState<PendingPlay | null>(null);
   const remoteMediaClient = useRemoteMediaClient();
   const castState = useCastState();
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      setIsAppActive(nextState === 'active');
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const normalizedEpisodes = useMemo(() => {
     if (!episodeList || !Array.isArray(episodeList)) {
@@ -1422,6 +1440,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
       clearActiveVegaCastTracking();
       return;
     }
+    if (!isFocused || !isAppActive) {
+      return;
+    }
 
     const expectedInfoUrl = String(routeParams.link || '').trim();
     const resolvedTracking =
@@ -1472,7 +1493,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     };
 
     syncProgress();
-    const interval = setInterval(syncProgress, 4000);
+    const interval = setInterval(syncProgress, 6000);
 
     return () => {
       cancelled = true;
@@ -1480,6 +1501,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
     };
   }, [
     castProvider,
+    isAppActive,
+    isFocused,
     refreshProgressData,
     routeParams.link,
     storeVegaProgress,
