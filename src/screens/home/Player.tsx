@@ -8,8 +8,8 @@ import {
   Platform,
   TouchableNativeFeedback,
   Alert,
-  Clipboard,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -68,8 +68,10 @@ import {
   resolveCastSubtitleUri,
 } from '../../lib/cast/nativeCast';
 import {
+  fetchVegaCastProgress,
   openVegaCastReceiverUrl,
   prepareVegaCastLaunchData,
+  VegaCastTracking,
 } from '../../lib/cast/vegaCast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
@@ -465,9 +467,13 @@ const Player = ({route}: Props): React.JSX.Element => {
   const [castProvider, setCastProvider] = useState<'native' | 'wvc' | 'vega'>(
     settingsStorage.getCastProvider(),
   );
+  const [vegaTracking, setVegaTracking] = useState<VegaCastTracking | null>(
+    null,
+  );
   const [pendingNativeCast, setPendingNativeCast] = useState(false);
   const [isStartingNativeCast, setIsStartingNativeCast] = useState(false);
   const lastCastProgressWriteRef = useRef(0);
+  const lastVegaProgressSyncRef = useRef(0);
   const currentCastEpisodeRef = useRef<{
     link?: string;
     title?: string;
@@ -1029,7 +1035,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         videoPositionRef.current?.position || watchedDuration || 0,
       );
 
-      const {receiverUrl, sessionCode, launchMode, expiresAt} =
+      const {receiverUrl, sessionCode, launchMode, expiresAt, tracking} =
         await prepareVegaCastLaunchData({
         currentEpisodeLink: activeEpisode?.link || selectedStream.link,
         episodeList: route.params?.episodeList || [],
@@ -1043,11 +1049,19 @@ const Player = ({route}: Props): React.JSX.Element => {
             route.params?.poster?.poster || route.params?.poster?.background || '',
           infoUrl: route.params?.infoUrl || '',
           seasonNumber: route.params?.seasonNumber,
+          aniSkipMalId: skipMalId,
           playbackRate,
           startTime,
           preferredSubtitleUri: selectedSubtitleUri,
         },
       });
+      if (launchMode === 'pairing' && tracking) {
+        lastVegaProgressSyncRef.current = 0;
+        lastCastProgressWriteRef.current = 0;
+        setVegaTracking(tracking);
+      } else {
+        setVegaTracking(null);
+      }
       const expiryMinutes =
         typeof expiresAt === 'number'
           ? Math.max(1, Math.round((expiresAt - Date.now()) / 60000))
@@ -1121,6 +1135,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     route.params?.seasonNumber,
     route.params?.secondaryTitle,
     route.params?.type,
+    skipMalId,
     selectedStream,
     t,
     videoPositionRef,
@@ -1443,6 +1458,102 @@ const Player = ({route}: Props): React.JSX.Element => {
     route.params?.episodeList,
     route.params?.seasonNumber,
     storeRemoteCastProgress,
+  ]);
+
+  useEffect(() => {
+    if (castProvider !== 'vega') {
+      setVegaTracking(null);
+      return;
+    }
+
+    if (!vegaTracking?.apiBaseUrl || !vegaTracking?.sessionId || !vegaTracking?.progressToken) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncProgress = async () => {
+      try {
+        const progress = await fetchVegaCastProgress(vegaTracking);
+        if (cancelled || !progress) {
+          return;
+        }
+
+        const updatedAt = Number(progress.updatedAt || 0);
+        if (
+          Number.isFinite(updatedAt) &&
+          updatedAt > 0 &&
+          updatedAt <= lastVegaProgressSyncRef.current
+        ) {
+          return;
+        }
+        lastVegaProgressSyncRef.current =
+          Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
+
+        const castEpisodeLink =
+          typeof progress.episodeLink === 'string' && progress.episodeLink
+            ? progress.episodeLink
+            : undefined;
+
+        if (castEpisodeLink) {
+          currentCastEpisodeRef.current = {
+            link: castEpisodeLink,
+            title:
+              typeof progress.episodeTitle === 'string'
+                ? progress.episodeTitle
+                : activeEpisode?.title,
+            episodeNumber:
+              typeof progress.episodeNumber === 'number'
+                ? progress.episodeNumber
+                : activeEpisode?.episodeNumber,
+            seasonNumber:
+              typeof progress.seasonNumber === 'number'
+                ? progress.seasonNumber
+                : route.params?.seasonNumber,
+          };
+
+          if (castEpisodeLink !== activeEpisode?.link) {
+            const matchingEpisode = route.params?.episodeList?.find(
+              item => item?.link === castEpisodeLink,
+            );
+            if (matchingEpisode) {
+              setActiveEpisode(matchingEpisode);
+            }
+          }
+        }
+
+        const currentTime = Number(progress.currentTime);
+        const duration = Number(progress.duration);
+        if (
+          Number.isFinite(currentTime) &&
+          Number.isFinite(duration) &&
+          duration > 0
+        ) {
+          storeRemoteCastProgress(currentTime, duration);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Vega cast progress sync failed:', error);
+        }
+      }
+    };
+
+    syncProgress();
+    const interval = setInterval(syncProgress, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    activeEpisode?.episodeNumber,
+    activeEpisode?.link,
+    activeEpisode?.title,
+    castProvider,
+    route.params?.episodeList,
+    route.params?.seasonNumber,
+    storeRemoteCastProgress,
+    vegaTracking,
   ]);
 
   useFocusEffect(

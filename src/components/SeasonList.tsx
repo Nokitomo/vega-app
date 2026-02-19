@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ToastAndroid,
   Alert,
-  Clipboard,
   Modal,
   FlatList,
   ActivityIndicator,
@@ -13,6 +12,7 @@ import {
   ScrollView,
   TextInput,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -55,8 +55,10 @@ import GoogleCast, {
 } from 'react-native-google-cast';
 import {prepareNativeCastQueue} from '../lib/cast/nativeCast';
 import {
+  fetchVegaCastProgress,
   openVegaCastReceiverUrl,
   prepareVegaCastLaunchData,
+  VegaCastTracking,
 } from '../lib/cast/vegaCast';
 
 interface SeasonListProps {
@@ -284,7 +286,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const {addItem} = useWatchHistoryStore(state => state);
+  const {addItem, updatePlaybackInfo} = useWatchHistoryStore(state => state);
   const {fetchStreams} = useStreamData();
   const resolveTitle = useCallback(
     (item?: {
@@ -570,6 +572,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const [castProvider, setCastProvider] = useState<'native' | 'wvc' | 'vega'>(
     settingsStorage.getCastProvider(),
   );
+  const [vegaTracking, setVegaTracking] = useState<VegaCastTracking | null>(
+    null,
+  );
+  const lastVegaProgressUpdatedRef = React.useRef(0);
+  const lastVegaProgressWriteRef = React.useRef(0);
   const [pendingNativeCastStream, setPendingNativeCastStream] = useState<any>(
     null,
   );
@@ -1005,7 +1012,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 },
               ];
 
-        const {receiverUrl, sessionCode, launchMode, expiresAt} =
+        const {receiverUrl, sessionCode, launchMode, expiresAt, tracking} =
           await prepareVegaCastLaunchData({
           currentEpisodeLink: fallbackEpisodeLink,
           episodeList: normalizedEpisodeList,
@@ -1022,6 +1029,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
             posterUrl: poster?.poster || poster?.background || '',
           },
         });
+        if (launchMode === 'pairing' && tracking) {
+          lastVegaProgressUpdatedRef.current = 0;
+          lastVegaProgressWriteRef.current = 0;
+          setVegaTracking(tracking);
+        } else {
+          setVegaTracking(null);
+        }
         const expiryMinutes =
           typeof expiresAt === 'number'
             ? Math.max(1, Math.round((expiresAt - Date.now()) / 60000))
@@ -1275,6 +1289,137 @@ const SeasonList: React.FC<SeasonListProps> = ({
       startNativeCastForStream,
     ],
   );
+
+  const storeVegaProgress = useCallback(
+    (progress: {
+      episodeLink?: string;
+      episodeTitle?: string;
+      episodeNumber?: number;
+      seasonNumber?: number;
+      currentTime?: number;
+      duration?: number;
+    }) => {
+      const episodeLink = String(progress.episodeLink || '').trim();
+      const currentTime = Number(progress.currentTime);
+      const duration = Number(progress.duration);
+
+      if (!episodeLink || !Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) {
+        return;
+      }
+      if (Math.abs(currentTime - lastVegaProgressWriteRef.current) < 2) {
+        return;
+      }
+      lastVegaProgressWriteRef.current = currentTime;
+
+      updatePlaybackInfo(episodeLink, {
+        currentTime,
+        duration,
+        playbackRate: 1,
+      });
+      cacheStorage.setString(
+        episodeLink,
+        JSON.stringify({
+          position: currentTime,
+          duration,
+        }),
+      );
+
+      const historyKey = routeParams.link || episodeLink;
+      const episodeTitle = String(progress.episodeTitle || '');
+      const progressData = {
+        currentTime,
+        duration,
+        percentage: (currentTime / duration) * 100,
+        infoUrl: routeParams.link || '',
+        title: metaTitle || '',
+        episodeTitle,
+        episodeNumber:
+          typeof progress.episodeNumber === 'number'
+            ? progress.episodeNumber
+            : undefined,
+        episodeLink,
+        seasonTitle: activeSeason?.title || '',
+        seasonNumber:
+          typeof progress.seasonNumber === 'number'
+            ? progress.seasonNumber
+            : activeSeasonNumber,
+        seasonEpisodesLink: activeSeason?.episodesLink || '',
+        updatedAt: Date.now(),
+      };
+      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      mainStorage.setString(historyProgressKey, JSON.stringify(progressData));
+      watchHistoryStorage.addProgressKey(historyProgressKey);
+      if (episodeTitle) {
+        const episodeKey = `watch_history_progress_${historyKey}_${episodeTitle.replace(
+          /\s+/g,
+          '_',
+        )}`;
+        mainStorage.setString(episodeKey, JSON.stringify(progressData));
+        watchHistoryStorage.addProgressKey(episodeKey);
+      }
+      watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
+    },
+    [
+      activeSeason?.episodesLink,
+      activeSeason?.title,
+      activeSeasonNumber,
+      metaTitle,
+      routeParams.link,
+      updatePlaybackInfo,
+    ],
+  );
+
+  useEffect(() => {
+    if (castProvider !== 'vega') {
+      setVegaTracking(null);
+      return;
+    }
+    if (!vegaTracking?.apiBaseUrl || !vegaTracking?.sessionId || !vegaTracking?.progressToken) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncProgress = async () => {
+      try {
+        const progress = await fetchVegaCastProgress(vegaTracking);
+        if (cancelled || !progress) {
+          return;
+        }
+
+        const updatedAt = Number(progress.updatedAt || 0);
+        if (
+          Number.isFinite(updatedAt) &&
+          updatedAt > 0 &&
+          updatedAt <= lastVegaProgressUpdatedRef.current
+        ) {
+          return;
+        }
+        lastVegaProgressUpdatedRef.current =
+          Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
+
+        storeVegaProgress(progress);
+        refreshProgressData();
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Vega cast list progress sync failed:', error);
+        }
+      }
+    };
+
+    syncProgress();
+    const interval = setInterval(syncProgress, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    castProvider,
+    refreshProgressData,
+    storeVegaProgress,
+    vegaTracking,
+  ]);
 
   useEffect(() => {
     if (

@@ -25,6 +25,12 @@ type CastQueueContext = {
   playbackRate?: number;
   startTime?: number;
   preferredSubtitleUri?: string;
+  aniSkipMalId?: number;
+  telemetry?: {
+    sessionId: string;
+    progressToken: string;
+    apiBaseUrl?: string;
+  };
 };
 
 type PrepareNativeCastQueueInput = {
@@ -53,6 +59,7 @@ export type VegaCastSessionItem = {
   subtitles: VegaCastSessionSubtitle[];
   episodeNumber?: number;
   seasonNumber?: number;
+  aniSkipMalId?: number;
 };
 
 export type VegaCastSessionPayload = {
@@ -64,6 +71,11 @@ export type VegaCastSessionPayload = {
   secondaryTitle?: string;
   posterUrl?: string;
   playbackRate: number;
+  telemetry?: {
+    sessionId: string;
+    progressToken: string;
+    apiBaseUrl?: string;
+  };
   queue: {
     startIndex: number;
     startTime: number;
@@ -297,6 +309,9 @@ const buildQueueItem = (
         episodeTitle: source.episode.title || '',
         episodeNumber,
         seasonNumber,
+        ...(typeof context.aniSkipMalId === 'number'
+          ? {aniSkipMalId: context.aniSkipMalId}
+          : {}),
       },
     },
   };
@@ -526,6 +541,9 @@ export const prepareVegaCastSession = async ({
         ...(typeof customData.seasonNumber === 'number'
           ? {seasonNumber: customData.seasonNumber}
           : {}),
+        ...(typeof customData.aniSkipMalId === 'number'
+          ? {aniSkipMalId: customData.aniSkipMalId}
+          : {}),
       };
     })
     .filter((item): item is VegaCastSessionItem => !!item);
@@ -542,6 +560,17 @@ export const prepareVegaCastSession = async ({
     ...(context.primaryTitle ? {primaryTitle: context.primaryTitle} : {}),
     ...(context.secondaryTitle ? {secondaryTitle: context.secondaryTitle} : {}),
     ...(context.posterUrl ? {posterUrl: context.posterUrl} : {}),
+    ...(context.telemetry
+      ? {
+          telemetry: {
+            sessionId: context.telemetry.sessionId,
+            progressToken: context.telemetry.progressToken,
+            ...(context.telemetry.apiBaseUrl
+              ? {apiBaseUrl: context.telemetry.apiBaseUrl}
+              : {}),
+          },
+        }
+      : {}),
     playbackRate,
     queue: {
       startIndex: Math.min(startIndex, Math.max(0, items.length - 1)),

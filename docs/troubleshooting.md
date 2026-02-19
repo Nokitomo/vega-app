@@ -101,6 +101,8 @@ Verifiche:
 4) Il codice e one-time con TTL: se scade o viene gia usato, rigenera un nuovo codice dall'app.
 5) Se l'API pairing non e disponibile, Vega fa fallback su link diretto: in quel caso assicurati che il link non venga troncato durante copia/incolla.
 6) Se il provider richiede header/cookie stretti e il browser TV blocca la richiesta, usa fallback `native` o `wvc`.
+7) Se il video parte ma l'app non aggiorna minutaggio/episodio, verifica endpoint `/api/session/progress/update` e `/api/session/progress/get` raggiungibili su Vercel.
+8) Per stream HLS protetti che continuano a fallire in browser standalone anche con Hls.js, usare fallback `native` o `wvc`.
 
 ## Stringhe non tradotte / chiavi visibili
 Sintomo: testi in inglese o chiavi raw (es. `Some Key`).

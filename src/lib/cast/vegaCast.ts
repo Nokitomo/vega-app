@@ -18,6 +18,30 @@ const VEGA_CAST_PAIR_REQUEST_TIMEOUT_MS = 12000;
 
 type VegaCastLaunchMode = 'pairing' | 'inline';
 
+export type VegaCastTracking = {
+  sessionId: string;
+  progressToken: string;
+  apiBaseUrl: string;
+};
+
+export type VegaCastProgressSnapshot = {
+  sessionId: string;
+  infoUrl?: string;
+  primaryTitle?: string;
+  secondaryTitle?: string;
+  providerValue?: string;
+  episodeLink?: string;
+  episodeTitle?: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+  queueIndex?: number;
+  currentTime?: number;
+  duration?: number;
+  playbackRate?: number;
+  isEnded?: boolean;
+  updatedAt?: number;
+};
+
 const normalizeApiBaseUrl = (value: string): string => {
   const trimmed = String(value || '').trim();
   if (!trimmed) {
@@ -61,6 +85,23 @@ const hashString = (value: string): number => {
   }
   return hash;
 };
+
+const createRandomToken = (bytes = 12): string =>
+  Buffer.from(
+    Array.from({length: bytes}, () => Math.floor(Math.random() * 256)),
+  )
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(new RegExp('/', 'g'), '_')
+    .replace(new RegExp('=+$'), '');
+
+const buildTelemetryTracking = (
+  pairApiBaseUrl: string,
+): VegaCastTracking => ({
+  sessionId: `vega_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  progressToken: createRandomToken(18),
+  apiBaseUrl: pairApiBaseUrl,
+});
 
 export const buildVegaCastSessionCode = (
   session: VegaCastSessionPayload,
@@ -139,7 +180,7 @@ const postJsonWithTimeout = async (
 const createPairingSession = async (
   session: VegaCastSessionPayload,
   pairApiBaseUrl: string,
-): Promise<{code: string; expiresAt: number}> => {
+): Promise<{code: string; expiresAt: number; sessionId?: string}> => {
   const endpoint = `${pairApiBaseUrl}/api/session`;
   const {status, payload} = await postJsonWithTimeout(endpoint, {
     session,
@@ -155,6 +196,8 @@ const createPairingSession = async (
     return {
       code: payload.code.toUpperCase(),
       expiresAt: payload.expiresAt,
+      sessionId:
+        typeof payload.sessionId === 'string' ? payload.sessionId : undefined,
     };
   }
 
@@ -189,14 +232,29 @@ export const prepareVegaCastLaunchData = async (
   receiverUrl: string;
   sessionCode: string;
   launchMode: VegaCastLaunchMode;
+  tracking?: VegaCastTracking;
   expiresAt?: number;
 }> => {
-  const session = await prepareVegaCastSession(input);
   const pairApiBaseUrl = getPairApiBaseUrlFromConfig();
+  const telemetry = pairApiBaseUrl
+    ? buildTelemetryTracking(pairApiBaseUrl)
+    : undefined;
+
+  const session = await prepareVegaCastSession({
+    ...input,
+    context: {
+      ...input.context,
+      ...(telemetry ? {telemetry} : {}),
+    },
+  });
 
   if (pairApiBaseUrl) {
     try {
       const paired = await createPairingSession(session, pairApiBaseUrl);
+      const tracking = {
+        ...telemetry!,
+        ...(paired.sessionId ? {sessionId: paired.sessionId} : {}),
+      };
       return {
         session,
         receiverUrl: buildVegaCastReceiverUrlWithCode(
@@ -205,6 +263,7 @@ export const prepareVegaCastLaunchData = async (
         ),
         sessionCode: paired.code,
         launchMode: 'pairing',
+        tracking,
         expiresAt: paired.expiresAt,
       };
     } catch (error) {
@@ -221,4 +280,24 @@ export const prepareVegaCastLaunchData = async (
     sessionCode,
     launchMode: 'inline',
   };
+};
+
+export const fetchVegaCastProgress = async (
+  tracking: VegaCastTracking,
+): Promise<VegaCastProgressSnapshot | null> => {
+  if (!tracking?.apiBaseUrl || !tracking?.sessionId || !tracking?.progressToken) {
+    return null;
+  }
+
+  const endpoint = `${normalizeApiBaseUrl(tracking.apiBaseUrl)}/api/session/progress/get`;
+  const {status, payload} = await postJsonWithTimeout(endpoint, {
+    sessionId: tracking.sessionId,
+    progressToken: tracking.progressToken,
+  });
+
+  if (status !== 200 || payload?.ok !== true || !payload?.progress) {
+    return null;
+  }
+
+  return payload.progress as VegaCastProgressSnapshot;
 };

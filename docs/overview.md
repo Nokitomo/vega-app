@@ -53,6 +53,8 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Il cast nativo usa una queue episodi (quando disponibile) e prova a mantenere il tracking progresso su cronologia/cache anche durante la riproduzione remota.
 - E disponibile anche `Vega Cast (LAN/Web)`: l'app genera una sessione web con codice pairing (one-time) per il receiver (`vega-cast-receiver`) utilizzabile da browser TV/PC sulla stessa rete.
 - In modalita Vega Cast, il controllo principale avviene lato receiver/telecomando TV (play/pause/seek/next/prev).
+- In modalita Vega Cast con pairing API attivo, il receiver sincronizza episodio/minutaggio verso l'app (watch history/progress).
+- In modalita Vega Cast, quando disponibili `malId` ed episodio, il receiver espone anche `Skip Intro` (AniSkip).
 - E mantenuto anche Web Video Caster (WVC) come alternativa selezionabile in Preferenze -> Player -> Cast Provider.
 - Se il cast nativo non parte, l'app chiede conferma prima di aprire WVC come fallback.
 - Per usare WVC, l'app Web Video Caster deve essere installata sul telefono. In caso contrario l'app prova ad aprire lo store.

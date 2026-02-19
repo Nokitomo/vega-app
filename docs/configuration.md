@@ -38,8 +38,10 @@ File: app.config.js
   - `extra.castPairApiBaseUrl` (in `app.config.js`)
   - variabile ambiente `EXPO_PUBLIC_CAST_PAIR_API_BASE_URL`
 - Con API pairing configurata, l'app crea un codice breve one-time (TTL) e il receiver recupera la sessione tramite Vercel Function.
+- Con pairing API attivo, il receiver invia progress episodico/minutaggio agli endpoint progress (`/api/session/progress/*`) per sync lato app.
 - In fallback (API non configurata/non raggiungibile), l'app usa il link sessione diretto in query.
 - La sessione include stream URL, headers e sottotitoli; la queue non e limitata dalla lunghezza URL quando il pairing API e attivo.
+- Per contenuti anime con `malId` disponibile, il receiver puo mostrare `Skip Intro` via AniSkip.
 - Il receiver puo funzionare in modalita standalone (browser TV/PC) con telecomando (play/pause/seek/next/prev).
 - Backend richiesto per pairing professionale: Vercel Function + KV (serverless, senza VPS h24).
 
