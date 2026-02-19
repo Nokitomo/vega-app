@@ -220,12 +220,18 @@ export class SettingsStorage {
     mainStorage.setNumber(SettingsKeys.SUBTITLE_BOTTOM_PADDING, padding);
   }
 
-  getCastProvider(): 'native' | 'wvc' {
+  getCastProvider(): 'native' | 'wvc' | 'vega' {
     const provider = mainStorage.getString(SettingsKeys.CAST_PROVIDER);
-    return provider === 'wvc' ? 'wvc' : 'native';
+    if (provider === 'wvc') {
+      return 'wvc';
+    }
+    if (provider === 'vega') {
+      return 'vega';
+    }
+    return 'native';
   }
 
-  setCastProvider(provider: 'native' | 'wvc'): void {
+  setCastProvider(provider: 'native' | 'wvc' | 'vega'): void {
     mainStorage.setString(SettingsKeys.CAST_PROVIDER, provider);
   }
 

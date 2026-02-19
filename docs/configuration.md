@@ -20,6 +20,7 @@ File: app.config.js
 - In `app.config.js` sono esposti anche:
   - `extra.castReceiverAppId`
   - `extra.castReceiverWebUrl`
+  - `extra.castPairApiBaseUrl`
 
 ### Cast Web Video Caster (fallback/alternativa)
 - Android: integrazione via `Intent ACTION_VIEW` con package `com.instantbits.cast.webvideo`.
@@ -27,10 +28,26 @@ File: app.config.js
 - Supporta passaggio URL stream, headers HTTP e sottotitoli (quando disponibili).
 - Se WVC non e installata, l'app tenta apertura store (market/play store URL).
 
+### Vega Cast (LAN/Web)
+- Provider cast aggiuntivo che genera una sessione web per receiver browser TV/PC.
+- Base URL receiver letto da:
+  - `extra.castReceiverWebUrl` (in `app.config.js`)
+  - variabile ambiente `EXPO_PUBLIC_CAST_RECEIVER_WEB_URL`
+  - fallback: `https://nokitomo.github.io/vega-cast-receiver/`
+- Base URL API pairing letto da:
+  - `extra.castPairApiBaseUrl` (in `app.config.js`)
+  - variabile ambiente `EXPO_PUBLIC_CAST_PAIR_API_BASE_URL`
+- Con API pairing configurata, l'app crea un codice breve one-time (TTL) e il receiver recupera la sessione tramite Vercel Function.
+- In fallback (API non configurata/non raggiungibile), l'app usa il link sessione diretto in query.
+- La sessione include stream URL, headers e sottotitoli; la queue non e limitata dalla lunghezza URL quando il pairing API e attivo.
+- Il receiver puo funzionare in modalita standalone (browser TV/PC) con telecomando (play/pause/seek/next/prev).
+- Backend richiesto per pairing professionale: Vercel Function + KV (serverless, senza VPS h24).
+
 ### Scelta provider cast
 - Impostazione utente: `Preferences -> Player -> Cast Provider`.
 - Valori supportati:
   - `native` (default)
+  - `vega`
   - `wvc`
 
 ## Signing release

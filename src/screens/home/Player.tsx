@@ -8,6 +8,7 @@ import {
   Platform,
   TouchableNativeFeedback,
   Alert,
+  Clipboard,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -66,6 +67,10 @@ import {
   prepareNativeCastQueue,
   resolveCastSubtitleUri,
 } from '../../lib/cast/nativeCast';
+import {
+  openVegaCastReceiverUrl,
+  prepareVegaCastLaunchData,
+} from '../../lib/cast/vegaCast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -457,7 +462,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   const remoteMediaClient = useRemoteMediaClient();
   const castState = useCastState();
-  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc' | 'vega'>(
     settingsStorage.getCastProvider(),
   );
   const [pendingNativeCast, setPendingNativeCast] = useState(false);
@@ -1011,6 +1016,117 @@ const Player = ({route}: Props): React.JSX.Element => {
     t,
   ]);
 
+  const handleVegaCast = useCallback(async () => {
+    if (!selectedStream?.link) {
+      ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
+      return;
+    }
+
+    try {
+      const selectedSubtitleUri = resolveCastSubtitleUri(getCastSubtitleTracks(), 0);
+      const startTime = Math.max(
+        0,
+        videoPositionRef.current?.position || watchedDuration || 0,
+      );
+
+      const {receiverUrl, sessionCode, launchMode, expiresAt} =
+        await prepareVegaCastLaunchData({
+        currentEpisodeLink: activeEpisode?.link || selectedStream.link,
+        episodeList: route.params?.episodeList || [],
+        selectedStream,
+        providerValue: route.params?.providerValue || providerValue,
+        contentType: route.params?.type || 'series',
+        context: {
+          primaryTitle: route.params?.primaryTitle || '',
+          secondaryTitle: route.params?.secondaryTitle || '',
+          posterUrl:
+            route.params?.poster?.poster || route.params?.poster?.background || '',
+          infoUrl: route.params?.infoUrl || '',
+          seasonNumber: route.params?.seasonNumber,
+          playbackRate,
+          startTime,
+          preferredSubtitleUri: selectedSubtitleUri,
+        },
+      });
+      const expiryMinutes =
+        typeof expiresAt === 'number'
+          ? Math.max(1, Math.round((expiresAt - Date.now()) / 60000))
+          : 10;
+
+      Alert.alert(
+        t('Vega Cast Ready'),
+        launchMode === 'pairing'
+          ? t(
+              'Open Vega Cast Receiver on TV and enter code {{code}}. Code valid for about {{minutes}} minutes.',
+              {code: sessionCode, minutes: expiryMinutes},
+            )
+          : t(
+              'Open Vega Cast Receiver on TV, then use this link. Session code: {{code}}',
+              {code: sessionCode},
+            ),
+        [
+          {
+            text: t('Cancel'),
+            style: 'cancel',
+          },
+          {
+            text: launchMode === 'pairing' ? t('Copy Code') : t('Copy Link'),
+            onPress: () => {
+              Clipboard.setString(
+                launchMode === 'pairing' ? sessionCode : receiverUrl,
+              );
+              ToastAndroid.show(
+                launchMode === 'pairing'
+                  ? t('Vega Cast code copied')
+                  : t('Vega Cast link copied'),
+                ToastAndroid.SHORT,
+              );
+            },
+          },
+          {
+            text: t('Open Receiver'),
+            onPress: async () => {
+              const opened = await openVegaCastReceiverUrl(receiverUrl);
+              if (!opened) {
+                ToastAndroid.show(
+                  t('Failed to open Vega Cast receiver'),
+                  ToastAndroid.SHORT,
+                );
+                return;
+              }
+              ToastAndroid.show(t('Vega Cast receiver opened'), ToastAndroid.SHORT);
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      console.error('Vega Cast session preparation failed:', error);
+      const message =
+        error instanceof Error && error.message === 'VEGA_CAST_SESSION_TOO_LARGE'
+          ? t('Vega Cast session too large')
+          : t('Failed to prepare Vega Cast');
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    }
+  }, [
+    activeEpisode?.link,
+    getCastSubtitleTracks,
+    playbackRate,
+    providerValue,
+    route.params?.episodeList,
+    route.params?.infoUrl,
+    route.params?.poster?.background,
+    route.params?.poster?.poster,
+    route.params?.primaryTitle,
+    route.params?.providerValue,
+    route.params?.seasonNumber,
+    route.params?.secondaryTitle,
+    route.params?.type,
+    selectedStream,
+    t,
+    videoPositionRef,
+    watchedDuration,
+  ]);
+
   const storeRemoteCastProgress = useCallback(
     (currentTime: number, duration: number) => {
       const episodeLink = currentCastEpisodeRef.current.link || activeEpisode?.link;
@@ -1222,12 +1338,16 @@ const Player = ({route}: Props): React.JSX.Element => {
   ]);
 
   const handleCastPress = useCallback(async () => {
+    if (castProvider === 'vega') {
+      await handleVegaCast();
+      return;
+    }
     if (castProvider === 'wvc') {
       await handleWebVideoCasterCast();
       return;
     }
     await handleNativeCast();
-  }, [castProvider, handleNativeCast, handleWebVideoCasterCast]);
+  }, [castProvider, handleNativeCast, handleVegaCast, handleWebVideoCasterCast]);
 
   useEffect(() => {
     if (!pendingNativeCast || !remoteMediaClient || castProvider !== 'native') {

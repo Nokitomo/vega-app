@@ -96,11 +96,12 @@ const Preferences = () => {
   const [OpenExternalPlayer, setOpenExternalPlayer] = useState(
     settingsStorage.getBool('useExternalPlayer', false),
   );
-  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc' | 'vega'>(
     settingsStorage.getCastProvider(),
   );
   const castProviderOptions = [
     {label: t('Native Cast (Recommended)'), value: 'native'},
+    {label: t('Vega Cast (LAN/Web)'), value: 'vega'},
     {label: t('Web Video Caster'), value: 'wvc'},
   ];
 
@@ -440,7 +441,10 @@ const Preferences = () => {
                   data={castProviderOptions}
                   value={castProvider}
                   onChange={item => {
-                    const nextProvider = item.value as 'native' | 'wvc';
+                    const nextProvider = item.value as
+                      | 'native'
+                      | 'wvc'
+                      | 'vega';
                     setCastProvider(nextProvider);
                     settingsStorage.setCastProvider(nextProvider);
                   }}

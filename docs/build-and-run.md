@@ -28,6 +28,12 @@ Nota (cast nativo custom receiver): puoi impostare l'App ID con variabile ambien
 $env:VEGA_CAST_RECEIVER_APP_ID="ABCD1234"
 npx expo run:android --device "Medium_phone_API_35"
 ```
+Nota (Vega Cast pairing code): per usare codice corto con API Vercel, imposta anche:
+```powershell
+$env:EXPO_PUBLIC_CAST_RECEIVER_WEB_URL="https://nokitomo.github.io/vega-cast-receiver/"
+$env:EXPO_PUBLIC_CAST_PAIR_API_BASE_URL="https://your-vercel-domain.vercel.app"
+npx expo run:android --device "Medium_phone_API_35"
+```
 
 ## Prebuild (rigenera android/ios)
 Attenzione: non eseguire `npx expo prebuild` per Android (sovrascrive customizzazioni in `android/`).

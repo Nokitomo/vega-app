@@ -89,6 +89,19 @@ Verifiche:
 2) Avvia cast subito dopo fetch stream (evita URL scaduti).
 3) Prova fallback WVC per confermare che il problema e specifico del receiver nativo.
 
+## Vega Cast (LAN/Web): receiver non parte o non apre media
+Sintomi tipici:
+- il receiver non accetta il codice pairing
+- il receiver si apre ma non avvia il video
+
+Verifiche:
+1) Controlla `EXPO_PUBLIC_CAST_RECEIVER_WEB_URL` (o fallback) e che l'URL receiver sia raggiungibile in HTTPS.
+2) Controlla `EXPO_PUBLIC_CAST_PAIR_API_BASE_URL` e che l'endpoint Vercel risponda su `/api/session` e `/api/session/consume`.
+3) Se usi GitHub Pages per il receiver, verifica `receiver-config.js` con `pairApiBaseUrl` corretto.
+4) Il codice e one-time con TTL: se scade o viene gia usato, rigenera un nuovo codice dall'app.
+5) Se l'API pairing non e disponibile, Vega fa fallback su link diretto: in quel caso assicurati che il link non venga troncato durante copia/incolla.
+6) Se il provider richiede header/cookie stretti e il browser TV blocca la richiesta, usa fallback `native` o `wvc`.
+
 ## Stringhe non tradotte / chiavi visibili
 Sintomo: testi in inglese o chiavi raw (es. `Some Key`).
 - Verifica che la chiave esista in `src/i18n/en.json` e `src/i18n/it.json`.

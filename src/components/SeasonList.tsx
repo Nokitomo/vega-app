@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ToastAndroid,
   Alert,
+  Clipboard,
   Modal,
   FlatList,
   ActivityIndicator,
@@ -53,6 +54,10 @@ import GoogleCast, {
   useRemoteMediaClient,
 } from 'react-native-google-cast';
 import {prepareNativeCastQueue} from '../lib/cast/nativeCast';
+import {
+  openVegaCastReceiverUrl,
+  prepareVegaCastLaunchData,
+} from '../lib/cast/vegaCast';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -562,7 +567,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const [externalPlayerStreams, setExternalPlayerStreams] = useState<any[]>([]);
   const [externalPlayerContext, setExternalPlayerContext] =
     useState<ExternalPlayerContext | null>(null);
-  const [castProvider, setCastProvider] = useState<'native' | 'wvc'>(
+  const [castProvider, setCastProvider] = useState<'native' | 'wvc' | 'vega'>(
     settingsStorage.getCastProvider(),
   );
   const [pendingNativeCastStream, setPendingNativeCastStream] = useState<any>(
@@ -972,6 +977,133 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [activeSeason?.title, metaTitle, poster?.background, poster?.poster, t],
   );
 
+  const openVegaCast = useCallback(
+    async (stream: any) => {
+      if (!stream?.link) {
+        ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
+        return;
+      }
+
+      try {
+        const contextEpisodeList =
+          externalPlayerContext?.episodeList && externalPlayerContext.episodeList.length > 0
+            ? externalPlayerContext.episodeList
+            : sortedEpisodes.length > 0
+              ? sortedEpisodes
+              : sortedDirectLinks;
+        const fallbackEpisodeTitle =
+          activeSeason?.title || t('Episode {{number}}', {number: 1});
+        const fallbackEpisodeLink =
+          externalPlayerContext?.currentEpisodeLink || stream.link;
+        const normalizedEpisodeList =
+          contextEpisodeList && contextEpisodeList.length > 0
+            ? contextEpisodeList
+            : [
+                {
+                  link: fallbackEpisodeLink,
+                  title: fallbackEpisodeTitle,
+                },
+              ];
+
+        const {receiverUrl, sessionCode, launchMode, expiresAt} =
+          await prepareVegaCastLaunchData({
+          currentEpisodeLink: fallbackEpisodeLink,
+          episodeList: normalizedEpisodeList,
+          selectedStream: stream,
+          providerValue,
+          contentType: type,
+          context: {
+            primaryTitle: metaTitle,
+            secondaryTitle:
+              externalPlayerContext?.seasonTitle || activeSeason?.title || '',
+            seasonNumber:
+              externalPlayerContext?.seasonNumber ?? activeSeasonNumber,
+            infoUrl: routeParams.link,
+            posterUrl: poster?.poster || poster?.background || '',
+          },
+        });
+        const expiryMinutes =
+          typeof expiresAt === 'number'
+            ? Math.max(1, Math.round((expiresAt - Date.now()) / 60000))
+            : 10;
+
+        Alert.alert(
+          t('Vega Cast Ready'),
+          launchMode === 'pairing'
+            ? t(
+                'Open Vega Cast Receiver on TV and enter code {{code}}. Code valid for about {{minutes}} minutes.',
+                {code: sessionCode, minutes: expiryMinutes},
+              )
+            : t(
+                'Open Vega Cast Receiver on TV, then use this link. Session code: {{code}}',
+                {code: sessionCode},
+              ),
+          [
+            {
+              text: t('Cancel'),
+              style: 'cancel',
+            },
+            {
+              text: launchMode === 'pairing' ? t('Copy Code') : t('Copy Link'),
+              onPress: () => {
+                Clipboard.setString(
+                  launchMode === 'pairing' ? sessionCode : receiverUrl,
+                );
+                ToastAndroid.show(
+                  launchMode === 'pairing'
+                    ? t('Vega Cast code copied')
+                    : t('Vega Cast link copied'),
+                  ToastAndroid.SHORT,
+                );
+              },
+            },
+            {
+              text: t('Open Receiver'),
+              onPress: async () => {
+                const opened = await openVegaCastReceiverUrl(receiverUrl);
+                if (!opened) {
+                  ToastAndroid.show(
+                    t('Failed to open Vega Cast receiver'),
+                    ToastAndroid.SHORT,
+                  );
+                  return;
+                }
+                ToastAndroid.show(
+                  t('Vega Cast receiver opened'),
+                  ToastAndroid.SHORT,
+                );
+              },
+            },
+          ],
+        );
+      } catch (error) {
+        console.error('Vega Cast session preparation failed from list:', error);
+        const message =
+          error instanceof Error && error.message === 'VEGA_CAST_SESSION_TOO_LARGE'
+            ? t('Vega Cast session too large')
+            : t('Failed to prepare Vega Cast');
+        ToastAndroid.show(message, ToastAndroid.SHORT);
+      }
+    },
+    [
+      activeSeason?.title,
+      activeSeasonNumber,
+      externalPlayerContext?.currentEpisodeLink,
+      externalPlayerContext?.episodeList,
+      externalPlayerContext?.seasonNumber,
+      externalPlayerContext?.seasonTitle,
+      metaTitle,
+      poster?.background,
+      poster?.poster,
+      providerValue,
+      routeParams.link,
+      sortedDirectLinks,
+      sortedEpisodes,
+      t,
+      type,
+    ],
+  );
+
   const askWvcFallback = useCallback((): Promise<boolean> => {
     return new Promise(resolve => {
       let isResolved = false;
@@ -1094,6 +1226,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const openCastForStream = useCallback(
     async (stream: any) => {
+      if (castProvider === 'vega') {
+        await openVegaCast(stream);
+        return;
+      }
+
       if (castProvider === 'wvc') {
         await openWebVideoCaster(stream);
         return;
@@ -1132,6 +1269,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [
       askWvcFallback,
       castProvider,
+      openVegaCast,
       openWebVideoCaster,
       remoteMediaClient,
       startNativeCastForStream,

@@ -37,6 +37,42 @@ type PrepareNativeCastQueueInput = {
   maxQueueItems?: number;
 };
 
+export type VegaCastSessionSubtitle = {
+  uri: string;
+  title: string;
+  language: string;
+  type: string;
+};
+
+export type VegaCastSessionItem = {
+  episodeLink: string;
+  episodeTitle: string;
+  streamUrl: string;
+  contentType: string;
+  headers: Record<string, string>;
+  subtitles: VegaCastSessionSubtitle[];
+  episodeNumber?: number;
+  seasonNumber?: number;
+};
+
+export type VegaCastSessionPayload = {
+  version: 1;
+  createdAt: number;
+  providerValue: string;
+  infoUrl?: string;
+  primaryTitle?: string;
+  secondaryTitle?: string;
+  posterUrl?: string;
+  playbackRate: number;
+  queue: {
+    startIndex: number;
+    startTime: number;
+    items: VegaCastSessionItem[];
+  };
+};
+
+export type PrepareVegaCastSessionInput = PrepareNativeCastQueueInput;
+
 type QueueSource = {
   episode: CastEpisode;
   stream: Stream;
@@ -420,4 +456,97 @@ export const resolveCastSubtitleUri = (
   }
   const first = subtitles.find(item => isHttpUrl(item?.uri));
   return first?.uri;
+};
+
+export const prepareVegaCastSession = async ({
+  currentEpisodeLink,
+  episodeList,
+  selectedStream,
+  providerValue,
+  contentType,
+  context = {},
+  maxQueueItems = DEFAULT_MAX_QUEUE_ITEMS,
+}: PrepareVegaCastSessionInput): Promise<VegaCastSessionPayload> => {
+  const {request} = await prepareNativeCastQueue({
+    currentEpisodeLink,
+    episodeList,
+    selectedStream,
+    providerValue,
+    contentType,
+    context,
+    maxQueueItems,
+  });
+
+  const queueData = request.queueData;
+  const queueItems = Array.isArray(queueData?.items) ? queueData.items : [];
+  const startIndex = Math.max(0, Number(queueData?.startIndex || 0));
+  const startTime = Math.max(0, Number(request.startTime || queueData?.startTime || 0));
+  const safePlaybackRate = Number(request.playbackRate || context.playbackRate || 1);
+  const playbackRate =
+    Number.isFinite(safePlaybackRate) && safePlaybackRate > 0
+      ? Math.min(2, Math.max(0.5, safePlaybackRate))
+      : 1;
+
+  const items: VegaCastSessionItem[] = queueItems
+    .map(item => {
+      const mediaInfo = item?.mediaInfo;
+      if (!mediaInfo || !isHttpUrl(mediaInfo.contentUrl)) {
+        return null;
+      }
+
+      const customData = mediaInfo.customData || {};
+      const metadata = mediaInfo.metadata || {};
+      const subtitles: VegaCastSessionSubtitle[] = Array.isArray(mediaInfo.mediaTracks)
+        ? mediaInfo.mediaTracks
+            .filter(track => track?.type === 'text' && isHttpUrl(track?.contentId))
+            .map(track => ({
+              uri: String(track.contentId),
+              title: String(track.name || track.language || ''),
+              language: String(track.language || 'it'),
+              type: String(track.contentType || 'text/vtt'),
+            }))
+        : [];
+
+      return {
+        episodeLink: String(customData.episodeLink || ''),
+        episodeTitle: String(
+          customData.episodeTitle || metadata.title || metadata.subtitle || '',
+        ),
+        streamUrl: String(mediaInfo.contentUrl),
+        contentType: String(mediaInfo.contentType || ''),
+        headers: normalizeHeaders(
+          customData.headers && typeof customData.headers === 'object'
+            ? customData.headers
+            : undefined,
+        ),
+        subtitles,
+        ...(typeof customData.episodeNumber === 'number'
+          ? {episodeNumber: customData.episodeNumber}
+          : {}),
+        ...(typeof customData.seasonNumber === 'number'
+          ? {seasonNumber: customData.seasonNumber}
+          : {}),
+      };
+    })
+    .filter((item): item is VegaCastSessionItem => !!item);
+
+  if (items.length === 0) {
+    throw new Error('VEGA_CAST_SESSION_EMPTY');
+  }
+
+  return {
+    version: 1,
+    createdAt: Date.now(),
+    providerValue,
+    ...(context.infoUrl ? {infoUrl: context.infoUrl} : {}),
+    ...(context.primaryTitle ? {primaryTitle: context.primaryTitle} : {}),
+    ...(context.secondaryTitle ? {secondaryTitle: context.secondaryTitle} : {}),
+    ...(context.posterUrl ? {posterUrl: context.posterUrl} : {}),
+    playbackRate,
+    queue: {
+      startIndex: Math.min(startIndex, Math.max(0, items.length - 1)),
+      startTime,
+      items,
+    },
+  };
 };

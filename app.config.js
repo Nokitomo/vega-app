@@ -4,7 +4,11 @@ const hasAndroidGoogleServices = fs.existsSync('./google-services.json');
 const hasIosGooglePlist = fs.existsSync('./GoogleService-Info.plist');
 const castReceiverAppId =
   process.env.EXPO_PUBLIC_CAST_RECEIVER_APP_ID || 'CC1AD845';
-const castReceiverWebUrl = process.env.EXPO_PUBLIC_CAST_RECEIVER_WEB_URL || '';
+const castReceiverWebUrl =
+  process.env.EXPO_PUBLIC_CAST_RECEIVER_WEB_URL ||
+  'https://nokitomo.github.io/vega-cast-receiver/';
+const castPairApiBaseUrl =
+  process.env.EXPO_PUBLIC_CAST_PAIR_API_BASE_URL || '';
 
 module.exports = () => {
   const plugins = [
@@ -150,6 +154,7 @@ module.exports = () => {
         hasFirebase: hasAndroidGoogleServices || hasIosGooglePlist,
         castReceiverAppId,
         castReceiverWebUrl,
+        castPairApiBaseUrl,
       },
     },
   };
