@@ -171,7 +171,13 @@ export const usePlayerSettings = () => {
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'audio' | 'subtitle' | 'server' | 'quality' | 'speed' | 'episodes'
+    | 'audio'
+    | 'subtitle'
+    | 'server'
+    | 'quality'
+    | 'speed'
+    | 'episodes'
+    | 'options'
   >('audio');
   const [resizeMode, setResizeMode] = useState<any>('none');
   const [playbackRate, setPlaybackRate] = useState(1.0);

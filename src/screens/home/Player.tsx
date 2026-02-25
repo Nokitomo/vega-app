@@ -2403,6 +2403,12 @@ const Player = ({route}: Props): React.JSX.Element => {
     (route.params?.type === 'series' ||
       episodeGroups.length > 1 ||
       episodeList.length > 1);
+  const groupedOptionsQualityLabel =
+    videoTracks?.length === 1
+      ? formatQuality(videoTracks[0]?.height?.toString() || 'auto')
+      : formatQuality(
+          videoTracks?.[selectedQualityIndex]?.height?.toString() || 'auto',
+        );
   const shouldShowSkipIntro =
     !!skipIntroInterval &&
     currentPosition >=
@@ -2564,21 +2570,16 @@ const Player = ({route}: Props): React.JSX.Element => {
             </Text>
           </TouchableOpacity>
 
-          {/* Subtitle controls */}
+          {/* Grouped playback options */}
           <TouchableOpacity
             onPress={() => {
-              setActiveTab('subtitle');
+              setActiveTab('options');
               setShowSettings(!showSettings);
             }}
-            className="flex flex-row gap-x-1 items-center">
-            <MaterialIcons
-              style={{opacity: 0.6}}
-              name={'subtitles'}
-              size={24}
-              color="white"
-            />
-          <Text className="text-xs capitalize text-white opacity-70">
-              {selectedSubtitleLabel}
+            className="flex flex-row gap-x-1 items-center opacity-60">
+            <MaterialIcons name={'tune'} size={24} color="white" />
+            <Text className="text-xs capitalize text-white">
+              {t('Options')}
             </Text>
           </TouchableOpacity>
 
@@ -2591,31 +2592,6 @@ const Player = ({route}: Props): React.JSX.Element => {
               <Text className="text-white text-xs">{t('Episodes')}</Text>
             </TouchableOpacity>
           )}
-
-          {/* Next episode controls */}
-          {canShowEpisodeControls && (
-            <TouchableOpacity
-              className="flex-row gap-1 items-center"
-              disabled={!hasNextEpisode}
-              onPress={handleNextEpisode}
-              style={{opacity: hasNextEpisode ? 0.6 : 0.25}}>
-              <MaterialIcons name="skip-next" size={24} color="white" />
-              <Text className="text-white text-xs">{t('Next')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Speed controls */}
-          <TouchableOpacity
-            className="flex-row gap-1 items-center opacity-60"
-            onPress={() => {
-              setActiveTab('speed');
-              setShowSettings(!showSettings);
-            }}>
-            <MaterialIcons name="speed" size={26} color="white" />
-            <Text className="text-white text-sm">
-              {playbackRate === 1 ? '1.0' : playbackRate}
-            </Text>
-          </TouchableOpacity>
 
           {/* PIP */}
           {!Platform.isTV && (
@@ -2633,24 +2609,6 @@ const Player = ({route}: Props): React.JSX.Element => {
             </TouchableOpacity>
           )}
 
-          {/* Server & Quality */}
-          <TouchableOpacity
-            className="flex-row gap-1 items-center opacity-60"
-            onPress={() => {
-              setActiveTab('server');
-              setShowSettings(!showSettings);
-            }}>
-            <MaterialIcons name="video-settings" size={25} color="white" />
-            <Text className="text-xs text-white capitalize">
-              {videoTracks?.length === 1
-                ? formatQuality(videoTracks[0]?.height?.toString() || 'auto')
-                : formatQuality(
-                    videoTracks?.[selectedQualityIndex]?.height?.toString() ||
-                      'auto',
-                  )}
-            </Text>
-          </TouchableOpacity>
-
           {/* Resize button */}
           <TouchableOpacity
             className="flex-row gap-1 items-center opacity-60"
@@ -2666,6 +2624,18 @@ const Player = ({route}: Props): React.JSX.Element => {
                     : t('Contain')}
             </Text>
           </TouchableOpacity>
+
+          {/* Next episode controls */}
+          {canShowEpisodeControls && (
+            <TouchableOpacity
+              className="flex-row gap-1 items-center"
+              disabled={!hasNextEpisode}
+              onPress={handleNextEpisode}
+              style={{opacity: hasNextEpisode ? 0.6 : 0.25}}>
+              <MaterialIcons name="skip-next" size={24} color="white" />
+              <Text className="text-white text-xs">{t('Next')}</Text>
+            </TouchableOpacity>
+          )}
 
         </Animated.View>
       )}
@@ -2784,6 +2754,87 @@ const Player = ({route}: Props): React.JSX.Element => {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+            )}
+
+            {/* Options Menu Tab */}
+            {activeTab === 'options' && (
+              <View className="w-full h-full p-1 px-4">
+                <Text className="text-lg font-bold text-center text-white mb-2">
+                  {t('Options')}
+                </Text>
+
+                <TouchableOpacity
+                  className="flex-row items-center rounded-md px-2 py-2 my-1"
+                  onPress={() => setActiveTab('subtitle')}>
+                  <MaterialIcons
+                    style={{opacity: 0.8}}
+                    name="subtitles"
+                    size={22}
+                    color="white"
+                  />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white text-base font-semibold">
+                      {t('Subtitle')}
+                    </Text>
+                    <Text className="text-white/60 text-xs" numberOfLines={1}>
+                      {selectedSubtitleLabel}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color="rgba(255,255,255,0.7)"
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="flex-row items-center rounded-md px-2 py-2 my-1"
+                  onPress={() => setActiveTab('speed')}>
+                  <MaterialIcons
+                    style={{opacity: 0.8}}
+                    name="speed"
+                    size={22}
+                    color="white"
+                  />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white text-base font-semibold">
+                      {t('Playback Speed')}
+                    </Text>
+                    <Text className="text-white/60 text-xs" numberOfLines={1}>
+                      {playbackRate === 1 ? '1.0x' : `${playbackRate}x`}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color="rgba(255,255,255,0.7)"
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="flex-row items-center rounded-md px-2 py-2 my-1"
+                  onPress={() => setActiveTab('server')}>
+                  <MaterialIcons
+                    style={{opacity: 0.8}}
+                    name="video-settings"
+                    size={22}
+                    color="white"
+                  />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white text-base font-semibold">
+                      {t('Server')}
+                    </Text>
+                    <Text className="text-white/60 text-xs" numberOfLines={1}>
+                      {groupedOptionsQualityLabel}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color="rgba(255,255,255,0.7)"
+                  />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Subtitle Tab */}
