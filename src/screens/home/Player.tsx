@@ -9,6 +9,7 @@ import {
   TouchableNativeFeedback,
   Alert,
   AppState,
+  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -81,6 +82,7 @@ import {
   VegaCastTracking,
 } from '../../lib/cast/vegaCast';
 import {setClipboardString} from '../../lib/utils/clipboard';
+import {EpisodeLink, Link} from '../../lib/providers/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -538,6 +540,26 @@ const Player = ({route}: Props): React.JSX.Element => {
     }
     return list.filter(item => item && item.link && item.title);
   }, []);
+  const resolveLocalizedItemTitle = useCallback(
+    (
+      item?:
+        | {
+            title?: string;
+            titleKey?: string;
+            titleParams?: Record<string, any>;
+          }
+        | null,
+    ) => {
+      if (!item) {
+        return '';
+      }
+      if (item.titleKey) {
+        return t(item.titleKey, item.titleParams);
+      }
+      return item.title || '';
+    },
+    [t],
+  );
 
   const hasEpisodesModule = useMemo(
     () =>
@@ -610,6 +632,167 @@ const Player = ({route}: Props): React.JSX.Element => {
     [getCachedEpisodes, hasEpisodesModule, normalizeEpisodeList, providerValue],
   );
 
+  const currentRouteEpisodeList = useMemo(
+    () => normalizeEpisodeList(route.params?.episodeList || []) as EpisodeLink[],
+    [normalizeEpisodeList, route.params?.episodeList],
+  );
+
+  const episodeGroups = useMemo<Link[]>(() => {
+    if (Array.isArray(route.params?.seasons) && route.params.seasons.length > 0) {
+      return route.params.seasons;
+    }
+
+    if (currentRouteEpisodeList.length === 0) {
+      return [];
+    }
+
+    const fallbackTitle = route.params?.secondaryTitle || t('Episodes');
+    return [
+      {
+        title: fallbackTitle,
+        ...(route.params?.secondaryTitle ? {} : {titleKey: 'Episodes'}),
+        seasonNumber: route.params?.seasonNumber,
+        episodesLink: route.params?.seasonEpisodesLink,
+        directLinks: currentRouteEpisodeList.map(item => ({
+          ...item,
+          type: (route.params?.type === 'movie' ? 'movie' : 'series') as
+            | 'movie'
+            | 'series',
+        })),
+      },
+    ];
+  }, [
+    currentRouteEpisodeList,
+    route.params?.seasonEpisodesLink,
+    route.params?.seasonNumber,
+    route.params?.secondaryTitle,
+    route.params?.seasons,
+    route.params?.type,
+    t,
+  ]);
+
+  const currentGroupIndex = useMemo(() => {
+    if (episodeGroups.length === 0) {
+      return -1;
+    }
+
+    if (
+      typeof route.params?.seasonIndex === 'number' &&
+      route.params.seasonIndex >= 0 &&
+      route.params.seasonIndex < episodeGroups.length
+    ) {
+      return route.params.seasonIndex;
+    }
+
+    if (route.params?.seasonEpisodesLink) {
+      const byEpisodesLink = episodeGroups.findIndex(
+        group => group?.episodesLink === route.params.seasonEpisodesLink,
+      );
+      if (byEpisodesLink >= 0) {
+        return byEpisodesLink;
+      }
+    }
+
+    if (activeEpisode?.link) {
+      const byDirectLink = episodeGroups.findIndex(group =>
+        Array.isArray(group?.directLinks)
+          ? group.directLinks.some(item => item?.link === activeEpisode.link)
+          : false,
+      );
+      if (byDirectLink >= 0) {
+        return byDirectLink;
+      }
+    }
+
+    return 0;
+  }, [
+    activeEpisode?.link,
+    episodeGroups,
+    route.params?.seasonEpisodesLink,
+    route.params?.seasonIndex,
+  ]);
+
+  const [episodesTabGroupIndex, setEpisodesTabGroupIndex] = useState(0);
+  const [episodesTabEpisodeList, setEpisodesTabEpisodeList] = useState<
+    EpisodeLink[]
+  >(currentRouteEpisodeList);
+  const [episodesTabLoading, setEpisodesTabLoading] = useState(false);
+  const [episodesTabError, setEpisodesTabError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEpisodesTabGroupIndex(currentGroupIndex >= 0 ? currentGroupIndex : 0);
+    setEpisodesTabEpisodeList(currentRouteEpisodeList);
+    setEpisodesTabLoading(false);
+    setEpisodesTabError(null);
+  }, [currentGroupIndex, currentRouteEpisodeList, route.params?.seasonEpisodesLink]);
+
+  const replacePlayerEpisode = useCallback(
+    ({
+      nextEpisodes,
+      nextIndex,
+      nextGroup,
+      nextGroupIndex,
+    }: {
+      nextEpisodes: EpisodeLink[];
+      nextIndex: number;
+      nextGroup?: Link;
+      nextGroupIndex?: number;
+    }) => {
+      const normalizedEpisodes = normalizeEpisodeList(nextEpisodes) as EpisodeLink[];
+      const targetEpisode = normalizedEpisodes[nextIndex];
+      if (!targetEpisode) {
+        return false;
+      }
+
+      hasSetInitialTracksRef.current = false;
+      navigation.replace('Player', {
+        linkIndex: nextIndex,
+        episodeList: normalizedEpisodes,
+        directUrl: route.params?.directUrl,
+        type: route.params?.type,
+        primaryTitle: route.params?.primaryTitle,
+        secondaryTitle:
+          resolveLocalizedItemTitle(nextGroup) || route.params?.secondaryTitle,
+        episodeNumber: targetEpisode.episodeNumber,
+        seasonNumber:
+          targetEpisode.seasonNumber ??
+          nextGroup?.seasonNumber ??
+          route.params?.seasonNumber,
+        seasonEpisodesLink:
+          nextGroup?.episodesLink || route.params?.seasonEpisodesLink,
+        poster: route.params?.poster,
+        file: route.params?.file,
+        providerValue: route.params?.providerValue,
+        infoUrl: route.params?.infoUrl,
+        doNotTrack: route.params?.doNotTrack,
+        seasons: route.params?.seasons,
+        seasonIndex:
+          typeof nextGroupIndex === 'number'
+            ? nextGroupIndex
+            : route.params?.seasonIndex,
+      });
+      return true;
+    },
+    [
+      navigation,
+      normalizeEpisodeList,
+      resolveLocalizedItemTitle,
+      route.params?.directUrl,
+      route.params?.doNotTrack,
+      route.params?.file,
+      route.params?.infoUrl,
+      route.params?.poster,
+      route.params?.primaryTitle,
+      route.params?.providerValue,
+      route.params?.seasonEpisodesLink,
+      route.params?.seasonIndex,
+      route.params?.seasonNumber,
+      route.params?.secondaryTitle,
+      route.params?.seasons,
+      route.params?.type,
+    ],
+  );
+
   const nextSeasonInfo = useMemo(() => {
     const seasons = route.params?.seasons;
     const seasonIndex = route.params?.seasonIndex;
@@ -653,8 +836,14 @@ const Player = ({route}: Props): React.JSX.Element => {
       currentIndex >= 0 &&
       currentIndex < episodeList.length - 1
     ) {
-      setActiveEpisode(episodeList[currentIndex + 1]);
-      hasSetInitialTracksRef.current = false;
+      const currentGroup =
+        currentGroupIndex >= 0 ? episodeGroups[currentGroupIndex] : undefined;
+      replacePlayerEpisode({
+        nextEpisodes: episodeList as EpisodeLink[],
+        nextIndex: currentIndex + 1,
+        nextGroup: currentGroup,
+        nextGroupIndex: currentGroupIndex >= 0 ? currentGroupIndex : undefined,
+      });
       return;
     }
 
@@ -668,18 +857,11 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
 
       if (nextSeasonEpisodeList.length > 0) {
-        navigation.replace('Player', {
-          linkIndex: 0,
-          episodeList: nextSeasonEpisodeList,
-          type: route.params?.type,
-          primaryTitle: route.params?.primaryTitle,
-          secondaryTitle: nextSeasonInfo.season.title,
-          seasonEpisodesLink: nextSeasonInfo.season.episodesLink,
-          poster: route.params?.poster,
-          providerValue: route.params?.providerValue,
-          infoUrl: route.params?.infoUrl,
-          seasons: route.params?.seasons,
-          seasonIndex: nextSeasonInfo.seasonIndex,
+        replacePlayerEpisode({
+          nextEpisodes: nextSeasonEpisodeList as EpisodeLink[],
+          nextIndex: 0,
+          nextGroup: nextSeasonInfo.season,
+          nextGroupIndex: nextSeasonInfo.seasonIndex,
         });
         return;
       }
@@ -688,18 +870,115 @@ const Player = ({route}: Props): React.JSX.Element => {
     ToastAndroid.show(t('No more episodes'), ToastAndroid.SHORT);
   }, [
     activeEpisode?.link,
+    currentGroupIndex,
+    episodeGroups,
     loadSeasonEpisodes,
-    navigation,
     nextSeasonInfo,
+    replacePlayerEpisode,
     route.params?.episodeList,
-    route.params?.infoUrl,
-    route.params?.poster,
-    route.params?.primaryTitle,
-    route.params?.providerValue,
-    route.params?.seasons,
-    route.params?.type,
     t,
   ]);
+
+  const handleOpenEpisodesTab = useCallback(() => {
+    const targetIndex = currentGroupIndex >= 0 ? currentGroupIndex : 0;
+    setEpisodesTabGroupIndex(targetIndex);
+    setEpisodesTabEpisodeList(currentRouteEpisodeList);
+    setEpisodesTabLoading(false);
+    setEpisodesTabError(null);
+    setActiveTab('episodes');
+    setShowSettings(!showSettings);
+
+    if (currentRouteEpisodeList.length === 0 && episodeGroups[targetIndex]) {
+      (async () => {
+        setEpisodesTabLoading(true);
+        const loaded = (await loadSeasonEpisodes(
+          episodeGroups[targetIndex],
+        )) as EpisodeLink[];
+        setEpisodesTabEpisodeList(loaded);
+        setEpisodesTabLoading(false);
+        setEpisodesTabError(loaded.length === 0 ? t('No episodes available') : null);
+      })();
+    }
+  }, [
+    currentGroupIndex,
+    currentRouteEpisodeList,
+    episodeGroups,
+    loadSeasonEpisodes,
+    setActiveTab,
+    setShowSettings,
+    showSettings,
+    t,
+  ]);
+
+  const handleSelectEpisodeGroup = useCallback(
+    async (groupIndex: number) => {
+      const group = episodeGroups[groupIndex];
+      if (!group) {
+        return;
+      }
+
+      setEpisodesTabGroupIndex(groupIndex);
+      setEpisodesTabError(null);
+
+      if (groupIndex === currentGroupIndex && currentRouteEpisodeList.length > 0) {
+        setEpisodesTabEpisodeList(currentRouteEpisodeList);
+        setEpisodesTabLoading(false);
+        return;
+      }
+
+      setEpisodesTabLoading(true);
+      const loadedEpisodes = (await loadSeasonEpisodes(group)) as EpisodeLink[];
+      setEpisodesTabEpisodeList(loadedEpisodes);
+      setEpisodesTabLoading(false);
+      setEpisodesTabError(
+        loadedEpisodes.length === 0 ? t('No episodes available') : null,
+      );
+    },
+    [
+      currentGroupIndex,
+      currentRouteEpisodeList,
+      episodeGroups,
+      loadSeasonEpisodes,
+      t,
+    ],
+  );
+
+  const handleSelectEpisodeFromTab = useCallback(
+    (episode: EpisodeLink, index: number) => {
+      const selectedGroup =
+        episodesTabGroupIndex >= 0 ? episodeGroups[episodesTabGroupIndex] : undefined;
+      const selectedGroupIndex =
+        episodesTabGroupIndex >= 0 ? episodesTabGroupIndex : undefined;
+
+      if (
+        selectedGroupIndex === currentGroupIndex &&
+        episode?.link === activeEpisode?.link
+      ) {
+        setShowSettings(false);
+        return;
+      }
+
+      const changed = replacePlayerEpisode({
+        nextEpisodes: episodesTabEpisodeList,
+        nextIndex: index,
+        nextGroup: selectedGroup,
+        nextGroupIndex: selectedGroupIndex,
+      });
+
+      if (changed) {
+        setShowSettings(false);
+      }
+    },
+    [
+      activeEpisode?.link,
+      currentGroupIndex,
+      episodeGroups,
+      episodesTabEpisodeList,
+      episodesTabGroupIndex,
+      replacePlayerEpisode,
+      setShowSettings,
+    ],
+  );
 
   const handleSkipIntro = useCallback(() => {
     if (!skipIntroInterval) {
@@ -2099,12 +2378,6 @@ const Player = ({route}: Props): React.JSX.Element => {
   const currentPosition = Number.isFinite(videoPositionRef.current.position)
     ? videoPositionRef.current.position
     : 0;
-  const effectiveDuration = Math.max(
-    Number.isFinite(videoPositionRef.current.duration)
-      ? videoPositionRef.current.duration
-      : 0,
-    Number.isFinite(loadedDurationRef.current) ? loadedDurationRef.current : 0,
-  );
   const episodeList = route.params?.episodeList || [];
   const currentEpisodeIndex = episodeList.findIndex(
     item => item?.link === activeEpisode?.link,
@@ -2125,12 +2398,11 @@ const Player = ({route}: Props): React.JSX.Element => {
     hasNextEpisodeInSeason ||
     hasNextEpisodeFromLoadedNextSeason ||
     canLoadNextSeasonOnDemand;
-  const remainingSeconds =
-    effectiveDuration > 0
-      ? Math.max(0, effectiveDuration - currentPosition)
-      : 0;
-  const shouldShowNext =
-    hasNextEpisode && effectiveDuration > 0 && remainingSeconds <= 90;
+  const canShowEpisodeControls =
+    episodeGroups.length > 0 &&
+    (route.params?.type === 'series' ||
+      episodeGroups.length > 1 ||
+      episodeList.length > 1);
   const shouldShowSkipIntro =
     !!skipIntroInterval &&
     currentPosition >=
@@ -2140,6 +2412,15 @@ const Player = ({route}: Props): React.JSX.Element => {
     castProvider === 'native' && castState === CastState.CONNECTED
       ? primary
       : 'hsl(0, 0%, 70%)';
+  const isEpisodesSettingsTab = activeTab === 'episodes';
+  const settingsPanelWidth = Math.max(
+    320,
+    Math.min(
+      Dimensions.get('window').width - 24,
+      isEpisodesSettingsTab ? 900 : 600,
+    ),
+  );
+  const settingsPanelHeight = isEpisodesSettingsTab ? 420 : 288;
 
   // Show loading state
   if (isPreparingPlayer) {
@@ -2301,6 +2582,28 @@ const Player = ({route}: Props): React.JSX.Element => {
             </Text>
           </TouchableOpacity>
 
+          {/* Episode list controls */}
+          {canShowEpisodeControls && (
+            <TouchableOpacity
+              className="flex-row gap-1 items-center opacity-60"
+              onPress={handleOpenEpisodesTab}>
+              <MaterialIcons name="list" size={24} color="white" />
+              <Text className="text-white text-xs">{t('Episodes')}</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Next episode controls */}
+          {canShowEpisodeControls && (
+            <TouchableOpacity
+              className="flex-row gap-1 items-center"
+              disabled={!hasNextEpisode}
+              onPress={handleNextEpisode}
+              style={{opacity: hasNextEpisode ? 0.6 : 0.25}}>
+              <MaterialIcons name="skip-next" size={24} color="white" />
+              <Text className="text-white text-xs">{t('Next')}</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Speed controls */}
           <TouchableOpacity
             className="flex-row gap-1 items-center opacity-60"
@@ -2402,43 +2705,6 @@ const Player = ({route}: Props): React.JSX.Element => {
         </Animated.View>
       )}
 
-      {/* Next episode button */}
-      {!isPlayerLocked && shouldShowNext && (
-        <Animated.View
-          style={[nextButtonStyle]}
-          className="absolute bottom-24 right-5 z-50">
-          <TouchableOpacity
-            activeOpacity={0.85}
-            className="rounded-full"
-            onPress={handleNextEpisode}>
-            <View
-              style={overlayButtonContainerStyle}
-              className="rounded-full overflow-hidden">
-              <BlurView
-                intensity={overlayBlurIntensity}
-                tint="dark"
-                experimentalBlurMethod="dimezisBlurView"
-                style={{
-                  backgroundColor: overlayBackgroundColor,
-                }}
-                className="flex-row items-center gap-2 px-4 py-2">
-                <Text
-                  style={{opacity: overlayTextOpacity}}
-                  className="text-white text-sm font-semibold uppercase">
-                  {t('Next')}
-                </Text>
-                <MaterialIcons
-                  name="skip-next"
-                  size={22}
-                  color="white"
-                  style={{opacity: overlayTextOpacity}}
-                />
-              </BlurView>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
       {/* Toast message */}
       <Animated.View
         style={[toastStyle]}
@@ -2456,7 +2722,8 @@ const Player = ({route}: Props): React.JSX.Element => {
           className="absolute opacity-0 top-0 left-0 w-full h-full bg-black/20 justify-end items-center"
           onTouchEnd={() => setShowSettings(false)}>
           <View
-            className="bg-black p-3 w-[600px] h-72 rounded-t-lg flex-row justify-start items-center"
+            className="bg-black p-3 rounded-t-lg flex-row justify-start items-center"
+            style={{width: settingsPanelWidth, height: settingsPanelHeight}}
             onTouchEnd={e => e.stopPropagation()}>
             {/* Audio Tab */}
             {activeTab === 'audio' && (
@@ -2657,6 +2924,113 @@ const Player = ({route}: Props): React.JSX.Element => {
                   </TouchableOpacity>
                 )}
               />
+            )}
+
+            {/* Episodes Tab */}
+            {activeTab === 'episodes' && (
+              <View className="w-full h-full flex-row p-1">
+                <View className="w-44 pr-3 border-r border-white/15">
+                  <Text className="text-lg font-bold text-center text-white mb-2">
+                    {t('Lists')}
+                  </Text>
+                  <ScrollView
+                    className="w-full"
+                    contentContainerStyle={{paddingBottom: 8}}>
+                    {episodeGroups.map((group, index) => {
+                      const isSelectedGroup = episodesTabGroupIndex === index;
+                      const groupTitle = resolveLocalizedItemTitle(group);
+                      return (
+                        <TouchableOpacity
+                          key={`episode-group-${group.episodesLink || group.title || index}`}
+                          className="rounded-md px-2 py-2 my-1"
+                          style={{
+                            backgroundColor: isSelectedGroup
+                              ? 'rgba(255,255,255,0.12)'
+                              : 'transparent',
+                          }}
+                          onPress={() => {
+                            handleSelectEpisodeGroup(index);
+                          }}>
+                          <Text
+                            className="text-sm"
+                            style={{
+                              color: isSelectedGroup ? primary : 'white',
+                              fontWeight: isSelectedGroup ? '700' : '500',
+                            }}
+                            numberOfLines={2}>
+                            {groupTitle || `#${index + 1}`}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <View className="flex-1 pl-3">
+                  <Text className="text-lg font-bold text-center text-white mb-2">
+                    {t('Episodes')}
+                  </Text>
+
+                  {episodesTabLoading ? (
+                    <View className="flex-1 items-center justify-center">
+                      <Text className="text-white text-sm">
+                        {t('Loading episodes...')}
+                      </Text>
+                    </View>
+                  ) : episodesTabError ? (
+                    <View className="flex-1 items-center justify-center px-4">
+                      <Text className="text-white text-sm text-center">
+                        {episodesTabError}
+                      </Text>
+                    </View>
+                  ) : episodesTabEpisodeList.length === 0 ? (
+                    <View className="flex-1 items-center justify-center">
+                      <Text className="text-white text-sm">
+                        {t('No episodes available')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <FlashList
+                      data={episodesTabEpisodeList}
+                      estimatedItemSize={58}
+                      keyExtractor={(item, index) =>
+                        `player-episode-${item.link}-${index}`
+                      }
+                      renderItem={({item, index}) => {
+                        const isCurrentEpisode = item.link === activeEpisode?.link;
+                        const episodeTitle = resolveLocalizedItemTitle(item) || item.title;
+                        return (
+                          <TouchableOpacity
+                            className="rounded-md px-2 py-2 my-1 flex-row items-center justify-between"
+                            style={{
+                              backgroundColor: isCurrentEpisode
+                                ? 'rgba(255,255,255,0.12)'
+                                : 'transparent',
+                            }}
+                            onPress={() => handleSelectEpisodeFromTab(item, index)}>
+                            <Text
+                              className="text-sm flex-1 pr-2"
+                              style={{
+                                color: isCurrentEpisode ? primary : 'white',
+                                fontWeight: isCurrentEpisode ? '700' : '500',
+                              }}
+                              numberOfLines={2}>
+                              {episodeTitle}
+                            </Text>
+                            {isCurrentEpisode && (
+                              <MaterialIcons
+                                name="play-circle-filled"
+                                size={18}
+                                color={primary}
+                              />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      }}
+                    />
+                  )}
+                </View>
+              </View>
             )}
 
             {/* Server Tab */}
