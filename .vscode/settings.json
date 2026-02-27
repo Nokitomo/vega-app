@@ -2,5 +2,6 @@
   "cSpell.words": ["notifee", "RNFS"],
   "npm.packageManager": "npm",
   "snyk.advanced.autoSelectOrganization": true,
-  "java.compile.nullAnalysis.mode": "automatic"
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.configuration.updateBuildConfiguration": "automatic"
 }
