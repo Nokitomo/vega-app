@@ -27,9 +27,9 @@ import {enableFreeze, enableScreens} from 'react-native-screens';
 import Preferences from './screens/settings/Preference';
 import useThemeStore from './lib/zustand/themeStore';
 import {
-  Dimensions,
   LogBox,
   PixelRatio,
+  useWindowDimensions,
   ViewStyle,
 } from 'react-native';
 import {EpisodeLink, Link} from './lib/providers/types';
@@ -79,7 +79,8 @@ const getCrashlytics = (): any | null => {
 enableScreens(true);
 enableFreeze(true);
 
-const isLargeScreen = Dimensions.get('window').width > 768;
+const LARGE_SCREEN_WIDTH = 768;
+const TABLET_MIN_DIMENSION_DP = 600;
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type HomeStackParamList = {
@@ -215,10 +216,19 @@ const AppContent = () => {
   const {clearCache} = useSearchCacheStore(state => ({
     clearCache: state.clearCache,
   }));
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
   const showTabBarLables = useUiSettingsStore(
     state => state.showTabBarLabels,
   );
+  const tabletRotationEnabled = useUiSettingsStore(
+    state => state.tabletRotationEnabled,
+  );
+  const isLargeScreen = windowWidth > LARGE_SCREEN_WIDTH;
+  const isTabletDevice =
+    Math.min(windowWidth, windowHeight) >= TABLET_MIN_DIMENSION_DP;
+  const allowNonPlayerRotation = isTabletDevice && tabletRotationEnabled;
+  const useSideTabLayout = isLargeScreen && !allowNonPlayerRotation;
   const tabBarLabelLift = (() => {
     if (!showTabBarLables) {
       return 0;
@@ -465,13 +475,22 @@ const AppContent = () => {
       </SettingsStack.Navigator>
     );
   }
-  const applyOrientationForRoute = (routeName?: string) => {
-    if (routeName === 'Player') {
-      Orientation.lockToLandscape();
-    } else {
+  const applyOrientationForRoute = useCallback(
+    (routeName?: string) => {
+      if (routeName === 'Player') {
+        Orientation.lockToLandscape();
+        return;
+      }
+
+      if (allowNonPlayerRotation) {
+        Orientation.unlockAllOrientations();
+        return;
+      }
+
       Orientation.lockToPortrait();
-    }
-  };
+    },
+    [allowNonPlayerRotation],
+  );
 
   function TabStack() {
     return (
@@ -480,15 +499,15 @@ const AppContent = () => {
         screenOptions={{
           animation: 'shift',
           tabBarLabelPosition: 'below-icon',
-          tabBarVariant: isLargeScreen ? 'material' : 'uikit',
+          tabBarVariant: useSideTabLayout ? 'material' : 'uikit',
           popToTopOnBlur: false,
-          tabBarPosition: isLargeScreen ? 'left' : 'bottom',
+          tabBarPosition: useSideTabLayout ? 'left' : 'bottom',
           headerShown: false,
           freezeOnBlur: true,
           tabBarActiveTintColor: primary,
           tabBarInactiveTintColor: '#dadde3',
           tabBarShowLabel: showTabBarLables,
-          tabBarStyle: !isLargeScreen
+          tabBarStyle: !useSideTabLayout
             ? {
                 position: 'absolute',
                 bottom: -insets.bottom + tabBarLabelLift,
@@ -613,6 +632,10 @@ const AppContent = () => {
       checkForUpdate(() => {}, settingsStorage.isAutoDownloadEnabled(), false);
     }
   }, []);
+
+  useEffect(() => {
+    applyOrientationForRoute(navigationRef.getCurrentRoute()?.name);
+  }, [applyOrientationForRoute]);
 
   return (
     <GlobalErrorBoundary>

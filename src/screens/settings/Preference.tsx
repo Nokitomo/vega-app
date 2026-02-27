@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ToastAndroid,
   StatusBar,
+  useWindowDimensions,
 } from 'react-native';
 import React, {useState} from 'react';
 import {settingsStorage} from '../../lib/storage';
@@ -38,14 +39,22 @@ const getCrashlytics = (): any | null => {
 const Preferences = () => {
   const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
   const {t} = useTranslation();
+  const {width, height} = useWindowDimensions();
   const {primary, setPrimary, isCustom, setCustom} = useThemeStore(
     state => state,
   );
+  const isTabletDevice = Math.min(width, height) >= 600;
   const showRecentlyWatched = useUiSettingsStore(
     state => state.showRecentlyWatched,
   );
   const setShowRecentlyWatched = useUiSettingsStore(
     state => state.setShowRecentlyWatched,
+  );
+  const tabletRotationEnabled = useUiSettingsStore(
+    state => state.tabletRotationEnabled,
+  );
+  const setTabletRotationEnabled = useUiSettingsStore(
+    state => state.setTabletRotationEnabled,
   );
   const [language, setLanguage] = useState<SupportedLanguage>(
     settingsStorage.getAppLanguage(),
@@ -379,6 +388,22 @@ const Preferences = () => {
                 }}
               />
             </View>
+
+            {/* Tablet Rotation */}
+            {isTabletDevice && (
+              <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+                <Text className="text-white text-base flex-1">
+                  {t('Allow Screen Rotation on Tablet')}
+                </Text>
+                <Switch
+                  thumbColor={tabletRotationEnabled ? primary : 'gray'}
+                  value={tabletRotationEnabled}
+                  onValueChange={() => {
+                    setTabletRotationEnabled(!tabletRotationEnabled);
+                  }}
+                />
+              </View>
+            )}
 
             {/* Always Use External Downloader */}
             <View className="flex-row items-center justify-between p-4">

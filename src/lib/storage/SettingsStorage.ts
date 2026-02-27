@@ -11,6 +11,7 @@ export enum SettingsKeys {
   SHOW_RECENTLY_WATCHED = 'showRecentlyWatched',
   CUSTOM_COLOR = 'customColor',
   APP_LANGUAGE = 'appLanguage',
+  ALLOW_TABLET_ROTATION = 'allowTabletRotation',
   // Feedback settings
   HAPTIC_FEEDBACK = 'hapticFeedback',
   NOTIFICATIONS_ENABLED = 'notificationsEnabled',
@@ -98,6 +99,16 @@ export class SettingsStorage {
 
   setShowRecentlyWatched(show: boolean): void {
     mainStorage.setBool(SettingsKeys.SHOW_RECENTLY_WATCHED, show);
+  }
+
+  isTabletRotationEnabled(): boolean {
+    return mainStorage.getBool(SettingsKeys.ALLOW_TABLET_ROTATION) === null
+      ? false
+      : mainStorage.getBool(SettingsKeys.ALLOW_TABLET_ROTATION);
+  }
+
+  setTabletRotationEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.ALLOW_TABLET_ROTATION, enabled);
   }
 
   isHapticFeedbackEnabled(): boolean {
