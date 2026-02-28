@@ -62,9 +62,11 @@ import {
   clearActiveVegaCastTracking,
   fetchVegaCastProgress,
   getActiveVegaCastTracking,
+  normalizeVegaCastEpisodeProgress,
   openVegaCastReceiverUrl,
   prepareVegaCastLaunchData,
   saveActiveVegaCastTracking,
+  VegaCastEpisodeProgressSnapshot,
   VegaCastTracking,
 } from '../lib/cast/vegaCast';
 import {setClipboardString} from '../lib/utils/clipboard';
@@ -1434,6 +1436,163 @@ const SeasonList: React.FC<SeasonListProps> = ({
     ],
   );
 
+  const syncVegaEpisodeLedgerProgress = useCallback(
+    (episodes: VegaCastEpisodeProgressSnapshot[]) => {
+      if (!Array.isArray(episodes) || episodes.length === 0) {
+        return;
+      }
+
+      const historyKey = String(routeParams.link || '').trim();
+      if (!historyKey) {
+        return;
+      }
+
+      let latestEntry:
+        | (VegaCastEpisodeProgressSnapshot & {currentTime: number; duration: number})
+        | null = null;
+      let latestUpdatedAt = 0;
+
+      episodes.forEach(entry => {
+        const episodeLink = String(entry.episodeLink || '').trim();
+        const duration = Number(entry.duration);
+        if (!episodeLink || !Number.isFinite(duration) || duration <= 0) {
+          return;
+        }
+
+        const rawCurrentTime = Number(entry.currentTime);
+        const normalizedCurrentTime = Number.isFinite(rawCurrentTime)
+          ? Math.max(0, rawCurrentTime)
+          : 0;
+        const currentTime = entry.completed
+          ? duration
+          : Math.min(duration, normalizedCurrentTime);
+
+        cacheStorage.setString(
+          episodeLink,
+          JSON.stringify({
+            position: currentTime,
+            duration,
+          }),
+        );
+        watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
+
+        const progressData = {
+          currentTime,
+          duration,
+          percentage: (currentTime / duration) * 100,
+          infoUrl: routeParams.link || '',
+          title: metaTitle || '',
+          episodeTitle: String(entry.episodeTitle || ''),
+          episodeNumber:
+            typeof entry.episodeNumber === 'number' ? entry.episodeNumber : undefined,
+          episodeLink,
+          seasonTitle: activeSeason?.title || '',
+          seasonNumber:
+            typeof entry.seasonNumber === 'number'
+              ? entry.seasonNumber
+              : activeSeasonNumber,
+          seasonEpisodesLink: activeSeason?.episodesLink || '',
+          updatedAt: Date.now(),
+        };
+
+        if (progressData.episodeTitle) {
+          const episodeKey = `watch_history_progress_${historyKey}_${progressData.episodeTitle.replace(
+            /\s+/g,
+            '_',
+          )}`;
+          mainStorage.setString(episodeKey, JSON.stringify(progressData));
+          watchHistoryStorage.addProgressKey(episodeKey);
+        }
+
+        const updatedAt = Number(entry.updatedAt || 0);
+        const comparableUpdatedAt =
+          Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
+        if (comparableUpdatedAt >= latestUpdatedAt) {
+          latestUpdatedAt = comparableUpdatedAt;
+          latestEntry = {
+            ...entry,
+            currentTime,
+            duration,
+          };
+        }
+      });
+
+      if (!latestEntry) {
+        return;
+      }
+
+      const hasHistoryEntry = watchHistoryStorage
+        .getWatchHistory()
+        .some(item => item.link === historyKey);
+      if (!hasHistoryEntry) {
+        addItem({
+          id: historyKey,
+          link: historyKey,
+          title: metaTitle || '',
+          poster: poster?.poster || poster?.background,
+          provider: providerValue,
+          lastPlayed: Date.now(),
+          currentTime: latestEntry.currentTime,
+          duration: latestEntry.duration,
+          playbackRate: 1,
+          episodeTitle: String(latestEntry.episodeTitle || ''),
+          episodeNumber:
+            typeof latestEntry.episodeNumber === 'number'
+              ? latestEntry.episodeNumber
+              : undefined,
+          seasonNumber:
+            typeof latestEntry.seasonNumber === 'number'
+              ? latestEntry.seasonNumber
+              : activeSeasonNumber,
+        });
+      }
+
+      updatePlaybackInfo(historyKey, {
+        currentTime: latestEntry.currentTime,
+        duration: latestEntry.duration,
+        playbackRate: 1,
+      });
+
+      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      mainStorage.setString(
+        historyProgressKey,
+        JSON.stringify({
+          currentTime: latestEntry.currentTime,
+          duration: latestEntry.duration,
+          percentage: (latestEntry.currentTime / latestEntry.duration) * 100,
+          infoUrl: routeParams.link || '',
+          title: metaTitle || '',
+          episodeTitle: String(latestEntry.episodeTitle || ''),
+          episodeNumber:
+            typeof latestEntry.episodeNumber === 'number'
+              ? latestEntry.episodeNumber
+              : undefined,
+          episodeLink: latestEntry.episodeLink,
+          seasonTitle: activeSeason?.title || '',
+          seasonNumber:
+            typeof latestEntry.seasonNumber === 'number'
+              ? latestEntry.seasonNumber
+              : activeSeasonNumber,
+          seasonEpisodesLink: activeSeason?.episodesLink || '',
+          updatedAt: Date.now(),
+        }),
+      );
+      watchHistoryStorage.addProgressKey(historyProgressKey);
+    },
+    [
+      activeSeason?.episodesLink,
+      activeSeason?.title,
+      activeSeasonNumber,
+      addItem,
+      metaTitle,
+      poster?.background,
+      poster?.poster,
+      providerValue,
+      routeParams.link,
+      updatePlaybackInfo,
+    ],
+  );
+
   useEffect(() => {
     if (castProvider !== 'vega') {
       setVegaTracking(null);
@@ -1483,6 +1642,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
         lastVegaProgressUpdatedRef.current =
           Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
 
+        const episodeLedger = normalizeVegaCastEpisodeProgress(progress);
+        if (episodeLedger.length > 0) {
+          syncVegaEpisodeLedgerProgress(episodeLedger);
+        }
+
         storeVegaProgress(progress);
         refreshProgressData();
       } catch (error) {
@@ -1505,6 +1669,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     isFocused,
     refreshProgressData,
     routeParams.link,
+    syncVegaEpisodeLedgerProgress,
     storeVegaProgress,
     vegaTracking,
   ]);

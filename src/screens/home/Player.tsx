@@ -76,9 +76,11 @@ import {
   clearActiveVegaCastTracking,
   fetchVegaCastProgress,
   getActiveVegaCastTracking,
+  normalizeVegaCastEpisodeProgress,
   openVegaCastReceiverUrl,
   prepareVegaCastLaunchData,
   saveActiveVegaCastTracking,
+  VegaCastEpisodeProgressSnapshot,
   VegaCastTracking,
 } from '../../lib/cast/vegaCast';
 import {setClipboardString} from '../../lib/utils/clipboard';
@@ -1553,6 +1555,169 @@ const Player = ({route}: Props): React.JSX.Element => {
     ],
   );
 
+  const syncVegaEpisodeLedgerProgress = useCallback(
+    (episodes: VegaCastEpisodeProgressSnapshot[]) => {
+      if (!Array.isArray(episodes) || episodes.length === 0) {
+        return;
+      }
+
+      const historyKey =
+        String(route.params?.infoUrl || '').trim() ||
+        String(activeEpisode?.link || '').trim();
+      if (!historyKey) {
+        return;
+      }
+
+      let latestEntry:
+        | (VegaCastEpisodeProgressSnapshot & {currentTime: number; duration: number})
+        | null = null;
+      let latestUpdatedAt = 0;
+
+      episodes.forEach(entry => {
+        const episodeLink = String(entry.episodeLink || '').trim();
+        const duration = Number(entry.duration);
+        if (!episodeLink || !Number.isFinite(duration) || duration <= 0) {
+          return;
+        }
+
+        const rawCurrentTime = Number(entry.currentTime);
+        const normalizedCurrentTime = Number.isFinite(rawCurrentTime)
+          ? Math.max(0, rawCurrentTime)
+          : 0;
+        const currentTime = entry.completed
+          ? duration
+          : Math.min(duration, normalizedCurrentTime);
+
+        cacheStorage.setString(
+          episodeLink,
+          JSON.stringify({
+            position: currentTime,
+            duration,
+          }),
+        );
+        watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
+
+        const progressData = {
+          currentTime,
+          duration,
+          percentage: (currentTime / duration) * 100,
+          infoUrl: route.params?.infoUrl || '',
+          title: route.params?.primaryTitle || '',
+          episodeTitle: String(entry.episodeTitle || ''),
+          episodeNumber:
+            typeof entry.episodeNumber === 'number' ? entry.episodeNumber : undefined,
+          episodeLink,
+          seasonTitle: route.params?.secondaryTitle || '',
+          seasonNumber:
+            typeof entry.seasonNumber === 'number'
+              ? entry.seasonNumber
+              : route.params?.seasonNumber,
+          seasonEpisodesLink: route.params?.episodesLink || '',
+          updatedAt: Date.now(),
+        };
+
+        if (progressData.episodeTitle) {
+          const episodeKey = `watch_history_progress_${historyKey}_${progressData.episodeTitle.replace(
+            /\s+/g,
+            '_',
+          )}`;
+          mainStorage.setString(episodeKey, JSON.stringify(progressData));
+          watchHistoryStorage.addProgressKey(episodeKey);
+        }
+
+        const updatedAt = Number(entry.updatedAt || 0);
+        const comparableUpdatedAt =
+          Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
+        if (comparableUpdatedAt >= latestUpdatedAt) {
+          latestUpdatedAt = comparableUpdatedAt;
+          latestEntry = {
+            ...entry,
+            currentTime,
+            duration,
+          };
+        }
+      });
+
+      if (!latestEntry) {
+        return;
+      }
+
+      const hasHistoryEntry = watchHistoryStorage
+        .getWatchHistory()
+        .some(item => item.link === historyKey);
+      if (!hasHistoryEntry) {
+        addItem({
+          id: historyKey,
+          link: historyKey,
+          title: route.params?.primaryTitle || '',
+          poster: route.params?.poster?.poster || route.params?.poster?.background,
+          provider: route.params?.providerValue || providerValue,
+          lastPlayed: Date.now(),
+          currentTime: latestEntry.currentTime,
+          duration: latestEntry.duration,
+          playbackRate,
+          episodeTitle: String(latestEntry.episodeTitle || ''),
+          episodeNumber:
+            typeof latestEntry.episodeNumber === 'number'
+              ? latestEntry.episodeNumber
+              : route.params?.episodeNumber,
+          seasonNumber:
+            typeof latestEntry.seasonNumber === 'number'
+              ? latestEntry.seasonNumber
+              : route.params?.seasonNumber,
+        });
+      }
+
+      updatePlaybackInfo(historyKey, {
+        currentTime: latestEntry.currentTime,
+        duration: latestEntry.duration,
+        playbackRate,
+      });
+
+      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      mainStorage.setString(
+        historyProgressKey,
+        JSON.stringify({
+          currentTime: latestEntry.currentTime,
+          duration: latestEntry.duration,
+          percentage: (latestEntry.currentTime / latestEntry.duration) * 100,
+          infoUrl: route.params?.infoUrl || '',
+          title: route.params?.primaryTitle || '',
+          episodeTitle: String(latestEntry.episodeTitle || ''),
+          episodeNumber:
+            typeof latestEntry.episodeNumber === 'number'
+              ? latestEntry.episodeNumber
+              : route.params?.episodeNumber,
+          episodeLink: latestEntry.episodeLink,
+          seasonTitle: route.params?.secondaryTitle || '',
+          seasonNumber:
+            typeof latestEntry.seasonNumber === 'number'
+              ? latestEntry.seasonNumber
+              : route.params?.seasonNumber,
+          seasonEpisodesLink: route.params?.episodesLink || '',
+          updatedAt: Date.now(),
+        }),
+      );
+      watchHistoryStorage.addProgressKey(historyProgressKey);
+    },
+    [
+      activeEpisode?.link,
+      addItem,
+      playbackRate,
+      providerValue,
+      route.params?.episodeNumber,
+      route.params?.episodesLink,
+      route.params?.infoUrl,
+      route.params?.poster?.background,
+      route.params?.poster?.poster,
+      route.params?.primaryTitle,
+      route.params?.providerValue,
+      route.params?.secondaryTitle,
+      route.params?.seasonNumber,
+      updatePlaybackInfo,
+    ],
+  );
+
   const startNativeCast = useCallback(async () => {
     if (!remoteMediaClient || !selectedStream?.link || isStartingNativeCast) {
       return false;
@@ -1838,6 +2003,11 @@ const Player = ({route}: Props): React.JSX.Element => {
         lastVegaProgressSyncRef.current =
           Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now();
 
+        const episodeLedger = normalizeVegaCastEpisodeProgress(progress);
+        if (episodeLedger.length > 0) {
+          syncVegaEpisodeLedgerProgress(episodeLedger);
+        }
+
         const castEpisodeLink =
           typeof progress.episodeLink === 'string' && progress.episodeLink
             ? progress.episodeLink
@@ -1903,6 +2073,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     route.params?.episodeList,
     route.params?.infoUrl,
     route.params?.seasonNumber,
+    syncVegaEpisodeLedgerProgress,
     storeRemoteCastProgress,
     vegaTracking,
   ]);

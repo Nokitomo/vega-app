@@ -27,6 +27,19 @@ export type VegaCastTracking = {
   apiBaseUrl: string;
 };
 
+export type VegaCastEpisodeProgressSnapshot = {
+  episodeLink: string;
+  episodeTitle?: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+  queueIndex?: number;
+  currentTime?: number;
+  duration?: number;
+  playbackRate?: number;
+  completed?: boolean;
+  updatedAt?: number;
+};
+
 export type VegaCastProgressSnapshot = {
   sessionId: string;
   infoUrl?: string;
@@ -43,6 +56,102 @@ export type VegaCastProgressSnapshot = {
   playbackRate?: number;
   isEnded?: boolean;
   updatedAt?: number;
+  episodes?:
+    | VegaCastEpisodeProgressSnapshot[]
+    | Record<string, VegaCastEpisodeProgressSnapshot>;
+};
+
+const normalizeEpisodeProgressEntry = (
+  value: unknown,
+): VegaCastEpisodeProgressSnapshot | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const episodeLink = String(candidate.episodeLink || '').trim();
+  if (!episodeLink) {
+    return null;
+  }
+
+  const parseNonNegative = (raw: unknown): number | undefined => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return undefined;
+    }
+    return parsed;
+  };
+
+  const parsePositive = (raw: unknown): number | undefined => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return parsed;
+  };
+
+  const parseInteger = (raw: unknown): number | undefined => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return undefined;
+    }
+    return Math.floor(parsed);
+  };
+
+  const episodeNumber = parsePositive(candidate.episodeNumber);
+  const seasonNumber = parsePositive(candidate.seasonNumber);
+  const queueIndexRaw = parseInteger(candidate.queueIndex);
+  const queueIndex =
+    typeof queueIndexRaw === 'number' && queueIndexRaw >= 0
+      ? queueIndexRaw
+      : undefined;
+  const currentTime = parseNonNegative(candidate.currentTime);
+  const duration = parseNonNegative(candidate.duration);
+  const playbackRate = parsePositive(candidate.playbackRate);
+  const updatedAt = parseNonNegative(candidate.updatedAt);
+
+  return {
+    episodeLink,
+    episodeTitle: String(candidate.episodeTitle || ''),
+    ...(typeof episodeNumber === 'number' ? {episodeNumber} : {}),
+    ...(typeof seasonNumber === 'number' ? {seasonNumber} : {}),
+    ...(typeof queueIndex === 'number' ? {queueIndex} : {}),
+    ...(typeof currentTime === 'number' ? {currentTime} : {}),
+    ...(typeof duration === 'number' ? {duration} : {}),
+    ...(typeof playbackRate === 'number' ? {playbackRate} : {}),
+    ...(typeof updatedAt === 'number' ? {updatedAt} : {}),
+    completed: candidate.completed === true || candidate.isEnded === true,
+  };
+};
+
+export const normalizeVegaCastEpisodeProgress = (
+  progress: VegaCastProgressSnapshot | null | undefined,
+): VegaCastEpisodeProgressSnapshot[] => {
+  const rawEpisodes = progress?.episodes;
+  const source = Array.isArray(rawEpisodes)
+    ? rawEpisodes
+    : rawEpisodes && typeof rawEpisodes === 'object'
+      ? Object.values(rawEpisodes)
+      : [];
+
+  const normalized = source
+    .map(normalizeEpisodeProgressEntry)
+    .filter((item): item is VegaCastEpisodeProgressSnapshot => !!item);
+
+  return normalized.sort((left, right) => {
+    const leftUpdatedAt = Number(left.updatedAt || 0);
+    const rightUpdatedAt = Number(right.updatedAt || 0);
+    if (leftUpdatedAt !== rightUpdatedAt) {
+      return leftUpdatedAt - rightUpdatedAt;
+    }
+    const leftQueueIndex =
+      typeof left.queueIndex === 'number' ? left.queueIndex : Number.MAX_SAFE_INTEGER;
+    const rightQueueIndex =
+      typeof right.queueIndex === 'number'
+        ? right.queueIndex
+        : Number.MAX_SAFE_INTEGER;
+    return leftQueueIndex - rightQueueIndex;
+  });
 };
 
 const normalizeApiBaseUrl = (value: string): string => {
