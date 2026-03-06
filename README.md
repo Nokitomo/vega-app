@@ -1,29 +1,29 @@
-![vega-high-resolution-logo-transparent](https://github.com/Zenda-Cross/vega-app/assets/143804558/b2eb446f-8e7f-4800-81e1-3320c82f33de)
+![vega-high-resolution-logo-transparent](./assets/readme/vega-high-resolution-logo-transparent.png)
 
 # Vega-App
-Android and iOS app for streaming media.
-### Features
-- Stream and download ad-free.
-- Multiple providers/sources.
-- Subtitles and multiple stream options when available.
+App Android e iOS per lo streaming di contenuti multimediali.
+### Funzionalita
+- Streaming e download senza pubblicita.
+- Provider/sorgenti multipli.
+- Sottotitoli e opzioni stream multiple quando disponibili.
 - WatchList.
-- External player and downloader support.
-- Dynamic providers with automatic updates.
-- English and Italian UI (i18n).
+- Supporto player esterni e downloader.
+- Provider dinamici con aggiornamenti automatici.
+- Interfaccia in inglese e italiano (i18n).
 <br>
 
 [![Discord](https://custom-icon-badges.demolab.com/badge/-Join_Discord-6567a5?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/cr42m6maWy)
 
 ___
 
-## Download  ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Zenda-Cross/vega-app/total?link=https%3A%2F%2Fgithub.com%2FZenda-Cross%2Fvega-app%2Freleases)
-> <sub>Download Universal version if you are confused about armeabi-v7a or arm64-v8a.</sub>
+## Download  ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Nokitomo/vega-app/total?link=https%3A%2F%2Fgithub.com%2FNokitomo%2Fvega-app%2Freleases)
+> <sub>Scarica la versione Universal se non sai scegliere tra armeabi-v7a o arm64-v8a.</sub>
 
-[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_Apk-blue?style=for-the-badge&logo=download&logoColor=white "Download Apk")](https://github.com/Zenda-Cross/vega-app/releases/latest)
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_Apk-blue?style=for-the-badge&logo=download&logoColor=white "Download Apk")](https://github.com/Nokitomo/vega-app/releases/latest)
 
 <br>
 
-## Screenshots
+## Screenshot
 ![Screenshots](https://github.com/user-attachments/assets/b86af756-e66e-4ae7-b2af-61b25cfd8d4e)
 
 ___
@@ -43,52 +43,52 @@ ___
 
 </p>
 
-## Build and Dev
-0. Set up the React Native environment if you haven't already. [Guide](https://reactnative.dev/docs/set-up-your-environment)
+## Build e sviluppo
+0. Configura l'ambiente React Native se non lo hai gia fatto. [Guida](https://reactnative.dev/docs/set-up-your-environment)
 
-1. Clone
+1. Clona
      ```bash
-     git clone https://github.com/Zenda-Cross/vega-app.git
+     git clone https://github.com/Nokitomo/vega-app.git
      ```
      ```bash
      cd vega-app
      ```
-2. Install
+2. Installa
      ```bash
      npm install
      ```
-3. Start Metro (dev client)
+3. Avvia Metro (dev client)
      ```bash
      npx expo start -c --dev-client --scheme com.vega --port 8081
      ```
-4. Run Android (dev client)
+4. Avvia Android (dev client)
      ```bash
      npx expo run:android --device "Medium_phone_API_35"
      ```
-5. Run iOS (dev client)
+5. Avvia iOS (dev client)
      ```bash
      npx expo run:ios
      ```
-6. Clean prebuild (if needed, but can overwrite native customizations)
+6. Prebuild pulito (se necessario, ma puo sovrascrivere customizzazioni native)
      ```bash
      npx expo prebuild -p android --clean
      npx expo prebuild -p ios --clean
      ```
 
-Note: Expo Go is not supported for native features.
+Nota: Expo Go non e supportato per le funzionalita native.
 
 Build apk/aab
 https://reactnative.dev/docs/signed-apk-android
 
 ---
 > [!IMPORTANT]
-> Vega App does not store any media files on our servers and is not directly linked to the media. Third-party services host all media, and Vega App merely provides a search and web scraping tool that indexes publicly available data. We are not responsible for the content or availability of the media, as we do not host or control any of it.
+> Vega App non memorizza alcun file multimediale sui propri server e non e direttamente collegata ai media. Tutti i media sono ospitati da servizi di terze parti e Vega App fornisce solo uno strumento di ricerca e web scraping che indicizza dati pubblicamente disponibili. Non siamo responsabili dei contenuti o della disponibilita dei media, poiche non li ospitiamo ne li controlliamo.
 
 
-## Stars
+## Stelle
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Zenda-Cross/vega-app&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Zenda-Cross/vega-app&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Zenda-Cross/vega-app&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Nokitomo/vega-app&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Nokitomo/vega-app&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Nokitomo/vega-app&type=Date" />
  </picture>
 </a>

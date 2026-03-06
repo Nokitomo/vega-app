@@ -3,8 +3,8 @@ const path = require('path');
 const {withDangerousMod} = require('@expo/config-plugins');
 
 /**
- * Adds release signing configuration that reads from env vars after prebuild.
- * Uses a Gradle file that applies signing config during the android block evaluation.
+ * Adds release signing configuration after prebuild.
+ * Priority: android/signing.local.properties, then env vars fallback.
  */
 module.exports = function withAndroidSigning(config) {
   return withDangerousMod(config, [
@@ -15,60 +15,66 @@ module.exports = function withAndroidSigning(config) {
       const buildGradle = path.join(appDir, 'build.gradle');
       const signingGradle = path.join(appDir, 'with-signing.gradle');
 
-      // Create signing gradle that extends signingConfigs during android block
+      // Create signing gradle that extends signingConfigs during android block.
       const signingContent = `// Auto-applied by with-android-signing config plugin
+import java.util.Properties
+
+def signingProps = new Properties()
+def signingPropsFile = new File(rootProject.projectDir, 'signing.local.properties')
+
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+    println "Loaded signing properties from \${signingPropsFile.absolutePath}"
+}
+
+def fileStoreFile = signingProps.getProperty('storeFile')
+def fileStorePassword = signingProps.getProperty('storePassword')
+def fileKeyAlias = signingProps.getProperty('keyAlias')
+def fileKeyPassword = signingProps.getProperty('keyPassword')
+def useReleaseSigningForDebug = signingProps
+    .getProperty('useReleaseSigningForDebug', 'true')
+    .toBoolean()
+project.ext.set('useReleaseSigningForDebugLocal', useReleaseSigningForDebug)
+
+def envStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE')
+def envStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD')
+def envKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS')
+def envKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD')
+
+def storeFileValue = fileStoreFile ?: envStoreFile
+def storePasswordValue = fileStorePassword ?: envStorePassword
+def keyAliasValue = fileKeyAlias ?: envKeyAlias
+def keyPasswordValue = fileKeyPassword ?: envKeyPassword
+
 android {
     signingConfigs {
         release {
-            def envStoreFile = System.getenv('MYAPP_UPLOAD_STORE_FILE')
-            def envStorePassword = System.getenv('MYAPP_UPLOAD_STORE_PASSWORD')
-            def envKeyAlias = System.getenv('MYAPP_UPLOAD_KEY_ALIAS')
-            def envKeyPassword = System.getenv('MYAPP_UPLOAD_KEY_PASSWORD')
-            
-            if (envStoreFile && envStorePassword && envKeyAlias && envKeyPassword) {
-                def keystoreFile = file(envStoreFile)
-                println "Keystore file path: \${envStoreFile}"
-                println "Keystore file exists: \${keystoreFile.exists()}"
-                
+            if (storeFileValue && storePasswordValue && keyAliasValue && keyPasswordValue) {
+                def keystoreFile = file(storeFileValue)
                 if (keystoreFile.exists()) {
                     storeFile keystoreFile
-                    storePassword envStorePassword
-                    keyAlias envKeyAlias
-                    keyPassword envKeyPassword
+                    storePassword storePasswordValue
+                    keyAlias keyAliasValue
+                    keyPassword keyPasswordValue
                     println "Release signing config configured successfully"
                 } else {
-                    println "Keystore file not found: \${envStoreFile}"
+                    println "Configured keystore file not found: \${storeFileValue}"
                 }
             } else {
-                println "Missing signing environment variables:"
-                println "  MYAPP_UPLOAD_STORE_FILE: \${envStoreFile}"
-                println "  MYAPP_UPLOAD_STORE_PASSWORD: \${envStorePassword ? '***' : 'null'}"
-                println "  MYAPP_UPLOAD_KEY_ALIAS: \${envKeyAlias}"
-                println "  MYAPP_UPLOAD_KEY_PASSWORD: \${envKeyPassword ? '***' : 'null'}"
+                println "Missing release signing credentials (file/env)."
             }
         }
     }
 }
 
-// Use afterEvaluate to forcefully override the release signing config
+// Force release signing and optionally reuse it for debug in local builds.
 afterEvaluate {
     def releaseSigningConfig = android.signingConfigs.release
-    println "🔧 Final signing config check:"
-    println "  Release signingConfig storeFile: \${releaseSigningConfig.storeFile}"
-    println "  Current release buildType signingConfig: \${android.buildTypes.release.signingConfig?.name}"
-    
     if (releaseSigningConfig.storeFile && releaseSigningConfig.storeFile.exists()) {
-        // Force override the signing config
         android.buildTypes.release.signingConfig = releaseSigningConfig
-        println "✅ Applied release signing config: \${releaseSigningConfig.storeFile.absolutePath}"
-        println "  Final release buildType signingConfig: \${android.buildTypes.release.signingConfig?.name}"
+        println "Applied release signing config: \${releaseSigningConfig.storeFile.absolutePath}"
     } else {
-        println "❌ Release signing config not applied, using debug keystore"
-        if (releaseSigningConfig.storeFile) {
-            println "   Keystore file does not exist: \${releaseSigningConfig.storeFile.absolutePath}"
-        } else {
-            println "   No keystore file configured"
-        }
+        println 'Release signing config not applied. Debug keystore will be used.'
     }
 }
 `;

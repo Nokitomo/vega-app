@@ -1,0 +1,5 @@
+storeFile=D:/path/to/your/keystore.jks
+storePassword=replace_me
+keyAlias=replace_me
+keyPassword=replace_me
+useReleaseSigningForDebug=true

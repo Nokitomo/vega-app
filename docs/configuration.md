@@ -53,7 +53,15 @@ File: app.config.js
   - `wvc`
 
 ## Signing release
-- La build release usa `signingConfigs.release`. Le credenziali (keystore path/password/alias) devono essere presenti nelle variabili d'ambiente o in `gradle.properties`.
+- La build Android legge prima `android/signing.local.properties` e, solo come fallback, le variabili d'ambiente legacy (`MYAPP_UPLOAD_*`).
+- Esempio pronto: `android/signing.local.properties.example`.
+- Chiavi supportate nel file locale:
+  - `storeFile` (path assoluto del keystore `.jks`)
+  - `storePassword`
+  - `keyAlias`
+  - `keyPassword`
+  - `useReleaseSigningForDebug` (`true`/`false`)
+- Con `useReleaseSigningForDebug=true`, anche `debug` usa la stessa chiave della `release` nei build locali.
 
 ## Metro
 File: metro.config.js

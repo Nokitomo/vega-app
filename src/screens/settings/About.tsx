@@ -6,6 +6,7 @@ import {
   Linking,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
 // import pkg from '../../../package.json';
 import React, {useState} from 'react';
@@ -18,6 +19,75 @@ import * as Application from 'expo-application';
 import {notificationService} from '../../lib/services/Notification';
 import {useTranslation} from 'react-i18next';
 import i18n from '../../i18n';
+
+type GitHubReleaseAsset = {
+  name?: string;
+  browser_download_url?: string;
+};
+
+type GitHubRelease = {
+  tag_name?: string;
+  body?: string | null;
+  html_url?: string;
+  draft?: boolean;
+  assets?: GitHubReleaseAsset[];
+};
+
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/Nokitomo/vega-app/releases';
+const GITHUB_RELEASES_PAGE = 'https://github.com/Nokitomo/vega-app/releases';
+
+const extractSemver = (tag: string): string | null => {
+  const match = String(tag || '').match(/(\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+};
+
+const pickAndroidApkAsset = (
+  assets: GitHubReleaseAsset[] = [],
+): GitHubReleaseAsset | undefined => {
+  const apkAssets = assets.filter(
+    asset =>
+      typeof asset?.name === 'string' &&
+      asset.name.toLowerCase().endsWith('.apk') &&
+      typeof asset?.browser_download_url === 'string',
+  );
+
+  if (apkAssets.length === 0) {
+    return undefined;
+  }
+
+  const priority = ['universal', 'arm64', 'armv8', 'armeabi-v7a', 'armv7'];
+  for (const keyword of priority) {
+    const found = apkAssets.find(asset =>
+      String(asset.name).toLowerCase().includes(keyword),
+    );
+    if (found) {
+      return found;
+    }
+  }
+
+  return apkAssets[0];
+};
+
+const selectBestRelease = (releases: GitHubRelease[]): GitHubRelease | undefined => {
+  const usable = Array.isArray(releases)
+    ? releases.filter(release => !release?.draft)
+    : [];
+
+  if (usable.length === 0) {
+    return undefined;
+  }
+
+  if (Platform.OS === 'android') {
+    const withApk = usable.find(release =>
+      Boolean(pickAndroidApkAsset(release.assets || [])),
+    );
+    if (withApk) {
+      return withApk;
+    }
+  }
+
+  return usable[0];
+};
 
 // download update
 const downloadUpdate = async (url: string, name: string) => {
@@ -81,40 +151,58 @@ export const checkForUpdate = async (
 ) => {
   setUpdateLoading(true);
   try {
-    const res = await fetch(
-      'https://api.github.com/repos/Nokitomo/vega-app/releases/latest',
-    );
-    const data = await res.json();
+    const res = await fetch(GITHUB_RELEASES_API);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch releases: ${res.status}`);
+    }
+
+    const releases = (await res.json()) as GitHubRelease[];
+    const data = selectBestRelease(releases);
+    if (!data) {
+      showToast &&
+        ToastAndroid.show(i18n.t('App is up to date'), ToastAndroid.SHORT);
+      setUpdateLoading(false);
+      return;
+    }
+
     const localVersion = Application.nativeApplicationVersion;
-    const remoteVersion = Number(
-      data.tag_name.replace('v', '')?.split('.').join(''),
-    );
-    if (compareVersions(localVersion || '', data.tag_name.replace('v', ''))) {
+    const remoteSemver = extractSemver(String(data.tag_name || ''));
+    if (!remoteSemver) {
+      showToast &&
+        ToastAndroid.show(i18n.t('App is up to date'), ToastAndroid.SHORT);
+      setUpdateLoading(false);
+      return;
+    }
+
+    const apkAsset = pickAndroidApkAsset(data.assets || []);
+
+    if (compareVersions(localVersion || '', remoteSemver)) {
       ToastAndroid.show(i18n.t('New update available'), ToastAndroid.SHORT);
       Alert.alert(
         i18n.t('Update v{{current}} -> {{target}}', {
           current: localVersion,
-          target: data.tag_name,
+          target: data.tag_name || remoteSemver,
         }),
-        data.body,
+        data.body || '',
         [
           {text: i18n.t('Cancel')},
-        {
-          text: i18n.t('Update'),
-          onPress: () =>
-            autoDownload
-              ? downloadUpdate(
-                  data?.assets?.[2]?.browser_download_url,
-                  data.assets?.[2]?.name,
-                )
-              : Linking.openURL(data.html_url),
-        },
-      ]);
+          {
+            text: i18n.t('Update'),
+            onPress: () =>
+              autoDownload &&
+              Platform.OS === 'android' &&
+              apkAsset?.browser_download_url &&
+              apkAsset?.name
+                ? downloadUpdate(apkAsset.browser_download_url, apkAsset.name)
+                : Linking.openURL(data.html_url || GITHUB_RELEASES_PAGE),
+          },
+        ],
+      );
       console.log(
         'local version',
         localVersion,
-        'remote version',
-        remoteVersion,
+        'remote semver',
+        remoteSemver,
       );
     } else {
       showToast &&
@@ -122,8 +210,8 @@ export const checkForUpdate = async (
       console.log(
         'local version',
         localVersion,
-        'remote version',
-        remoteVersion,
+        'remote semver',
+        remoteSemver,
       );
     }
   } catch (error) {
