@@ -63,6 +63,19 @@ File: app.config.js
   - `useReleaseSigningForDebug` (`true`/`false`)
 - Con `useReleaseSigningForDebug=true`, anche `debug` usa la stessa chiave della `release` nei build locali.
 
+## GitHub Nightly (Android)
+- Workflow: `.github/workflows/main.yml`
+- Firma in CI:
+  - decodifica il keystore dal secret base64 in `android/ci-release.jks`
+  - genera `android/signing.local.properties` al volo
+  - esegue `./gradlew :app:assembleRelease`
+  - pulisce i file di signing a fine job
+- Secrets richiesti (Repository Secrets):
+  - `ANDROID_KEYSTORE_BASE64`
+  - `ANDROID_KEYSTORE_PASSWORD`
+  - `ANDROID_KEY_ALIAS`
+  - `ANDROID_KEY_PASSWORD`
+
 ## Metro
 File: metro.config.js
 - usa expo/metro-config

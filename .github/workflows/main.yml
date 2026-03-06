@@ -64,8 +64,6 @@ jobs:
     needs: check_for_changes
     if: ${{ needs.check_for_changes.outputs.has_changes == 'true' }}
     runs-on: ubuntu-latest
-    # Use the nightly environment with the required secrets
-    environment: nightly
     permissions:
       # Need these permissions for creating GitHub releases
       contents: write
@@ -112,12 +110,17 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # Decode the keystore from your secret
-      - name: Decode keystore
+      # Decode keystore and generate signing.local.properties used by Gradle.
+      - name: Configure Android signing
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-          # Verify the keystore was created properly
-          ls -la android/app/release.keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/ci-release.jks
+          cat > android/signing.local.properties <<EOF
+          storeFile=${GITHUB_WORKSPACE}/android/ci-release.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          useReleaseSigningForDebug=false
+          EOF
 
       # Make gradlew executable
       - name: Make gradlew executable
@@ -129,19 +132,12 @@ jobs:
           echo "BUILD_DATE=$(date -u '+%Y-%m-%d')" >> $GITHUB_ENV
           echo "BUILD_TIME=$(date -u '+%H-%M-%S')" >> $GITHUB_ENV
           echo "Build started at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Builder: himanshu8443"
+          echo "Builder: ${{ github.actor }}"
 
-      # Build the APKs with DIRECT SIGNING PARAMETERS as requested
-      - name: Build Android App with Direct Signing Parameters
+      - name: Build Android release APKs
         run: |
           cd android
-          KEYSTORE_PATH=$(realpath app/release.keystore)
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" \
-            --stacktrace
+          ./gradlew :app:assembleRelease --stacktrace
 
       # Find and identify the APKs
       - name: Identify APKs
@@ -230,13 +226,13 @@ jobs:
               git push --delete origin $TAG 2>/dev/null || true
               
               # Also delete the release via API
-              RELEASE_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              RELEASE_ID=$(curl -s -H "Authorization: token ${{ github.token }}" \
                 "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" | \
                 grep -o '"id": [0-9]*' | head -1 | sed 's/"id": //')
               
               if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
                 echo "Deleting release with ID: $RELEASE_ID"
-                curl -s -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                curl -s -X DELETE -H "Authorization: token ${{ github.token }}" \
                   "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
               fi
             done
@@ -272,4 +268,10 @@ jobs:
           name: Vega-Nightly-v${{ env.APP_VERSION }}-${{ env.BUILD_DATE }}
           path: apks/*.apk
           if-no-files-found: warn
+
+      - name: Cleanup signing files
+        if: always()
+        run: |
+          rm -f android/ci-release.jks
+          rm -f android/signing.local.properties
 
