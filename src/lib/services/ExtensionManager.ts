@@ -13,7 +13,7 @@ export class ExtensionManager {
   private primaryBaseUrl =
     'https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main';
   private fallbackBaseUrl =
-    'https://raw.githubusercontent.com/Zenda-Cross/vega-providers/refs/heads/main';
+    'https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main';
 
   private testMode = false;
   private baseUrlTestMode = '';
