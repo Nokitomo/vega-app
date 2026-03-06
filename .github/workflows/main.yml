@@ -98,7 +98,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '20.x'
           cache: 'npm'
 
       - name: Install dependencies
@@ -274,4 +274,3 @@ jobs:
         run: |
           rm -f android/ci-release.jks
           rm -f android/signing.local.properties
-
