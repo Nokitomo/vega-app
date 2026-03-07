@@ -65,17 +65,19 @@ File: app.config.js
 
 ## GitHub Nightly (Android)
 - Workflow: `.github/workflows/main.yml`
+- Il job Android usa `environment: nightly`.
 - Firma in CI:
   - decodifica il keystore dal secret base64 in `android/ci-release.jks`
   - genera `android/signing.local.properties` al volo
   - esegue `./gradlew :app:assembleRelease --no-daemon --max-workers=2 -x lintVitalRelease`
   - usa `GRADLE_OPTS` con heap/metaspace aumentati per ridurre errori OOM (`Metaspace`) su runner GitHub
   - pulisce i file di signing a fine job
-- Secrets richiesti (Repository Secrets):
+- Secrets richiesti (consigliato in `Environment secrets` dell'environment `nightly`):
   - `ANDROID_KEYSTORE_BASE64`
   - `ANDROID_KEYSTORE_PASSWORD`
   - `ANDROID_KEY_ALIAS`
   - `ANDROID_KEY_PASSWORD`
+- In alternativa puoi metterli nei `Repository Secrets`.
 - Compatibilita temporanea:
   - se i secret sopra non sono presenti, la pipeline prova i nomi legacy:
     - `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
