@@ -288,7 +288,7 @@ jobs:
 
           files: ${{ steps.apk_files.outputs.apk_paths }}
           draft: false
-          prerelease: true
+          prerelease: false
 
       # Also upload APKs as GitHub artifacts as backup
       - name: Upload APKs as GitHub artifacts
