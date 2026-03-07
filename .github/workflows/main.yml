@@ -64,6 +64,8 @@ jobs:
     needs: check_for_changes
     if: ${{ needs.check_for_changes.outputs.has_changes == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
     permissions:
       # Need these permissions for creating GitHub releases
       contents: write
@@ -137,7 +139,7 @@ jobs:
       - name: Build Android release APKs
         run: |
           cd android
-          ./gradlew :app:assembleRelease --stacktrace
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon --max-workers=2 -x lintVitalRelease
 
       # Find and identify the APKs
       - name: Identify APKs

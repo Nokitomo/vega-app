@@ -68,7 +68,8 @@ File: app.config.js
 - Firma in CI:
   - decodifica il keystore dal secret base64 in `android/ci-release.jks`
   - genera `android/signing.local.properties` al volo
-  - esegue `./gradlew :app:assembleRelease`
+  - esegue `./gradlew :app:assembleRelease --no-daemon --max-workers=2 -x lintVitalRelease`
+  - usa `GRADLE_OPTS` con heap/metaspace aumentati per ridurre errori OOM (`Metaspace`) su runner GitHub
   - pulisce i file di signing a fine job
 - Secrets richiesti (Repository Secrets):
   - `ANDROID_KEYSTORE_BASE64`
