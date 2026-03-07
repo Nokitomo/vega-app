@@ -76,6 +76,10 @@ File: app.config.js
   - `ANDROID_KEYSTORE_PASSWORD`
   - `ANDROID_KEY_ALIAS`
   - `ANDROID_KEY_PASSWORD`
+- Compatibilita temporanea:
+  - se i secret sopra non sono presenti, la pipeline prova i nomi legacy:
+    - `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
+- La pipeline valida keystore/alias/password prima della build e fallisce subito con errore chiaro se i secret non sono corretti.
 
 ## Metro
 File: metro.config.js
