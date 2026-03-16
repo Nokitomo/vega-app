@@ -36,6 +36,13 @@ import {hasItaBadge} from '../../lib/utils/helpers';
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
+const PROVIDER_FIRST_TITLE_PROVIDERS = new Set([
+  'animeunity',
+  'streamingunity',
+  'streamingcommunity',
+  'altadefinizionez',
+]);
+
 export default function Info({route, navigation}: Props): React.JSX.Element {
   const searchNavigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
@@ -107,7 +114,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return info?.title;
   }, [info?.titleKey, info?.titleParams, info?.title, t]);
   const forceProviderTitle = useMemo(
-    () => providerValue === 'animeunity' || providerValue === 'streamingunity',
+    () => PROVIDER_FIRST_TITLE_PROVIDERS.has(providerValue),
     [providerValue],
   );
   const libraryTitle = useMemo(

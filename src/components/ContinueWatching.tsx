@@ -26,6 +26,8 @@ type EpisodeMeta = {
   seasonNumber?: number;
 };
 
+const CONTINUE_WATCHING_LIMIT = 30;
+
 const normalizeNumericValue = (value: unknown): number | undefined => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -86,7 +88,7 @@ const ContinueWatching = ({
         seen.add(item.link);
         return true;
       })
-      .slice(0, 10); // Limit to 10 items
+      .slice(0, CONTINUE_WATCHING_LIMIT);
 
     return items;
   }, [history]);
@@ -205,6 +207,18 @@ const ContinueWatching = ({
     }
   };
 
+  const handleSeeAllPress = () => {
+    navigation.navigate(
+      'SettingsStack',
+      {
+        screen: 'WatchHistoryStack',
+        params: {
+          screen: 'WatchHistory',
+        },
+      } as any,
+    );
+  };
+
   const deleteSelectedItems = () => {
     recentItems.forEach(item => {
       if (selectedItems.has(item.link)) {
@@ -237,22 +251,30 @@ const ContinueWatching = ({
           {t('Continue Watching')}
         </Text>
 
-        {selectionMode && selectedItems.size > 0 && (
-          <View className="flex flex-row items-center">
-            <Text className="text-white mr-1">
-              {t('{{count}} selected', {count: selectedItems.size})}
-            </Text>
-            <TouchableOpacity
-              onPress={deleteSelectedItems}
-              className=" rounded-full mr-2">
-              <MaterialCommunityIcons
-                name="delete-outline"
-                size={25}
-                color={primary}
-              />
+        <View className="flex flex-row items-center">
+          {!selectionMode && (
+            <TouchableOpacity onPress={handleSeeAllPress} className="mr-2">
+              <Text className="text-white text-sm">{t('See all')}</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+
+          {selectionMode && selectedItems.size > 0 && (
+            <View className="flex flex-row items-center">
+              <Text className="text-white mr-1">
+                {t('{{count}} selected', {count: selectedItems.size})}
+              </Text>
+              <TouchableOpacity
+                onPress={deleteSelectedItems}
+                className="rounded-full mr-2">
+                <MaterialCommunityIcons
+                  name="delete-outline"
+                  size={25}
+                  color={primary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       <FlatList
