@@ -1,0 +1,195 @@
+name: Android Stable Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch o ref da buildare'
+        required: true
+        default: 'main'
+      version:
+        description: 'Versione semver (es. 3.3.4)'
+        required: true
+      release_notes:
+        description: 'Testo release (usa \n per andare a capo)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    environment: nightly
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+    steps:
+      - name: Checkout ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - name: Configure Android signing
+        run: |
+          KEYSTORE_B64="${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          STORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+          # Compatibilità con nomi legacy
+          [ -z "$KEYSTORE_B64" ] && KEYSTORE_B64="${{ secrets.KEYSTORE_BASE64 }}"
+          [ -z "$STORE_PASSWORD" ] && STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}"
+          [ -z "$KEY_ALIAS" ] && KEY_ALIAS="${{ secrets.KEY_ALIAS }}"
+          [ -z "$KEY_PASSWORD" ] && KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
+
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Missing Android signing secrets."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/ci-release.jks
+          if [ ! -s android/ci-release.jks ]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore android/ci-release.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::Keystore validation failed. Check alias/password/base64 secrets."
+            exit 1
+          fi
+
+          {
+            echo "storeFile=${GITHUB_WORKSPACE}/android/ci-release.jks"
+            echo "storePassword=${STORE_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASSWORD}"
+            echo "useReleaseSigningForDebug=false"
+          } > android/signing.local.properties
+
+      - name: Validate version and tag
+        id: meta
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid version format. Expected x.y.z"
+            exit 1
+          fi
+
+          GRADLE_VERSION=$(grep -m 1 'versionName "' android/app/build.gradle | sed 's/.*versionName "\(.*\)".*/\1/')
+          if [ "$GRADLE_VERSION" != "$VERSION" ]; then
+            echo "::error::android/app/build.gradle versionName ($GRADLE_VERSION) != input version ($VERSION)"
+            exit 1
+          fi
+
+          APP_CONFIG_VERSION=$(node -e "const cfg=require('./app.config.js')(); process.stdout.write(String(cfg?.expo?.version || ''));")
+          if [ "$APP_CONFIG_VERSION" != "$VERSION" ]; then
+            echo "::error::app.config.js expo.version ($APP_CONFIG_VERSION) != input version ($VERSION)"
+            exit 1
+          fi
+
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PACKAGE_VERSION" != "$VERSION" ]; then
+            echo "::error::package.json version ($PACKAGE_VERSION) != input version ($VERSION)"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          git fetch --tags
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "::error::Tag ${TAG} already exists on origin"
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android release APKs
+        run: |
+          cd android
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon --max-workers=2 -x lintVitalRelease
+
+      - name: Identify and rename APKs
+        id: apk_files
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p apks
+
+          UNIVERSAL_APK=$(find android/app/build/outputs/apk/release -name "*universal*.apk" -not -name "*unsigned*" | head -1)
+          ARMV7_APK=$(find android/app/build/outputs/apk/release -name "*armeabi-v7a*.apk" -not -name "*unsigned*" | head -1)
+          ARMV8_APK=$(find android/app/build/outputs/apk/release -name "*arm64-v8a*.apk" -not -name "*unsigned*" | head -1)
+
+          if [ ! -f "$UNIVERSAL_APK" ] || [ ! -f "$ARMV7_APK" ] || [ ! -f "$ARMV8_APK" ]; then
+            echo "::error::Missing one or more expected APK outputs."
+            echo "UNIVERSAL_APK=$UNIVERSAL_APK"
+            echo "ARMV7_APK=$ARMV7_APK"
+            echo "ARMV8_APK=$ARMV8_APK"
+            exit 1
+          fi
+
+          UNIVERSAL_APK_NAME="Vega-universal-v${VERSION}.apk"
+          ARMV7_APK_NAME="Vega-armeabi-v7a-v${VERSION}.apk"
+          ARMV8_APK_NAME="Vega-arm64-v8a-v${VERSION}.apk"
+
+          cp "$UNIVERSAL_APK" "apks/${UNIVERSAL_APK_NAME}"
+          cp "$ARMV7_APK" "apks/${ARMV7_APK_NAME}"
+          cp "$ARMV8_APK" "apks/${ARMV8_APK_NAME}"
+
+          echo "apk_paths=apks/${UNIVERSAL_APK_NAME},apks/${ARMV7_APK_NAME},apks/${ARMV8_APK_NAME}" >> "$GITHUB_OUTPUT"
+
+          ls -la apks/
+
+      - name: Prepare release body
+        run: |
+          if [ -n "${{ inputs.release_notes }}" ]; then
+            printf '%b\n' "${{ inputs.release_notes }}" > release_body.md
+          else
+            VERSION="${{ steps.meta.outputs.version }}"
+            LAST_COMMIT=$(git log -1 --pretty=%s)
+            {
+              echo "Release ${VERSION}"
+              echo
+              echo "- ${LAST_COMMIT}"
+            } > release_body.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ inputs.ref }}
+          name: ${{ steps.meta.outputs.version }}
+          body_path: release_body.md
+          files: ${{ steps.apk_files.outputs.apk_paths }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vega-v${{ steps.meta.outputs.version }}
+          path: apks/*.apk
+          if-no-files-found: error
+
+      - name: Cleanup signing files
+        if: always()
+        run: |
+          rm -f android/ci-release.jks
+          rm -f android/signing.local.properties

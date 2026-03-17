@@ -84,6 +84,27 @@ File: app.config.js
     - `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 - La pipeline valida keystore/alias/password prima della build e fallisce subito con errore chiaro se i secret non sono corretti.
 
+## GitHub Stable Release (Android, manuale)
+- Workflow: `.github/workflows/android-release.yml`
+- Trigger: `workflow_dispatch` da GitHub Actions.
+- Input richiesti:
+  - `ref`: branch/ref da buildare (default `main`)
+  - `version`: semver `x.y.z` (es. `3.3.4`)
+  - `release_notes`: testo release opzionale (visibile nella pagina release e nell'avviso update in app)
+- Vincoli di sicurezza:
+  - la pipeline fallisce se `version` non coincide con:
+    - `android/app/build.gradle` (`versionName`)
+    - `app.config.js` (`expo.version`)
+    - `package.json` (`version`)
+  - la pipeline fallisce se il tag `v<version>` esiste gia su origin.
+- Output release:
+  - tag: `v<version>`
+  - nome release: `<version>`
+  - APK allegati:
+    - `Vega-universal-v<version>.apk`
+    - `Vega-armeabi-v7a-v<version>.apk`
+    - `Vega-arm64-v8a-v<version>.apk`
+
 ## Metro
 File: metro.config.js
 - usa expo/metro-config
