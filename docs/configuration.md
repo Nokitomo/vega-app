@@ -91,6 +91,7 @@ File: app.config.js
   - `ref`: branch/ref da buildare (default `main`)
   - `version`: semver `x.y.z` (es. `3.3.4`)
   - `release_notes`: testo release opzionale (visibile nella pagina release e nell'avviso update in app)
+    - supporta caratteri speciali (es. virgolette) e `\n` per andare a capo
 - Vincoli di sicurezza:
   - la pipeline fallisce se `version` non coincide con:
     - `android/app/build.gradle` (`versionName`)
@@ -104,6 +105,7 @@ File: app.config.js
     - `Vega-universal-v<version>.apk`
     - `Vega-armeabi-v7a-v<version>.apk`
     - `Vega-arm64-v8a-v<version>.apk`
+  - in app (Android) il download update seleziona l'APK in base alle ABI del device, con fallback sicuro su `universal`
 
 ## Metro
 File: metro.config.js

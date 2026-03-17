@@ -7,6 +7,7 @@ import {
   Alert,
   Switch,
   Platform,
+  NativeModules,
 } from 'react-native';
 // import pkg from '../../../package.json';
 import React, {useState} from 'react';
@@ -33,6 +34,12 @@ type GitHubRelease = {
   assets?: GitHubReleaseAsset[];
 };
 
+type AndroidApkArch = 'arm64-v8a' | 'armeabi-v7a' | 'universal' | 'other';
+
+type DeviceAbiNativeModule = {
+  supportedAbis?: string[];
+};
+
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/Nokitomo/vega-app/releases';
 const GITHUB_RELEASES_PAGE = 'https://github.com/Nokitomo/vega-app/releases';
 
@@ -41,8 +48,71 @@ const extractSemver = (tag: string): string | null => {
   return match ? match[1] : null;
 };
 
+const classifyApkArch = (assetName: string): AndroidApkArch => {
+  const lowerName = String(assetName || '').toLowerCase();
+  if (lowerName.includes('arm64-v8a') || lowerName.includes('arm64')) {
+    return 'arm64-v8a';
+  }
+  if (lowerName.includes('armeabi-v7a') || lowerName.includes('armv7')) {
+    return 'armeabi-v7a';
+  }
+  if (lowerName.includes('universal')) {
+    return 'universal';
+  }
+  return 'other';
+};
+
+const getAndroidSupportedAbis = (): string[] => {
+  if (Platform.OS !== 'android') {
+    return [];
+  }
+
+  const nativeModule = NativeModules.DeviceAbi as DeviceAbiNativeModule | undefined;
+  const supportedAbis = nativeModule?.supportedAbis;
+  if (!Array.isArray(supportedAbis)) {
+    return [];
+  }
+
+  return supportedAbis
+    .map(abi => String(abi || '').toLowerCase())
+    .filter(Boolean);
+};
+
+const getPreferredApkOrder = (supportedAbis: string[]): AndroidApkArch[] => {
+  const hasArm64 = supportedAbis.some(
+    abi => abi.includes('arm64') || abi.includes('aarch64'),
+  );
+  const hasArmV7 = supportedAbis.some(
+    abi =>
+      abi.includes('armeabi-v7a') || abi.includes('armv7') || abi === 'armeabi',
+  );
+
+  const order: AndroidApkArch[] = [];
+
+  if (hasArm64) {
+    order.push('arm64-v8a');
+  }
+  if (hasArmV7) {
+    order.push('armeabi-v7a');
+  }
+
+  order.push('universal');
+
+  if (!order.includes('arm64-v8a')) {
+    order.push('arm64-v8a');
+  }
+  if (!order.includes('armeabi-v7a')) {
+    order.push('armeabi-v7a');
+  }
+
+  order.push('other');
+
+  return order;
+};
+
 const pickAndroidApkAsset = (
   assets: GitHubReleaseAsset[] = [],
+  supportedAbis: string[] = [],
 ): GitHubReleaseAsset | undefined => {
   const apkAssets = assets.filter(
     asset =>
@@ -55,10 +125,10 @@ const pickAndroidApkAsset = (
     return undefined;
   }
 
-  const priority = ['universal', 'arm64', 'armv8', 'armeabi-v7a', 'armv7'];
-  for (const keyword of priority) {
+  const priority = getPreferredApkOrder(supportedAbis);
+  for (const arch of priority) {
     const found = apkAssets.find(asset =>
-      String(asset.name).toLowerCase().includes(keyword),
+      classifyApkArch(String(asset.name || '')) === arch,
     );
     if (found) {
       return found;
@@ -174,7 +244,8 @@ export const checkForUpdate = async (
       return;
     }
 
-    const apkAsset = pickAndroidApkAsset(data.assets || []);
+    const supportedAbis = getAndroidSupportedAbis();
+    const apkAsset = pickAndroidApkAsset(data.assets || [], supportedAbis);
 
     if (compareVersions(localVersion || '', remoteSemver)) {
       ToastAndroid.show(i18n.t('New update available'), ToastAndroid.SHORT);
