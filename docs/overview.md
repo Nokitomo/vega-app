@@ -63,7 +63,7 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 5) Watchlist e Cronologia
 - Salva e consulta elementi preferiti e gia visti.
 - La sezione Continue Watching mostra il badge episodio quando disponibile, fino a 30 elementi unici recenti.
-- In Home, Continue Watching espone il comando "Vedi tutti" che apre la schermata WatchHistory.
+- In Home, Continue Watching espone il comando "Altro" che apre la schermata WatchHistory.
 - Per i provider animeunity, streamingunity/streamingcommunity e altadefinizionez il titolo mostrato segue la sorgente provider (coerente con le altre sezioni).
 - WatchHistory e Continue Watching applicano una migrazione dei titoli gia salvati per riallinearli alle card provider, e mantengono il riallineamento anche per i nuovi elementi.
 - La pulizia della cronologia rimuove anche i progressi salvati.

@@ -263,7 +263,7 @@ const ContinueWatching = ({
         <View className="flex flex-row items-center">
           {!selectionMode && (
             <TouchableOpacity onPress={handleSeeAllPress} className="mr-2">
-              <Text className="text-white text-sm">{t('See all')}</Text>
+              <Text className="text-white text-sm">{t('More')}</Text>
             </TouchableOpacity>
           )}
 
