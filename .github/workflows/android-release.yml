@@ -159,9 +159,11 @@ jobs:
           ls -la apks/
 
       - name: Prepare release body
+        env:
+          RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
-          if [ -n "${{ inputs.release_notes }}" ]; then
-            printf '%b\n' "${{ inputs.release_notes }}" > release_body.md
+          if [ -n "$RELEASE_NOTES" ]; then
+            printf '%b\n' "$RELEASE_NOTES" > release_body.md
           else
             VERSION="${{ steps.meta.outputs.version }}"
             LAST_COMMIT=$(git log -1 --pretty=%s)
