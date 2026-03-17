@@ -120,6 +120,9 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build Android release APKs
         run: |
           cd android
