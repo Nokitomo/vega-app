@@ -193,7 +193,7 @@ jobs:
 
           # Set the file paths with clean names
           if [ -f "$UNIVERSAL_APK" ]; then
-            UNIVERSAL_APK_NAME="Vega-nightly-v${VERSION}-universal-${BUILD_DATE}.apk"
+            UNIVERSAL_APK_NAME="Vega-universal-v${VERSION}.apk"
             cp "$UNIVERSAL_APK" "apks/${UNIVERSAL_APK_NAME}"
             echo "UNIVERSAL_APK_NAME=${UNIVERSAL_APK_NAME}" >> $GITHUB_ENV
             echo "UNIVERSAL_APK_FOUND=true" >> $GITHUB_ENV
@@ -204,7 +204,7 @@ jobs:
           fi
 
           if [ -f "$ARMV7_APK" ]; then
-            ARMV7_APK_NAME="Vega-nightly-v${VERSION}-armv7-${BUILD_DATE}.apk"
+            ARMV7_APK_NAME="Vega-armeabi-v7a-v${VERSION}.apk"
             cp "$ARMV7_APK" "apks/${ARMV7_APK_NAME}"
             echo "ARMV7_APK_NAME=${ARMV7_APK_NAME}" >> $GITHUB_ENV
             echo "ARMV7_APK_FOUND=true" >> $GITHUB_ENV
@@ -215,7 +215,7 @@ jobs:
           fi
 
           if [ -f "$ARMV8_APK" ]; then
-            ARMV8_APK_NAME="Vega-nightly-v${VERSION}-armv8-${BUILD_DATE}.apk"
+            ARMV8_APK_NAME="Vega-arm64-v8a-v${VERSION}.apk"
             cp "$ARMV8_APK" "apks/${ARMV8_APK_NAME}"
             echo "ARMV8_APK_NAME=${ARMV8_APK_NAME}" >> $GITHUB_ENV
             echo "ARMV8_APK_FOUND=true" >> $GITHUB_ENV
@@ -275,7 +275,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: 'Nightly Build v${{ env.APP_VERSION }} (${{ env.BUILD_DATE }})'
+          name: '${{ env.APP_VERSION }}'
           body: |
             > ⚠️ **NIGHTLY BUILD** ⚠️  
             > Not recommended for regular users. Download version with latest tag not pre-release tag, for stable apk.

@@ -16,6 +16,7 @@ export enum WatchHistoryKeys {
 export interface WatchHistoryItem {
   id: string;
   title: string;
+  displayTitle?: string;
   poster?: string;
   provider?: string;
   link: string;
@@ -56,10 +57,20 @@ export class WatchHistoryStorage {
   }
 
   /**
+   * Replace the whole watch history list.
+   */
+  setWatchHistory(items: WatchHistoryItem[]): void {
+    const limitedHistory = (items || []).slice(0, 100);
+    mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, limitedHistory);
+  }
+
+  /**
    * Add or update an item in watch history
    */
   addToWatchHistory(item: WatchHistoryItem): void {
     const history = this.getWatchHistory();
+    const normalizedDisplayTitle =
+      item.displayTitle?.trim() || item.title?.trim() || undefined;
 
     // Check if the item already exists
     const existingIndex = history.findIndex(i => i.id === item.id);
@@ -69,20 +80,22 @@ export class WatchHistoryStorage {
       history[existingIndex] = {
         ...history[existingIndex],
         ...item,
+        displayTitle:
+          normalizedDisplayTitle ||
+          history[existingIndex].displayTitle ||
+          history[existingIndex].title,
         timestamp: Date.now(), // Always update timestamp
       };
     } else {
       // Add new item
       history.unshift({
         ...item,
+        displayTitle: normalizedDisplayTitle || item.title,
         timestamp: Date.now(),
       });
     }
 
-    // Limit history to 100 items
-    const limitedHistory = history.slice(0, 100);
-
-    mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, limitedHistory);
+    this.setWatchHistory(history);
   }
 
   /**

@@ -85,6 +85,10 @@ import {
 } from '../../lib/cast/vegaCast';
 import {setClipboardString} from '../../lib/utils/clipboard';
 import {EpisodeLink, Link} from '../../lib/providers/types';
+import {
+  resolveProviderCardTitle,
+  shouldResolveProviderCardTitle,
+} from '../../lib/utils/providerCardTitleResolver';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -357,6 +361,46 @@ const Player = ({route}: Props): React.JSX.Element => {
   });
 
   const providerValue = route.params?.providerValue || provider.value || '';
+  const [resolvedPrimaryTitle, setResolvedPrimaryTitle] = useState(
+    (route.params?.primaryTitle || '').trim(),
+  );
+
+  useEffect(() => {
+    setResolvedPrimaryTitle((route.params?.primaryTitle || '').trim());
+  }, [route.params?.primaryTitle, route.params?.infoUrl]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const infoLink = String(route.params?.infoUrl || '').trim();
+    if (!shouldResolveProviderCardTitle(providerValue) || !infoLink) {
+      return () => {
+        isCancelled = true;
+      };
+    }
+
+    resolveProviderCardTitle({
+      providerValue,
+      link: infoLink,
+      fallbackTitle: route.params?.primaryTitle || '',
+    })
+      .then(title => {
+        const normalizedTitle = (title || '').trim();
+        if (!normalizedTitle || isCancelled) {
+          return;
+        }
+        setResolvedPrimaryTitle(prev =>
+          prev === normalizedTitle ? prev : normalizedTitle,
+        );
+      })
+      .catch(error => {
+        console.error('Error resolving player primary title:', error);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [providerValue, route.params?.infoUrl, route.params?.primaryTitle]);
+
   const infoLinkForSkip =
     providerValue === 'animeunity' ? route.params?.infoUrl || '' : '';
   const {data: skipInfo} = useContentInfo(infoLinkForSkip, providerValue);
@@ -752,7 +796,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         episodeList: normalizedEpisodes,
         directUrl: route.params?.directUrl,
         type: route.params?.type,
-        primaryTitle: route.params?.primaryTitle,
+        primaryTitle: resolvedPrimaryTitle,
         secondaryTitle:
           resolveLocalizedItemTitle(nextGroup) || route.params?.secondaryTitle,
         episodeNumber: targetEpisode.episodeNumber,
@@ -784,7 +828,6 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params?.file,
       route.params?.infoUrl,
       route.params?.poster,
-      route.params?.primaryTitle,
       route.params?.providerValue,
       route.params?.seasonEpisodesLink,
       route.params?.seasonIndex,
@@ -792,6 +835,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params?.secondaryTitle,
       route.params?.seasons,
       route.params?.type,
+      resolvedPrimaryTitle,
     ],
   );
 
@@ -1279,7 +1323,7 @@ const Player = ({route}: Props): React.JSX.Element => {
             ? selectedStream.headers
             : undefined,
         subtitles: getCastSubtitleTracks(),
-        title: route.params?.primaryTitle || '',
+        title: resolvedPrimaryTitle,
         subtitle: activeEpisode?.title || route.params?.secondaryTitle || '',
         poster:
           route.params?.poster?.poster ||
@@ -1317,8 +1361,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     getCastSubtitleTracks,
     route.params?.poster?.background,
     route.params?.poster?.poster,
-    route.params?.primaryTitle,
     route.params?.secondaryTitle,
+    resolvedPrimaryTitle,
     selectedStream?.headers,
     selectedStream?.link,
     t,
@@ -1345,7 +1389,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         providerValue: route.params?.providerValue || providerValue,
         contentType: route.params?.type || 'series',
         context: {
-          primaryTitle: route.params?.primaryTitle || '',
+          primaryTitle: resolvedPrimaryTitle,
           secondaryTitle: route.params?.secondaryTitle || '',
           posterUrl:
             route.params?.poster?.poster || route.params?.poster?.background || '',
@@ -1434,11 +1478,11 @@ const Player = ({route}: Props): React.JSX.Element => {
     route.params?.infoUrl,
     route.params?.poster?.background,
     route.params?.poster?.poster,
-    route.params?.primaryTitle,
     route.params?.providerValue,
     route.params?.seasonNumber,
     route.params?.secondaryTitle,
     route.params?.type,
+    resolvedPrimaryTitle,
     skipMalId,
     selectedStream,
     t,
@@ -1484,7 +1528,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         addItem({
           id: historyKey,
           link: historyKey,
-          title: route.params?.primaryTitle || '',
+          title: resolvedPrimaryTitle,
           poster: route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
           lastPlayed: Date.now(),
@@ -1515,7 +1559,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         duration,
         percentage: (currentTime / duration) * 100,
         infoUrl: route.params?.infoUrl || '',
-        title: route.params?.primaryTitle || '',
+        title: resolvedPrimaryTitle,
         episodeTitle,
         episodeNumber,
         episodeLink,
@@ -1547,10 +1591,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params?.infoUrl,
       route.params?.poster?.background,
       route.params?.poster?.poster,
-      route.params?.primaryTitle,
       route.params?.seasonEpisodesLink,
       route.params?.seasonNumber,
       route.params?.secondaryTitle,
+      resolvedPrimaryTitle,
       updatePlaybackInfo,
     ],
   );
@@ -1602,7 +1646,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           duration,
           percentage: (currentTime / duration) * 100,
           infoUrl: route.params?.infoUrl || '',
-          title: route.params?.primaryTitle || '',
+          title: resolvedPrimaryTitle,
           episodeTitle: String(entry.episodeTitle || ''),
           episodeNumber:
             typeof entry.episodeNumber === 'number' ? entry.episodeNumber : undefined,
@@ -1649,7 +1693,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         addItem({
           id: historyKey,
           link: historyKey,
-          title: route.params?.primaryTitle || '',
+          title: resolvedPrimaryTitle,
           poster: route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
           lastPlayed: Date.now(),
@@ -1682,7 +1726,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           duration: latestEntry.duration,
           percentage: (latestEntry.currentTime / latestEntry.duration) * 100,
           infoUrl: route.params?.infoUrl || '',
-          title: route.params?.primaryTitle || '',
+          title: resolvedPrimaryTitle,
           episodeTitle: String(latestEntry.episodeTitle || ''),
           episodeNumber:
             typeof latestEntry.episodeNumber === 'number'
@@ -1710,10 +1754,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params?.infoUrl,
       route.params?.poster?.background,
       route.params?.poster?.poster,
-      route.params?.primaryTitle,
       route.params?.providerValue,
       route.params?.secondaryTitle,
       route.params?.seasonNumber,
+      resolvedPrimaryTitle,
       updatePlaybackInfo,
     ],
   );
@@ -1738,7 +1782,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         providerValue: route.params?.providerValue || providerValue,
         contentType: route.params?.type || 'series',
         context: {
-          primaryTitle: route.params?.primaryTitle || '',
+          primaryTitle: resolvedPrimaryTitle,
           secondaryTitle: route.params?.secondaryTitle || '',
           posterUrl:
             route.params?.poster?.poster || route.params?.poster?.background || '',
@@ -1791,11 +1835,11 @@ const Player = ({route}: Props): React.JSX.Element => {
     route.params?.infoUrl,
     route.params?.poster?.background,
     route.params?.poster?.poster,
-    route.params?.primaryTitle,
     route.params?.providerValue,
     route.params?.seasonNumber,
     route.params?.secondaryTitle,
     route.params?.type,
+    resolvedPrimaryTitle,
     selectedStream,
     t,
     videoPositionRef,
@@ -2182,8 +2226,8 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Initialize search query
   useEffect(() => {
-    setSearchQuery(route.params?.primaryTitle || '');
-  }, [route.params?.primaryTitle]);
+    setSearchQuery(resolvedPrimaryTitle);
+  }, [resolvedPrimaryTitle]);
 
   useEffect(() => {
     if (!externalSubs) {
@@ -2224,7 +2268,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Add to watch history
   useEffect(() => {
-    if (route.params?.primaryTitle && !route.params?.doNotTrack) {
+    if (resolvedPrimaryTitle && !route.params?.doNotTrack) {
       const routeEpisode =
         route.params?.episodeList?.[route.params?.linkIndex] || undefined;
       const episodeTitle =
@@ -2249,7 +2293,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         : undefined;
       addItem({
         id: route.params.infoUrl || activeEpisode.link,
-        title: route.params.primaryTitle,
+        title: resolvedPrimaryTitle,
         poster:
           route.params.poster?.poster || route.params.poster?.background || '',
         link: route.params.infoUrl || '',
@@ -2272,7 +2316,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       );
     }
   }, [
-    route.params?.primaryTitle,
+    resolvedPrimaryTitle,
     activeEpisode.link,
     addItem,
     updateItemWithInfo,
@@ -2436,7 +2480,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         ...(selectedStream?.type === 'm3u8' && {type: 'm3u8'}),
         headers: selectedStream?.headers,
         metadata: {
-          title: route.params?.primaryTitle,
+          title: resolvedPrimaryTitle,
           subtitle: activeEpisode?.title,
           artist: activeEpisode?.title,
           description: activeEpisode?.title,
@@ -2473,9 +2517,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       },
       title: {
         primary:
-          route.params?.primaryTitle && route.params?.primaryTitle?.length > 70
-            ? route.params?.primaryTitle.slice(0, 70) + '...'
-            : route.params?.primaryTitle || '',
+          resolvedPrimaryTitle && resolvedPrimaryTitle.length > 70
+            ? resolvedPrimaryTitle.slice(0, 70) + '...'
+            : resolvedPrimaryTitle,
         secondary: activeEpisode?.title,
       },
       navigator: navigation,

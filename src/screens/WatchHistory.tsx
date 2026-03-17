@@ -21,8 +21,16 @@ type Props = NativeStackScreenProps<WatchHistoryStackParamList, 'WatchHistory'>;
 const WatchHistory = ({navigation}: Props) => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
-  const {history, clearHistory} = useWatchHistoryStore(state => state);
+  const {history, clearHistory, migrateDisplayTitles} = useWatchHistoryStore(
+    state => state,
+  );
   const [progressData, setProgressData] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    migrateDisplayTitles().catch(error => {
+      console.error('Error migrating watch history display titles:', error);
+    });
+  }, [migrateDisplayTitles]);
 
   // Filter out duplicates by link, keeping only the most recent entry
   const uniqueHistory = React.useMemo(() => {
@@ -185,7 +193,8 @@ const WatchHistory = ({navigation}: Props) => {
         renderItem={({item}) => {
           // Get the progress for this item
           const progress = progressData[item.link] || 0;
-          const showItaBadge = hasItaBadge(item.title);
+          const displayTitle = item.displayTitle || item.title;
+          const showItaBadge = hasItaBadge(displayTitle);
 
           return (
             <View className="flex-1 m-1">
@@ -310,7 +319,7 @@ const WatchHistory = ({navigation}: Props) => {
                 </View>
 
                 <Text numberOfLines={2} className="text-white text-sm mt-1">
-                  {item.title}
+                  {displayTitle}
                 </Text>
                 {item.episodeTitle && (
                   <Text numberOfLines={1} className="text-white/60 text-xs">

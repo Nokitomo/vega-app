@@ -44,7 +44,9 @@ const ContinueWatching = ({
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
-  const {history, removeItem} = useWatchHistoryStore(state => state);
+  const {history, removeItem, migrateDisplayTitles} = useWatchHistoryStore(
+    state => state,
+  );
   const showRecentlyWatched = useUiSettingsStore(
     state => state.showRecentlyWatched,
   );
@@ -54,6 +56,13 @@ const ContinueWatching = ({
   >({});
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    migrateDisplayTitles().catch(error => {
+      console.error('Error migrating watch history display titles:', error);
+    });
+  }, [migrateDisplayTitles]);
+
   const getEpisodeLabel = ({
     episodeTitle,
     episodeNumber,
@@ -290,6 +299,7 @@ const ContinueWatching = ({
         renderItem={({item}) => {
           const progress = progressData[item.link] || 0;
           const isSelected = selectedItems.has(item.link);
+          const displayTitle = item.displayTitle || item.title;
           const episodeLabel = getEpisodeLabel({
             episodeTitle:
               episodeMetaData[item.link]?.episodeTitle || item.episodeTitle,
@@ -298,7 +308,7 @@ const ContinueWatching = ({
             seasonNumber:
               episodeMetaData[item.link]?.seasonNumber ?? item.seasonNumber,
           });
-          const showItaBadge = hasItaBadge(item.title);
+          const showItaBadge = hasItaBadge(displayTitle);
 
           return (
             <TouchableOpacity
@@ -383,7 +393,7 @@ const ContinueWatching = ({
               <Text
                 className="text-white text-center truncate w-24 text-xs"
                 numberOfLines={2}>
-                {item.title}
+                {displayTitle}
               </Text>
             </TouchableOpacity>
           );

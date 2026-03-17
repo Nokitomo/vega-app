@@ -1,5 +1,9 @@
 import {create} from 'zustand';
 import {WatchHistoryItem, watchHistoryStorage} from '../storage';
+import {
+  resolveProviderCardTitle,
+  shouldResolveProviderCardTitle,
+} from '../utils/providerCardTitleResolver';
 
 export interface History {
   history: WatchHistoryItem[];
@@ -11,6 +15,7 @@ export interface History {
   clearHistory: () => void;
   updateItemWithInfo: (link: string, infoData: any) => void;
   removeItem: (item: WatchHistoryItem) => void;
+  migrateDisplayTitles: () => Promise<void>;
 }
 
 // Helper function to convert between our storage format and zustand format
@@ -20,6 +25,72 @@ const convertStorageToZustand = (items: any[]): WatchHistoryItem[] => {
     lastPlayed: item.timestamp,
     currentTime: item.progress || 0,
   }));
+};
+
+const titleSyncInFlight = new Set<string>();
+let titleMigrationInFlight: Promise<void> | null = null;
+
+const refreshHistoryState = (set: (partial: Partial<History>) => void) => {
+  set({
+    history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
+  });
+};
+
+const getDisplayTitle = (item: WatchHistoryItem): string =>
+  (item.displayTitle || item.title || '').trim();
+
+const syncDisplayTitleForLink = async ({
+  link,
+  set,
+}: {
+  link?: string;
+  set: (partial: Partial<History>) => void;
+}) => {
+  const normalizedLink = (link || '').trim();
+  if (!normalizedLink || titleSyncInFlight.has(normalizedLink)) {
+    return;
+  }
+
+  titleSyncInFlight.add(normalizedLink);
+  try {
+    const history = watchHistoryStorage.getWatchHistory();
+    const targetItem = history.find(item => item.link === normalizedLink);
+    if (!targetItem) {
+      return;
+    }
+
+    if (!shouldResolveProviderCardTitle(targetItem.provider)) {
+      return;
+    }
+
+    const currentDisplayTitle = getDisplayTitle(targetItem);
+    const resolvedDisplayTitle = (
+      await resolveProviderCardTitle({
+        providerValue: targetItem.provider,
+        link: targetItem.link,
+        fallbackTitle: currentDisplayTitle,
+      })
+    ).trim();
+
+    if (!resolvedDisplayTitle || resolvedDisplayTitle === currentDisplayTitle) {
+      return;
+    }
+
+    const nextHistory = history.map(item =>
+      item.link === normalizedLink
+        ? {
+            ...item,
+            displayTitle: resolvedDisplayTitle,
+          }
+        : item,
+    );
+    watchHistoryStorage.setWatchHistory(nextHistory);
+    refreshHistoryState(set);
+  } catch (error) {
+    console.error('❌ Error syncing watch history display title:', error);
+  } finally {
+    titleSyncInFlight.delete(normalizedLink);
+  }
 };
 
 const useWatchHistoryStore = create<History>(set => ({
@@ -32,6 +103,7 @@ const useWatchHistoryStore = create<History>(set => ({
       const storageItem: WatchHistoryItem = {
         id: item.link || item.title,
         title: item.title,
+        displayTitle: item.displayTitle || item.title,
         poster: item.poster,
         provider: item.provider,
         link: item.link,
@@ -48,8 +120,13 @@ const useWatchHistoryStore = create<History>(set => ({
       watchHistoryStorage.addToWatchHistory(storageItem);
 
       // Update UI state
-      set({
-        history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
+      refreshHistoryState(set);
+
+      syncDisplayTitleForLink({
+        link: storageItem.link,
+        set,
+      }).catch(error => {
+        console.error('❌ Error syncing watch history display title:', error);
       });
     } catch (error) {
       console.error('❌ Error:', error);
@@ -72,9 +149,7 @@ const useWatchHistoryStore = create<History>(set => ({
         watchHistoryStorage.addToWatchHistory(updatedItem);
       }
 
-      set({
-        history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
-      });
+      refreshHistoryState(set);
     } catch (error) {
       console.error('❌ Error updating watch history:', error);
     }
@@ -83,9 +158,7 @@ const useWatchHistoryStore = create<History>(set => ({
   removeItem: item => {
     watchHistoryStorage.removeFromWatchHistory(item.link);
     watchHistoryStorage.clearProgressForLink(item.link);
-    set({
-      history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
-    });
+    refreshHistoryState(set);
   },
 
   clearHistory: () => {
@@ -112,12 +185,46 @@ const useWatchHistoryStore = create<History>(set => ({
         watchHistoryStorage.addToWatchHistory(updatedItem);
       }
 
-      set({
-        history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
-      });
+      refreshHistoryState(set);
     } catch (error) {
       console.error('❌ Error caching info data:', error);
     }
+  },
+
+  migrateDisplayTitles: async () => {
+    if (titleMigrationInFlight) {
+      await titleMigrationInFlight;
+      return;
+    }
+
+    titleMigrationInFlight = (async () => {
+      const uniqueLinks = new Set<string>();
+      const history = watchHistoryStorage.getWatchHistory();
+
+      for (const item of history) {
+        if (!item?.link || uniqueLinks.has(item.link)) {
+          continue;
+        }
+        uniqueLinks.add(item.link);
+
+        if (!shouldResolveProviderCardTitle(item.provider)) {
+          continue;
+        }
+
+        await syncDisplayTitleForLink({
+          link: item.link,
+          set,
+        });
+      }
+    })()
+      .catch(error => {
+        console.error('❌ Error migrating watch history display titles:', error);
+      })
+      .finally(() => {
+        titleMigrationInFlight = null;
+      });
+
+    await titleMigrationInFlight;
   },
 }));
 
