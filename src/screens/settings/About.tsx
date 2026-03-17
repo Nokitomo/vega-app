@@ -43,6 +43,44 @@ type DeviceAbiNativeModule = {
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/Nokitomo/vega-app/releases';
 const GITHUB_RELEASES_PAGE = 'https://github.com/Nokitomo/vega-app/releases';
 
+const markPendingUpdateArtifact = (apkName: string) => {
+  const sourceVersion = String(Application.nativeApplicationVersion || '');
+  if (!apkName || !sourceVersion) {
+    return;
+  }
+
+  settingsStorage.setPendingUpdateArtifact(apkName, sourceVersion);
+};
+
+export const cleanupDownloadedUpdateApk = async () => {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  const apkName = settingsStorage.getPendingUpdateApkName();
+  if (!apkName) {
+    return;
+  }
+
+  const sourceVersion = settingsStorage.getPendingUpdateSourceVersion();
+  const currentVersion = String(Application.nativeApplicationVersion || '');
+  if (!sourceVersion || sourceVersion === currentVersion) {
+    return;
+  }
+
+  const apkPath = `${RNFS.DownloadDirectoryPath}/${apkName}`;
+  try {
+    const exists = await RNFS.exists(apkPath);
+    if (exists) {
+      await RNFS.unlink(apkPath);
+    }
+  } catch (error) {
+    console.log('Failed to cleanup downloaded update apk', error);
+  } finally {
+    settingsStorage.clearPendingUpdateArtifact();
+  }
+};
+
 const extractSemver = (tag: string): string | null => {
   const match = String(tag || '').match(/(\d+\.\d+\.\d+)/);
   return match ? match[1] : null;
@@ -166,6 +204,7 @@ const downloadUpdate = async (url: string, name: string) => {
 
   try {
     if (await RNFS.exists(`${RNFS.DownloadDirectoryPath}/${name}`)) {
+      markPendingUpdateArtifact(name);
       await notificationService.displayUpdateNotification({
         id: 'downloadComplete',
         title: i18n.t('Download completed'),
@@ -202,6 +241,7 @@ const downloadUpdate = async (url: string, name: string) => {
   });
   promise.then(async res => {
     if (res.statusCode === 200) {
+      markPendingUpdateArtifact(name);
       await notificationService.cancelNotification('updateProgress');
       await notificationService.displayUpdateNotification({
         id: 'downloadComplete',

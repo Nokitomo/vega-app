@@ -21,7 +21,10 @@ import WebView from './screens/WebView';
 import SearchResults from './screens/SearchResults';
 import * as SystemUI from 'expo-system-ui';
 // import DisableProviders from './screens/settings/DisableProviders';
-import About, {checkForUpdate} from './screens/settings/About';
+import About, {
+  checkForUpdate,
+  cleanupDownloadedUpdateApk,
+} from './screens/settings/About';
 import BootSplash from 'react-native-bootsplash';
 import {enableFreeze, enableScreens} from 'react-native-screens';
 import Preferences from './screens/settings/Preference';
@@ -628,6 +631,10 @@ const AppContent = () => {
   }
 
   useEffect(() => {
+    cleanupDownloadedUpdateApk().catch(error => {
+      console.log('Update APK cleanup error', error);
+    });
+
     if (settingsStorage.isAutoCheckUpdateEnabled()) {
       checkForUpdate(() => {}, settingsStorage.isAutoDownloadEnabled(), false);
     }

@@ -19,6 +19,8 @@ export enum SettingsKeys {
   // Update settings
   AUTO_CHECK_UPDATE = 'autoCheckUpdate',
   AUTO_DOWNLOAD = 'autoDownload',
+  PENDING_UPDATE_APK_NAME = 'pendingUpdateApkName',
+  PENDING_UPDATE_SOURCE_VERSION = 'pendingUpdateSourceVersion',
 
   // Player settings
   SHOW_MEDIA_CONTROLS = 'showMediaControls',
@@ -147,6 +149,27 @@ export class SettingsStorage {
 
   setAutoDownloadEnabled(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.AUTO_DOWNLOAD, enabled);
+  }
+
+  getPendingUpdateApkName(): string | undefined {
+    return mainStorage.getString(SettingsKeys.PENDING_UPDATE_APK_NAME);
+  }
+
+  getPendingUpdateSourceVersion(): string | undefined {
+    return mainStorage.getString(SettingsKeys.PENDING_UPDATE_SOURCE_VERSION);
+  }
+
+  setPendingUpdateArtifact(apkName: string, sourceVersion: string): void {
+    mainStorage.setString(SettingsKeys.PENDING_UPDATE_APK_NAME, apkName);
+    mainStorage.setString(
+      SettingsKeys.PENDING_UPDATE_SOURCE_VERSION,
+      sourceVersion,
+    );
+  }
+
+  clearPendingUpdateArtifact(): void {
+    mainStorage.delete(SettingsKeys.PENDING_UPDATE_APK_NAME);
+    mainStorage.delete(SettingsKeys.PENDING_UPDATE_SOURCE_VERSION);
   }
 
   // Player settings

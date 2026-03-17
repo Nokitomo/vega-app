@@ -7,6 +7,13 @@ File: src/lib/services/Notification.ts
 - Gestisce azioni (cancel download, installazione APK).
 - Titoli e testi notifica sono localizzati via i18n.
 
+## Aggiornamento app (APK)
+File: src/screens/settings/About.tsx
+- Verifica release da GitHub e confronto versione app locale/remota.
+- Su Android seleziona l'APK piu compatibile per ABI device (arm64/armeabi-v7a, fallback universal).
+- Se auto-download e abilitato, scarica APK in `Download`.
+- Dopo update riuscito, al primo avvio con nuova versione elimina automaticamente l'APK scaricato in precedenza.
+
 ## Download
 - DownloadManager (src/lib/services/DownloadManager.ts) gestisce stato e persistenza.
 - Utilizza RNFS per operazioni su file.
