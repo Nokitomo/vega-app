@@ -13,6 +13,11 @@ const SEARCH_TIMEOUT_MS = 8000;
 const normalizeWhitespace = (value?: string) =>
   (value || '').replace(/\s+/g, ' ').trim();
 
+const hasSearchableLetters = (value?: string): boolean =>
+  /[A-Za-z\u00C0-\u024F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/.test(
+    normalizeWhitespace(value),
+  );
+
 const safeDecode = (value: string) => {
   try {
     return decodeURIComponent(value);
@@ -113,8 +118,11 @@ const searchProviderCardTitle = async ({
   link: string;
   fallbackTitle?: string;
 }): Promise<string> => {
+  const normalizedFallback = normalizeWhitespace(fallbackTitle);
   const slugQuery = slugToTitle(extractSlug(link));
-  const searchQuery = slugQuery || normalizeWhitespace(fallbackTitle);
+  const searchQuery = hasSearchableLetters(slugQuery)
+    ? slugQuery
+    : normalizedFallback;
   if (!searchQuery) {
     return '';
   }
@@ -170,7 +178,7 @@ export const resolveProviderCardTitle = async ({
   }
 
   const slugTitle = slugToTitle(extractSlug(link));
-  if (slugTitle) {
+  if (slugTitle && hasSearchableLetters(slugTitle)) {
     return slugTitle;
   }
 

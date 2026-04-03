@@ -39,6 +39,16 @@ const refreshHistoryState = (set: (partial: Partial<History>) => void) => {
 const getDisplayTitle = (item: WatchHistoryItem): string =>
   (item.displayTitle || item.title || '').trim();
 
+const isLowConfidenceTitle = (value?: string): boolean => {
+  const normalized = (value || '').trim();
+  if (!normalized) {
+    return true;
+  }
+  return !/[A-Za-z\u00C0-\u024F\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF]/.test(
+    normalized,
+  );
+};
+
 const syncDisplayTitleForLink = async ({
   link,
   set,
@@ -64,11 +74,14 @@ const syncDisplayTitleForLink = async ({
     }
 
     const currentDisplayTitle = getDisplayTitle(targetItem);
+    const fallbackTitle = isLowConfidenceTitle(currentDisplayTitle)
+      ? (targetItem.title || '').trim() || currentDisplayTitle
+      : currentDisplayTitle;
     const resolvedDisplayTitle = (
       await resolveProviderCardTitle({
         providerValue: targetItem.provider,
         link: targetItem.link,
-        fallbackTitle: currentDisplayTitle,
+        fallbackTitle,
       })
     ).trim();
 
