@@ -4,6 +4,13 @@ import {PASTEBIN_PROVIDERS, PASTEBIN_URL} from './baseUrlRegistry';
 // 1 hour
 const expireTime = 60 * 60 * 1000;
 
+const BASE_URL_CACHE_REVISIONS: Record<string, string> = {
+  altadefinizionez: '2',
+};
+
+const getBaseUrlCacheRevision = (providerValue: string) =>
+  BASE_URL_CACHE_REVISIONS[providerValue] || '1';
+
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
 
 const getPastebinBaseUrl = async (
@@ -39,8 +46,9 @@ const getPastebinBaseUrl = async (
 export const getBaseUrl = async (providerValue: string) => {
   try {
     let baseUrl = '';
-    const cacheKey = 'CacheBaseUrl' + providerValue;
-    const timeKey = 'baseUrlTime' + providerValue;
+    const cacheRevision = getBaseUrlCacheRevision(providerValue);
+    const cacheKey = `CacheBaseUrl${providerValue}:v${cacheRevision}`;
+    const timeKey = `baseUrlTime${providerValue}:v${cacheRevision}`;
 
     const cachedUrl = cacheStorageService.getString(cacheKey);
     const cachedTime = cacheStorageService.getObject<number>(timeKey);
