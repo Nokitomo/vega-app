@@ -4,8 +4,23 @@ import {cacheStorage} from '../storage';
 import i18n from '../../i18n';
 import {buildEnhancedMetaKey, fetchEnhancedMetadata} from '../services/enhancedMeta';
 
+const STREAMINGUNITY_PROVIDER = 'streamingunity';
+const STREAMINGUNITY_META_CACHE_VERSION = 'v2';
+
+const buildContentInfoCacheKey = (link: string, providerValue: string) => {
+  if (!link) {
+    return '';
+  }
+  if (providerValue === STREAMINGUNITY_PROVIDER) {
+    return `contentInfo:${STREAMINGUNITY_META_CACHE_VERSION}:${providerValue}:${link}`;
+  }
+  return link;
+};
+
 // Hook for fetching content info/metadata
 export const useContentInfo = (link: string, providerValue: string) => {
+  const cacheKey = buildContentInfoCacheKey(link, providerValue);
+
   return useQuery({
     queryKey: ['contentInfo', link, providerValue],
     queryFn: async () => {
@@ -27,7 +42,10 @@ export const useContentInfo = (link: string, providerValue: string) => {
     retry: 2,
     // Use cached data as initial data
     initialData: () => {
-      const cached = cacheStorage.getString(link);
+      if (!cacheKey) {
+        return undefined;
+      }
+      const cached = cacheStorage.getString(cacheKey);
       if (cached) {
         try {
           return JSON.parse(cached);
@@ -40,8 +58,8 @@ export const useContentInfo = (link: string, providerValue: string) => {
     // Cache successful responses
     meta: {
       onSuccess: (data: any) => {
-        if (data) {
-          cacheStorage.setString(link, JSON.stringify(data));
+        if (data && cacheKey) {
+          cacheStorage.setString(cacheKey, JSON.stringify(data));
         }
       },
     },

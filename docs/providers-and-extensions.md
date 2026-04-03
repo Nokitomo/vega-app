@@ -46,6 +46,11 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
   - `availabilityPrecision`: `day`, `year` o `unknown`
 - Quando una stagione/film e `upcoming` e non ci sono episodi/link, la UI mostra uno stato "In arrivo" con data (se disponibile) invece di una lista vuota.
 - Implementato attualmente per: `streamingunity`, `altadefinizionez`, `animeunity`.
+- Per StreamingUnity e attiva una reconciliation mirata per evitare falsi upcoming: se un titolo/stagione risulta `upcoming` ma con data non futura (es. data passata), il provider verifica la disponibilita reale.
+- Film StreamingUnity: probe su `watch/iframe`; se viene rilevato un embed/playlist VixCloud valido (`/embed/<id>` o `/playlist/<id>`), il contenuto viene marcato `available`.
+- Stagioni StreamingUnity: probe sulla pagina stagione; se `loadedSeason.episodes` contiene episodi, la stagione viene marcata `available`.
+- Fail-safe: se la probe fallisce (timeout/rete/parsing), lo stato resta `upcoming` per non introdurre false disponibilita.
+- Rationale: i campi editoriali sorgente (`status`/`release_date`) possono essere stale o incoerenti rispetto alla reale disponibilita stream.
 
 ## Metadati episodio/stagione per resume
 - I provider possono valorizzare su `EpisodeLink` e `Link.directLinks[]`:
@@ -97,6 +102,7 @@ File: src/lib/providers/providerContext.ts
 - ExtensionStorage gestisce cache locale e stato installato/abilitato.
 - UpdateProvidersService verifica versioni e aggiorna automaticamente.
 - Le notifiche di aggiornamento provider usano testi localizzati.
+- Per StreamingUnity e stato introdotto un cache key versioning mirato sui metadata (`content info` e `hero metadata`) per invalidare i valori storici senza reset globale cache.
 
 ## Dove stanno i provider
 - I provider non sono hardcoded nel repository dell'app.

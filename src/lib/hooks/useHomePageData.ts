@@ -28,11 +28,22 @@ interface UseHomePageDataOptions {
 }
 
 const STREAMINGUNITY_PROVIDER = 'streamingunity';
+const STREAMINGUNITY_META_CACHE_VERSION = 'v2';
 const HOME_SECTION_PARALLEL_LIMIT = 4;
 const HOME_SECTION_STEP_DELAY_MS = 200;
 const HOME_STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const HIDDEN_STREAMINGUNITY_TYPES = new Set(['movie', 'tv']);
 const HOME_CATEGORY_MAX_ITEMS = 30;
+
+const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
+  if (!heroLink) {
+    return '';
+  }
+  if (providerValue === STREAMINGUNITY_PROVIDER) {
+    return `heroMetadata:${STREAMINGUNITY_META_CACHE_VERSION}:${providerValue}:${heroLink}`;
+  }
+  return heroLink;
+};
 
 const shouldHideHomeCategory = (providerValue: string, filter: string): boolean => {
   if (providerValue !== STREAMINGUNITY_PROVIDER) {
@@ -552,6 +563,8 @@ export const clearHeroCache = (providerValue?: string) => {
 
 // New hook for hero metadata with React Query
 export const useHeroMetadata = (heroLink: string, providerValue: string) => {
+  const cacheKey = buildHeroMetadataCacheKey(heroLink, providerValue);
+
   return useQuery({
     queryKey: ['heroMetadata', heroLink, providerValue],
     queryFn: async () => {
@@ -664,12 +677,17 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
     // Cache hero metadata separately
     meta: {
       onSuccess: (data: any) => {
-        cacheStorage.setString(heroLink, JSON.stringify(data));
+        if (cacheKey) {
+          cacheStorage.setString(cacheKey, JSON.stringify(data));
+        }
       },
     },
     // Use cached data as initial data
     initialData: () => {
-      const cached = cacheStorage.getString(heroLink);
+      if (!cacheKey) {
+        return undefined;
+      }
+      const cached = cacheStorage.getString(cacheKey);
       if (cached) {
         try {
           return JSON.parse(cached);
