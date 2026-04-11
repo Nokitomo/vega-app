@@ -9,6 +9,7 @@ export type {
   GeckoLoadingErrorEvent,
   GeckoExternalOpenEvent,
   GeckoBridgeMessageEvent,
+  GeckoFullScreenEvent,
 } from './GeckoWebView.types';
 
 export default function GeckoWebView(_props: GeckoWebViewProps) {

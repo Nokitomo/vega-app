@@ -64,6 +64,7 @@ import Orientation from 'react-native-orientation-locker';
 import useSearchCacheStore from './lib/zustand/searchCacheStore';
 import useUiSettingsStore from './lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
+import {applyAndroidUserOrientation} from './lib/utils/vegaOrientation';
 // Lazy-load Firebase modules so app runs without google-services files
 const getAnalytics = (): any | null => {
   try {
@@ -622,8 +623,11 @@ const AppContent = () => {
       }
 
       if (routeName === 'Webview') {
-        // In Webview respect device auto-rotate settings without app-level force.
-        Orientation.unlockAllOrientations();
+        // In Webview use Android USER mode so device auto-rotate setting is respected.
+        const applied = applyAndroidUserOrientation();
+        if (!applied) {
+          Orientation.unlockAllOrientations();
+        }
         return;
       }
 

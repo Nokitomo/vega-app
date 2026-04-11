@@ -9,7 +9,7 @@ class VegaGeckoViewPackage : ReactPackage {
   @Deprecated("ReactPackage legacy API")
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> = emptyList()
+  ): List<NativeModule> = listOf(VegaOrientationModule(reactContext))
 
   @Deprecated("ReactPackage legacy API")
   override fun createViewManagers(

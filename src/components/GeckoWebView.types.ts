@@ -27,6 +27,10 @@ export type GeckoBridgeMessageEvent = {
   message?: string;
 };
 
+export type GeckoFullScreenEvent = {
+  fullScreen?: boolean;
+};
+
 export type GeckoWebViewProps = {
   style?: StyleProp<ViewStyle>;
   url?: string;
@@ -39,5 +43,8 @@ export type GeckoWebViewProps = {
   onExternalOpen?: (event: NativeSyntheticEvent<GeckoExternalOpenEvent>) => void;
   onBridgeMessage?: (
     event: NativeSyntheticEvent<GeckoBridgeMessageEvent>,
+  ) => void;
+  onFullScreenChange?: (
+    event: NativeSyntheticEvent<GeckoFullScreenEvent>,
   ) => void;
 };

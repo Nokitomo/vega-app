@@ -31,6 +31,7 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     private const val EVENT_LOADING_ERROR = "onLoadingError"
     private const val EVENT_EXTERNAL_OPEN = "onExternalOpen"
     private const val EVENT_BRIDGE_MESSAGE = "onBridgeMessage"
+    private const val EVENT_FULLSCREEN_CHANGE = "onFullScreenChange"
   }
 
   private data class SessionHolder(
@@ -67,6 +68,10 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         EVENT_BRIDGE_MESSAGE,
         MapBuilder.of("registrationName", EVENT_BRIDGE_MESSAGE),
       )
+      .put(
+        EVENT_FULLSCREEN_CHANGE,
+        MapBuilder.of("registrationName", EVENT_FULLSCREEN_CHANGE),
+      )
       .build()
       .toMutableMap()
 
@@ -78,9 +83,6 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         .allowJavascript(true)
         .build()
       val session = GeckoSession(settings)
-
-      // Workaround consigliato nella quick-start GeckoView.
-      session.setContentDelegate(object : GeckoSession.ContentDelegate {})
 
       val holder = SessionHolder(
         reactContext = reactContext,
@@ -191,6 +193,19 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
   }
 
   private fun configureSessionDelegates(holder: SessionHolder) {
+    holder.session.setContentDelegate(object : GeckoSession.ContentDelegate {
+      override fun onFullScreen(
+        session: GeckoSession,
+        fullScreen: Boolean,
+      ) {
+        emitEvent(
+          holder.view,
+          EVENT_FULLSCREEN_CHANGE,
+          mapOf("fullScreen" to fullScreen),
+        )
+      }
+    })
+
     holder.session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
       override fun onLoadRequest(
         session: GeckoSession,
