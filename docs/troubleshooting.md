@@ -109,6 +109,23 @@ Sintomo: testi in inglese o chiavi raw (es. `Some Key`).
 - Verifica che la chiave esista in `src/i18n/en.json` e `src/i18n/it.json`.
 - Nei componenti usare `t(...)`; nei servizi usare `i18n.t(...)`.
 
+## Android Webview: GeckoView fallback / kill-switch
+Sintomi tipici:
+- Lo screen "Open in Web" su Android non carica la pagina dopo un aggiornamento nativo.
+- In log compaiono errori di inizializzazione Gecko runtime o delegate.
+
+Verifiche:
+1) Ricostruisci il dev client Android dopo modifiche native:
+```
+npx expo run:android --device "Medium_phone_API_35"
+```
+2) Verifica che `android/build.gradle` includa il repository Mozilla Maven e che `android/app/build.gradle` includa la dipendenza `org.mozilla.geckoview:geckoview`.
+3) Verifica presenza degli asset extension in `android/app/src/main/assets/gecko-bridge/`.
+
+Kill-switch locale:
+- La chiave storage `androidGeckoWebViewEnabled` controlla l'uso di GeckoView su Android.
+- Se `false`, l'app forza fallback a `react-native-webview` legacy sullo screen Webview.
+
 ## Provider installato ma nessun contenuto (DNS/NXDOMAIN)
 Sintomi tipici:
 - Il provider risulta installato ma home/search/info tornano liste vuote.

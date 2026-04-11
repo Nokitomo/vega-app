@@ -173,6 +173,7 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation "org.mozilla.geckoview:geckoview:144.0.20251027123126"
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '21.4.0')}"
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";

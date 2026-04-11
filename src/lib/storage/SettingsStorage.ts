@@ -42,6 +42,9 @@ export enum SettingsKeys {
 
   // Telemetry (privacy)
   TELEMETRY_OPT_IN = 'telemetryOptIn',
+
+  // Runtime feature flags
+  ANDROID_GECKO_WEBVIEW_ENABLED = 'androidGeckoWebViewEnabled',
 }
 
 /**
@@ -289,6 +292,17 @@ export class SettingsStorage {
 
   setTelemetryOptIn(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.TELEMETRY_OPT_IN, enabled);
+  }
+
+  isAndroidGeckoWebViewEnabled(): boolean {
+    return mainStorage.getBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED) ===
+      null
+      ? true
+      : mainStorage.getBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED);
+  }
+
+  setAndroidGeckoWebViewEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED, enabled);
   }
 
   // Generic get/set methods for settings not covered by specific methods

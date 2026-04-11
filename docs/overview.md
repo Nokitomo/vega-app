@@ -34,6 +34,7 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Metadati, poster, trama e accesso alle sorgenti/episodi.
 - Supporta vista Episodi e vista Correlati.
 - Include controlli di chiusura e ritorno al contenuto precedente.
+- Il comando "Open in Web" usa GeckoView su Android (con bridge WebExtensionController built-in) e mantiene `react-native-webview` su iOS.
 - Mostra il pulsante "Riprendi"; se non esiste riproduzione salvata mostra "Riproduci Ep. 1 00:00".
 - La lista episodi mostra una barra di avanzamento per gli episodi gia iniziati.
 - Il pulsante "Riprendi/Riproduci" cambia automaticamente pagina quando il provider usa range di episodi (es. AnimeUnity).
