@@ -32,6 +32,8 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     private const val EVENT_EXTERNAL_OPEN = "onExternalOpen"
     private const val EVENT_BRIDGE_MESSAGE = "onBridgeMessage"
     private const val EVENT_FULLSCREEN_CHANGE = "onFullScreenChange"
+    private const val EVENT_ADBLOCK_STATUS = "onAdBlockStatusChange"
+    private const val AD_BLOCK_INSTALL_TIMEOUT_MS = 1800L
   }
 
   private data class SessionHolder(
@@ -39,6 +41,12 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     val view: GeckoView,
     val session: GeckoSession,
     var currentUrl: String? = null,
+    var pendingUrl: String? = null,
+    var adBlockEnabled: Boolean = true,
+    var hasAdBlockPreference: Boolean = false,
+    var adBlockRetryToken: Double = 0.0,
+    var loadGeneration: Int = 0,
+    var loadGateTimeoutRunnable: Runnable? = null,
   )
 
   private val holders =
@@ -72,6 +80,10 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         EVENT_FULLSCREEN_CHANGE,
         MapBuilder.of("registrationName", EVENT_FULLSCREEN_CHANGE),
       )
+      .put(
+        EVENT_ADBLOCK_STATUS,
+        MapBuilder.of("registrationName", EVENT_ADBLOCK_STATUS),
+      )
       .build()
       .toMutableMap()
 
@@ -96,6 +108,13 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
       session.open(runtime)
       geckoView.setSession(session)
       holders[geckoView] = holder
+
+      geckoView.post {
+        emitAdBlockStatus(holder, source = "view_created")
+      }
+      geckoView.postDelayed({
+        emitAdBlockStatus(holder, source = "view_created_delayed")
+      }, 250)
 
       VegaGeckoRuntime.ensureBuiltInExtension(reactContext) { extension ->
         if (extension == null) {
@@ -134,20 +153,17 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     }
 
     holder.currentUrl = url
-    try {
-      holder.session.loadUri(url)
-    } catch (error: Throwable) {
-      Log.e(TAG, "Unable to load URI in GeckoView: $url", error)
-      emitEvent(
-        view,
-        EVENT_LOADING_ERROR,
-        mapOf(
-          "uri" to url,
-          "message" to (error.message ?: "Unable to load URI"),
-          "fatal" to false,
-        ),
-      )
+    Log.d(
+      TAG,
+      "setUrl url=$url hasAdBlockPreference=${holder.hasAdBlockPreference} adBlockEnabled=${holder.adBlockEnabled}",
+    )
+    if (!holder.hasAdBlockPreference) {
+      holder.pendingUrl = url
+      Log.d(TAG, "setUrl deferred because adBlock preference not applied yet")
+      return
     }
+
+    loadUriWithAdBlockGate(holder, url, "set_url")
   }
 
   @ReactProp(name = "javaScriptEnabled", defaultBoolean = true)
@@ -168,9 +184,112 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     }
   }
 
+  @ReactProp(name = "adBlockEnabled", defaultBoolean = true)
+  fun setAdBlockEnabled(view: GeckoView, enabled: Boolean) {
+    val holder = holders[view] ?: return
+
+    val wasInitialized = holder.hasAdBlockPreference
+    val changed = holder.adBlockEnabled != enabled
+
+    Log.d(
+      TAG,
+      "setAdBlockEnabled enabled=$enabled wasInitialized=$wasInitialized changed=$changed pendingUrl=${holder.pendingUrl}",
+    )
+
+    holder.adBlockEnabled = enabled
+    holder.hasAdBlockPreference = true
+    VegaGeckoRuntime.setAdGuardWanted(enabled)
+    emitAdBlockStatus(holder, source = "adblock_prop_applied")
+
+    if (!wasInitialized && holder.pendingUrl != null) {
+      val pending = holder.pendingUrl
+      holder.pendingUrl = null
+      if (!pending.isNullOrBlank()) {
+        loadUriWithAdBlockGate(holder, pending, "initial_pref")
+      }
+      return
+    }
+
+    if (!changed) {
+      return
+    }
+
+    if (enabled) {
+      emitAdBlockStatus(holder, "toggle_on", installing = true)
+      VegaGeckoRuntime.ensureAdGuardExtension(holder.reactContext) { success, error ->
+        holder.view.post {
+          emitAdBlockStatus(
+            holder,
+            source = "toggle_on_result",
+            error = error,
+            installing = false,
+            installed = success && VegaGeckoRuntime.isAdGuardInstalled(),
+          )
+        }
+      }
+    } else {
+      emitAdBlockStatus(holder, "toggle_off", installing = true)
+      VegaGeckoRuntime.disableAdGuardExtension(holder.reactContext) { success, error ->
+        holder.view.post {
+          emitAdBlockStatus(
+            holder,
+            source = "toggle_off_result",
+            error = if (success) null else error,
+            installing = false,
+            installed = false,
+          )
+        }
+      }
+    }
+  }
+
+  @ReactProp(name = "adBlockRetryToken", defaultDouble = 0.0)
+  fun setAdBlockRetryToken(view: GeckoView, token: Double) {
+    val holder = holders[view] ?: return
+    if (token == holder.adBlockRetryToken) {
+      return
+    }
+
+    holder.adBlockRetryToken = token
+    Log.d(TAG, "setAdBlockRetryToken token=$token enabled=${holder.adBlockEnabled}")
+    if (!holder.adBlockEnabled) {
+      emitAdBlockStatus(
+        holder,
+        source = "manual_retry_skipped",
+        error = "AdBlock disabled",
+        installing = false,
+        installed = false,
+      )
+      return
+    }
+
+    emitAdBlockStatus(holder, "manual_retry", installing = true)
+    VegaGeckoRuntime.setAdGuardWanted(true)
+    VegaGeckoRuntime.ensureAdGuardExtension(holder.reactContext) { success, error ->
+      holder.view.post {
+        emitAdBlockStatus(
+          holder,
+          source = "manual_retry_result",
+          error = error,
+          installing = false,
+          installed = success && VegaGeckoRuntime.isAdGuardInstalled(),
+        )
+
+        if (success) {
+          try {
+            holder.session.reload()
+          } catch (reloadError: Throwable) {
+            Log.e(TAG, "Unable to reload GeckoView after AdBlock retry", reloadError)
+          }
+        }
+      }
+    }
+  }
+
   override fun onDropViewInstance(view: GeckoView) {
     val holder = holders.remove(view)
     if (holder != null) {
+      clearLoadGateTimeout(holder)
       try {
         holder.session.setNavigationDelegate(null)
         holder.session.setProgressDelegate(null)
@@ -216,7 +335,9 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
           request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW
 
         if (isNewWindow) {
-          openExternally(holder, uri, "new_window")
+          if (!isHttpOrHttps(uri)) {
+            openExternally(holder, uri, "new_window_external_scheme")
+          }
           return GeckoResult.deny()
         }
 
@@ -260,6 +381,7 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         session: GeckoSession,
         url: String,
       ) {
+        emitAdBlockStatus(holder, source = "page_start")
         emitEvent(
           holder.view,
           EVENT_LOADING_START,
@@ -271,6 +393,7 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         session: GeckoSession,
         success: Boolean,
       ) {
+        emitAdBlockStatus(holder, source = "page_stop")
         emitEvent(
           holder.view,
           EVENT_LOADING_FINISH,
@@ -337,6 +460,143 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
     }
   }
 
+  private fun loadUriWithAdBlockGate(
+    holder: SessionHolder,
+    url: String,
+    source: String,
+  ) {
+    Log.d(
+      TAG,
+      "loadUriWithAdBlockGate source=$source url=$url enabled=${holder.adBlockEnabled} installed=${VegaGeckoRuntime.isAdGuardInstalled()}",
+    )
+    if (!holder.adBlockEnabled) {
+      emitAdBlockStatus(
+        holder,
+        source = "${source}_disabled",
+        installing = false,
+        installed = false,
+      )
+      performSessionLoad(holder, url)
+      return
+    }
+
+    holder.pendingUrl = url
+    holder.loadGeneration += 1
+    val generation = holder.loadGeneration
+    clearLoadGateTimeout(holder)
+
+    emitAdBlockStatus(holder, source = "${source}_installing", installing = true)
+    VegaGeckoRuntime.setAdGuardWanted(true)
+
+    val timeoutRunnable = Runnable {
+      if (holder.loadGeneration != generation) {
+        return@Runnable
+      }
+
+      Log.w(TAG, "loadUriWithAdBlockGate timeout source=$source generation=$generation")
+      clearLoadGateTimeout(holder)
+      emitAdBlockStatus(
+        holder,
+        source = "${source}_timeout",
+        error = "AdBlock install timeout, continuing without wait",
+        installing = false,
+        installed = VegaGeckoRuntime.isAdGuardInstalled(),
+      )
+      val pending = holder.pendingUrl
+      holder.pendingUrl = null
+      if (!pending.isNullOrBlank()) {
+        performSessionLoad(holder, pending)
+      }
+    }
+
+    holder.loadGateTimeoutRunnable = timeoutRunnable
+    holder.view.postDelayed(timeoutRunnable, AD_BLOCK_INSTALL_TIMEOUT_MS)
+
+    VegaGeckoRuntime.ensureAdGuardExtension(holder.reactContext) { success, error ->
+      Log.d(
+        TAG,
+        "loadUriWithAdBlockGate callback source=$source success=$success error=$error generation=$generation currentGeneration=${holder.loadGeneration}",
+      )
+      holder.view.post {
+        if (holder.loadGeneration != generation) {
+          return@post
+        }
+
+        clearLoadGateTimeout(holder)
+        emitAdBlockStatus(
+          holder,
+          source = "${source}_ready",
+          error = error,
+          installing = false,
+          installed = success && VegaGeckoRuntime.isAdGuardInstalled(),
+        )
+
+        val pending = holder.pendingUrl
+        holder.pendingUrl = null
+        if (!pending.isNullOrBlank()) {
+          performSessionLoad(holder, pending)
+        }
+      }
+    }
+  }
+
+  private fun performSessionLoad(
+    holder: SessionHolder,
+    url: String,
+  ) {
+    Log.d(TAG, "performSessionLoad url=$url")
+    try {
+      holder.session.loadUri(url)
+    } catch (error: Throwable) {
+      Log.e(TAG, "Unable to load URI in GeckoView: $url", error)
+      emitEvent(
+        holder.view,
+        EVENT_LOADING_ERROR,
+        mapOf(
+          "uri" to url,
+          "message" to (error.message ?: "Unable to load URI"),
+          "fatal" to false,
+        ),
+      )
+    }
+  }
+
+  private fun clearLoadGateTimeout(holder: SessionHolder) {
+    val runnable = holder.loadGateTimeoutRunnable ?: return
+    holder.view.removeCallbacks(runnable)
+    holder.loadGateTimeoutRunnable = null
+  }
+
+  private fun emitAdBlockStatus(
+    holder: SessionHolder,
+    source: String,
+    error: String? = null,
+    installing: Boolean? = null,
+    installed: Boolean? = null,
+  ) {
+    val isInstalling = installing ?: VegaGeckoRuntime.isAdGuardInstalling()
+    val isInstalled = installed ?: VegaGeckoRuntime.isAdGuardInstalled()
+    val effectiveError = error ?: VegaGeckoRuntime.getAdGuardLastError()
+
+    Log.d(
+      TAG,
+      "emitAdBlockStatus source=$source enabled=${holder.adBlockEnabled} installing=$isInstalling installed=$isInstalled error=$effectiveError",
+    )
+
+    emitEvent(
+      holder.view,
+      EVENT_ADBLOCK_STATUS,
+      mapOf(
+        "enabled" to holder.adBlockEnabled,
+        "installing" to isInstalling,
+        "installed" to isInstalled,
+        "active" to (holder.adBlockEnabled && isInstalled),
+        "error" to effectiveError,
+        "source" to source,
+      ),
+    )
+  }
+
   private fun shouldOpenExternally(uri: String?): Boolean {
     if (uri.isNullOrBlank()) {
       return false
@@ -349,6 +609,15 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
       scheme != "about" &&
       scheme != "data" &&
       scheme != "blob"
+  }
+
+  private fun isHttpOrHttps(uri: String?): Boolean {
+    if (uri.isNullOrBlank()) {
+      return false
+    }
+
+    val scheme = Uri.parse(uri).scheme?.lowercase() ?: return false
+    return scheme == "http" || scheme == "https"
   }
 
   private fun openExternally(

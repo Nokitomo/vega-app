@@ -12,6 +12,7 @@ export type {
   GeckoExternalOpenEvent,
   GeckoBridgeMessageEvent,
   GeckoFullScreenEvent,
+  GeckoAdBlockStatusEvent,
 } from './GeckoWebView.types';
 
 export default function GeckoWebView(props: GeckoWebViewProps) {

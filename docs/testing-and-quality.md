@@ -35,6 +35,12 @@ npm test
   - In Webview verificare che la tabbar inferiore dell'app sia nascosta.
   - Verificare che link/popup in nuova finestra vengano aperti esternamente senza chiudere lo screen corrente.
   - Verificare che pagine con JavaScript client-side funzionino correttamente.
+  - Verificare che AdGuard risulti installata e attiva di default (almeno su una pagina con ads/banner noti).
+  - Aprire pannello AdBlock dalla barra top Webview:
+    - toggle OFF: AdGuard disattivata e navigazione invariata.
+    - toggle ON: AdGuard riattivata.
+    - "Riprova installazione": tenta reinstall e, se riuscita, ricarica la pagina corrente.
+  - In assenza rete o con AMO non raggiungibile, verificare che lo screen Webview continui ad aprirsi senza crash (degrado senza adblock).
   - Durante fullscreen video del provider in Webview verificare:
     - assenza tabbar inferiore.
     - assenza header superiore ("Webview", open-in-browser, close).

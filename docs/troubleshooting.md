@@ -121,10 +121,14 @@ npx expo run:android --device "Medium_phone_API_35"
 ```
 2) Verifica che `android/build.gradle` includa il repository Mozilla Maven e che `android/app/build.gradle` includa la dipendenza `org.mozilla.geckoview:geckoview`.
 3) Verifica presenza degli asset extension in `android/app/src/main/assets/gecko-bridge/`.
+4) Verifica raggiungibilita AMO dal device per auto-install AdGuard:
+   - `https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi`
+   - Se non raggiungibile, GeckoView continua comunque la navigazione ma senza adblock.
 
 Kill-switch locale:
 - La chiave storage `androidGeckoWebViewEnabled` controlla l'uso di GeckoView su Android.
 - Se `false`, l'app forza fallback a `react-native-webview` legacy sullo screen Webview.
+- La chiave storage `androidGeckoAdGuardEnabled` controlla il toggle AdGuard nel Webview Gecko Android.
 
 ## Provider installato ma nessun contenuto (DNS/NXDOMAIN)
 Sintomi tipici:

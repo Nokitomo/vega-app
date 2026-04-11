@@ -35,6 +35,8 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Supporta vista Episodi e vista Correlati.
 - Include controlli di chiusura e ritorno al contenuto precedente.
 - Il comando "Open in Web" usa GeckoView su Android (con bridge WebExtensionController built-in) e mantiene `react-native-webview` su iOS.
+- Su Android, GeckoView prova a installare automaticamente l'estensione `AdGuard AdBlocker` (`adguardadblocker@adguard.com`) al primo avvio runtime; in caso di errore l'apertura Webview continua senza bloccare la UI.
+- Nello screen Webview Android e disponibile un pulsante AdBlock nella barra superiore per aprire un pannello rapido con toggle enable/disable e retry installazione.
 - In Webview la rotazione non viene forzata dall'app: segue lo stato di auto-rotazione del device.
 - In Webview la tabbar inferiore dell'app viene nascosta per evitare overlay durante fullscreen video del sito provider.
 - Mostra il pulsante "Riprendi"; se non esiste riproduzione salvata mostra "Riproduci Ep. 1 00:00".

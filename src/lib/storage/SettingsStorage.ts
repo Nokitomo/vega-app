@@ -45,6 +45,7 @@ export enum SettingsKeys {
 
   // Runtime feature flags
   ANDROID_GECKO_WEBVIEW_ENABLED = 'androidGeckoWebViewEnabled',
+  ANDROID_GECKO_ADGUARD_ENABLED = 'androidGeckoAdGuardEnabled',
 }
 
 /**
@@ -303,6 +304,17 @@ export class SettingsStorage {
 
   setAndroidGeckoWebViewEnabled(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED, enabled);
+  }
+
+  isAndroidGeckoAdGuardEnabled(): boolean {
+    return mainStorage.getBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED) ===
+      null
+      ? true
+      : mainStorage.getBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED);
+  }
+
+  setAndroidGeckoAdGuardEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED, enabled);
   }
 
   // Generic get/set methods for settings not covered by specific methods

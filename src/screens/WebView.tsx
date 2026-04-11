@@ -7,6 +7,8 @@ import {
   NativeSyntheticEvent,
   StatusBar,
   AppState,
+  Switch,
+  Pressable,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {WebView as LegacyWebView} from 'react-native-webview';
@@ -15,6 +17,7 @@ import {HomeStackParamList} from '../App';
 import {MaterialIcons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
 import GeckoWebView, {
+  GeckoAdBlockStatusEvent,
   GeckoFullScreenEvent,
   GeckoLoadingErrorEvent,
 } from '../components/GeckoWebView';
@@ -30,6 +33,21 @@ const Webview = ({route, navigation}: Props) => {
   const {t} = useTranslation();
   const [forceLegacyWebView, setForceLegacyWebView] = useState(false);
   const [isWebContentFullscreen, setIsWebContentFullscreen] = useState(false);
+  const [showAdBlockPanel, setShowAdBlockPanel] = useState(false);
+  const [adBlockEnabled, setAdBlockEnabled] = useState(
+    settingsStorage.isAndroidGeckoAdGuardEnabled(),
+  );
+  const [adBlockRetryToken, setAdBlockRetryToken] = useState(0);
+  const [adBlockStatus, setAdBlockStatus] = useState<{
+    enabled: boolean;
+    installed: boolean;
+    installing: boolean;
+    error?: string;
+  }>({
+    enabled: settingsStorage.isAndroidGeckoAdGuardEnabled(),
+    installed: false,
+    installing: false,
+  });
   const reapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canUseGecko = useMemo(
@@ -59,11 +77,61 @@ const Webview = ({route, navigation}: Props) => {
     setIsWebContentFullscreen(Boolean(event.nativeEvent?.fullScreen));
   };
 
+  const handleAdBlockStatusChange = (
+    event: NativeSyntheticEvent<GeckoAdBlockStatusEvent>,
+  ) => {
+    const nativeEvent = event.nativeEvent;
+    console.log('[WebView][AdBlock] native status', nativeEvent);
+    setAdBlockStatus(prev => ({
+      enabled:
+        typeof nativeEvent.enabled === 'boolean'
+          ? nativeEvent.enabled
+          : prev.enabled,
+      installed:
+        typeof nativeEvent.installed === 'boolean'
+          ? nativeEvent.installed
+          : prev.installed,
+      installing:
+        typeof nativeEvent.installing === 'boolean'
+          ? nativeEvent.installing
+          : prev.installing,
+      error: nativeEvent.error || undefined,
+    }));
+  };
+
   useEffect(() => {
     if (!canUseGecko && isWebContentFullscreen) {
       setIsWebContentFullscreen(false);
     }
   }, [canUseGecko, isWebContentFullscreen]);
+
+  useEffect(() => {
+    if (!canUseGecko) {
+      setShowAdBlockPanel(false);
+    }
+  }, [canUseGecko]);
+
+  const handleToggleAdBlock = (value: boolean) => {
+    console.log('[WebView][AdBlock] toggle', value);
+    setAdBlockEnabled(value);
+    settingsStorage.setAndroidGeckoAdGuardEnabled(value);
+    setAdBlockStatus(prev => ({
+      ...prev,
+      enabled: value,
+      installing: value,
+      error: undefined,
+    }));
+  };
+
+  const handleRetryAdBlock = () => {
+    console.log('[WebView][AdBlock] manual retry');
+    setAdBlockRetryToken(prev => prev + 1);
+    setAdBlockStatus(prev => ({
+      ...prev,
+      installing: true,
+      error: undefined,
+    }));
+  };
 
   const clearReapplyTimer = useCallback(() => {
     if (reapplyTimerRef.current) {
@@ -177,6 +245,16 @@ const Webview = ({route, navigation}: Props) => {
                 Linking.openURL(route.params.link);
               }}
             />
+            {canUseGecko && (
+              <MaterialIcons
+                name={adBlockEnabled ? 'gpp-good' : 'gpp-bad'}
+                size={24}
+                color={adBlockEnabled ? '#4ADE80' : '#9CA3AF'}
+                onPress={() => {
+                  setShowAdBlockPanel(prev => !prev);
+                }}
+              />
+            )}
             <MaterialIcons
               name="close"
               size={24}
@@ -188,13 +266,83 @@ const Webview = ({route, navigation}: Props) => {
           </View>
         </View>
       )}
+      {canUseGecko && showAdBlockPanel && !isWebContentFullscreen && (
+        <View
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: 84,
+            zIndex: 30,
+            width: 260,
+            borderRadius: 12,
+            backgroundColor: '#111827',
+            borderColor: '#374151',
+            borderWidth: 1,
+            padding: 12,
+            gap: 10,
+          }}>
+          <Text style={{color: '#F9FAFB', fontSize: 16, fontWeight: '700'}}>
+            {t('AdBlock Settings')}
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+            <Text style={{color: '#E5E7EB'}}>{t('AdBlock Enabled')}</Text>
+            <Switch value={adBlockEnabled} onValueChange={handleToggleAdBlock} />
+          </View>
+          <Text style={{color: '#D1D5DB', fontSize: 12}}>
+            {adBlockStatus.installing
+              ? t('AdBlock Installing')
+              : adBlockEnabled && adBlockStatus.installed
+                ? t('AdBlock Active')
+                : adBlockStatus.error
+                  ? t('AdBlock Error')
+                  : t('AdBlock Disabled')}
+          </Text>
+          {Boolean(adBlockStatus.error) && (
+            <Text style={{color: '#FCA5A5', fontSize: 12}}>
+              {adBlockStatus.error}
+            </Text>
+          )}
+          <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 10}}>
+            <Pressable
+              onPress={handleRetryAdBlock}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                backgroundColor: '#1F2937',
+              }}>
+              <Text style={{color: '#F9FAFB', fontSize: 12}}>
+                {t('Retry install')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowAdBlockPanel(false)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                backgroundColor: '#374151',
+              }}>
+              <Text style={{color: '#F9FAFB', fontSize: 12}}>{t('Close')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
       {canUseGecko ? (
         <GeckoWebView
           style={{flex: 1}}
           url={route.params.link}
           javaScriptEnabled={true}
+          adBlockEnabled={adBlockEnabled}
+          adBlockRetryToken={adBlockRetryToken}
           onLoadingError={handleGeckoError}
           onFullScreenChange={handleGeckoFullScreenChange}
+          onAdBlockStatusChange={handleAdBlockStatusChange}
         />
       ) : (
         <LegacyWebView

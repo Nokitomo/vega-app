@@ -31,10 +31,21 @@ export type GeckoFullScreenEvent = {
   fullScreen?: boolean;
 };
 
+export type GeckoAdBlockStatusEvent = {
+  enabled?: boolean;
+  installed?: boolean;
+  installing?: boolean;
+  active?: boolean;
+  source?: string;
+  error?: string;
+};
+
 export type GeckoWebViewProps = {
   style?: StyleProp<ViewStyle>;
   url?: string;
   javaScriptEnabled?: boolean;
+  adBlockEnabled?: boolean;
+  adBlockRetryToken?: number;
   onLoadingStart?: (event: NativeSyntheticEvent<GeckoLoadingStartEvent>) => void;
   onLoadingFinish?: (
     event: NativeSyntheticEvent<GeckoLoadingFinishEvent>,
@@ -46,5 +57,8 @@ export type GeckoWebViewProps = {
   ) => void;
   onFullScreenChange?: (
     event: NativeSyntheticEvent<GeckoFullScreenEvent>,
+  ) => void;
+  onAdBlockStatusChange?: (
+    event: NativeSyntheticEvent<GeckoAdBlockStatusEvent>,
   ) => void;
 };
