@@ -27,6 +27,11 @@ npm test
   - WVC: apertura app e avvio stream con headers/sottotitoli quando disponibili.
 - Durante cast nativo da Player, verificare aggiornamento progresso episodio in cronologia/cache.
 
+## Smoke test Player Android
+- Da player nativo app (non Webview), attivare fullscreen e verificare che status/navigation bar Android siano nascoste.
+- In fullscreen player nativo, mettere app in background e tornare in foreground: verificare che status/navigation bar restino nascoste senza dover togglare il pulsante fullscreen.
+- Uscire dal fullscreen player nativo: verificare ripristino corretto delle system bars.
+
 ## Smoke test WebView/GeckoView
 - Android:
   - Da Info -> menu -> `Open in Web`, verificare apertura pagina nello screen Webview.

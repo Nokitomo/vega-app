@@ -221,6 +221,9 @@ const Player = ({route}: Props): React.JSX.Element => {
   const [isAppActive, setIsAppActive] = useState(
     AppState.currentState === 'active',
   );
+  const immersiveReapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const {addItem, updatePlaybackInfo, updateItemWithInfo} =
     useWatchHistoryStore();
 
@@ -2139,20 +2142,41 @@ const Player = ({route}: Props): React.JSX.Element => {
   );
 
   // Exit fullscreen on back
+  const clearImmersiveReapplyTimer = useCallback(() => {
+    if (immersiveReapplyTimerRef.current) {
+      clearTimeout(immersiveReapplyTimerRef.current);
+      immersiveReapplyTimerRef.current = null;
+    }
+  }, []);
+
+  const reapplyImmersiveIfNeeded = useCallback(() => {
+    if (Platform.OS !== 'android' || !isFullScreen) {
+      return;
+    }
+
+    clearImmersiveReapplyTimer();
+    goFullScreen();
+    immersiveReapplyTimerRef.current = setTimeout(() => {
+      goFullScreen();
+      immersiveReapplyTimerRef.current = null;
+    }, 120);
+  }, [clearImmersiveReapplyTimer, isFullScreen]);
+
   useFocusEffect(
     useCallback(() => {
       // This code now runs every time the screen is focused
       if (isFullScreen) {
-        goFullScreen();
+        reapplyImmersiveIfNeeded();
       } else {
         exitFullScreen();
       }
 
       return () => {
+        clearImmersiveReapplyTimer();
         // Ensure the system UI is restored when leaving the player
         exitFullScreen();
       };
-    }, [isFullScreen]),
+    }, [clearImmersiveReapplyTimer, isFullScreen, reapplyImmersiveIfNeeded]),
   );
 
   useEffect(() => {
@@ -2452,18 +2476,28 @@ const Player = ({route}: Props): React.JSX.Element => {
   useEffect(() => {
     // Handle fullscreen toggle
     if (isFullScreen) {
-      goFullScreen();
+      reapplyImmersiveIfNeeded();
     } else {
+      clearImmersiveReapplyTimer();
       exitFullScreen();
     }
-  }, [isFullScreen]);
+  }, [clearImmersiveReapplyTimer, isFullScreen, reapplyImmersiveIfNeeded]);
+
+  useEffect(() => {
+    if (!isAppActive) {
+      return;
+    }
+
+    reapplyImmersiveIfNeeded();
+  }, [isAppActive, reapplyImmersiveIfNeeded]);
 
   useEffect(() => {
     return () => {
+      clearImmersiveReapplyTimer();
       // Safety net: restore navigation bar on unmount
       exitFullScreen();
     };
-  }, []);
+  }, [clearImmersiveReapplyTimer]);
 
   // Memoized video player props
   const videoPlayerProps = useMemo(
