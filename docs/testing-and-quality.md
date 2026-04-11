@@ -30,8 +30,11 @@ npm test
 ## Smoke test WebView/GeckoView
 - Android:
   - Da Info -> menu -> `Open in Web`, verificare apertura pagina nello screen Webview.
+  - In Webview verificare che la rotazione segua lo stato auto-rotate del device (senza forzature app-level).
+  - In Webview verificare che la tabbar inferiore dell'app sia nascosta.
   - Verificare che link/popup in nuova finestra vengano aperti esternamente senza chiudere lo screen corrente.
   - Verificare che pagine con JavaScript client-side funzionino correttamente.
+  - Durante fullscreen video del provider in Webview verificare assenza overlay della tabbar.
   - Simulare errore fatale init Gecko (o disabilitare feature flag) e verificare fallback a WebView legacy.
 - iOS:
   - Verificare che lo screen Webview continui a usare `react-native-webview` con UX invariata.

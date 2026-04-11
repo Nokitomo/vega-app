@@ -10,6 +10,7 @@ import ScrollList from './screens/ScrollList';
 import {
   NavigationContainer,
   createNavigationContainerRef,
+  getFocusedRouteNameFromRoute,
 } from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -485,6 +486,12 @@ const AppContent = () => {
         return;
       }
 
+      if (routeName === 'Webview') {
+        // In Webview respect device auto-rotate settings without app-level force.
+        Orientation.unlockAllOrientations();
+        return;
+      }
+
       if (allowNonPlayerRotation) {
         Orientation.unlockAllOrientations();
         return;
@@ -494,6 +501,21 @@ const AppContent = () => {
     },
     [allowNonPlayerRotation],
   );
+
+  const defaultTabBarStyle = !useSideTabLayout
+    ? {
+        position: 'absolute' as const,
+        bottom: -insets.bottom + tabBarLabelLift,
+        height: 55 + insets.bottom,
+        borderRadius: 0,
+        overflow: 'hidden' as const,
+        elevation: 0,
+        borderTopWidth: 0,
+        paddingHorizontal: 0,
+        paddingTop: 5,
+        paddingBottom: insets.bottom,
+      }
+    : {};
 
   function TabStack() {
     return (
@@ -510,21 +532,7 @@ const AppContent = () => {
           tabBarActiveTintColor: primary,
           tabBarInactiveTintColor: '#dadde3',
           tabBarShowLabel: showTabBarLables,
-          tabBarStyle: !useSideTabLayout
-            ? {
-                position: 'absolute',
-                bottom: -insets.bottom + tabBarLabelLift,
-                height: 55 + insets.bottom,
-                borderRadius: 0,
-                // backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                overflow: 'hidden',
-                elevation: 0,
-                borderTopWidth: 0,
-                paddingHorizontal: 0,
-                paddingTop: 5,
-                paddingBottom: insets.bottom,
-              }
-            : {},
+          tabBarStyle: defaultTabBarStyle,
           tabBarBackground: () => <TabBarBackgound />,
           tabBarHideOnKeyboard: true,
           tabBarButton: props => {
@@ -553,39 +561,55 @@ const AppContent = () => {
         <Tab.Screen
           name="HomeStack"
           component={HomeStackScreen}
-          options={{
-            title: t('Home'),
-            tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="home" color={color} size={size} />
-                ) : (
-                  <Ionicons name="home-outline" color={color} size={size} />
-                )}
-              </Animated.View>
-            ),
+          options={({route}) => {
+            const focusedStackRoute = getFocusedRouteNameFromRoute(route);
+            const hideTabBar = focusedStackRoute === 'Webview';
+
+            return {
+              title: t('Home'),
+              tabBarStyle: hideTabBar
+                ? ({display: 'none'} as const)
+                : defaultTabBarStyle,
+              tabBarIcon: ({focused, color, size}) => (
+                <Animated.View
+                  style={{
+                    transform: [{scale: focused ? 1.1 : 1}],
+                  }}>
+                  {focused ? (
+                    <Ionicons name="home" color={color} size={size} />
+                  ) : (
+                    <Ionicons name="home-outline" color={color} size={size} />
+                  )}
+                </Animated.View>
+              ),
+            };
           }}
         />
         <Tab.Screen
           name="SearchStack"
           component={SearchStackScreen}
-          options={{
-            title: t('Search'),
-            tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="search" color={color} size={size} />
-                ) : (
-                  <Ionicons name="search-outline" color={color} size={size} />
-                )}
-              </Animated.View>
-            ),
+          options={({route}) => {
+            const focusedStackRoute = getFocusedRouteNameFromRoute(route);
+            const hideTabBar = focusedStackRoute === 'Webview';
+
+            return {
+              title: t('Search'),
+              tabBarStyle: hideTabBar
+                ? ({display: 'none'} as const)
+                : defaultTabBarStyle,
+              tabBarIcon: ({focused, color, size}) => (
+                <Animated.View
+                  style={{
+                    transform: [{scale: focused ? 1.1 : 1}],
+                  }}>
+                  {focused ? (
+                    <Ionicons name="search" color={color} size={size} />
+                  ) : (
+                    <Ionicons name="search-outline" color={color} size={size} />
+                  )}
+                </Animated.View>
+              ),
+            };
           }}
         />
         <Tab.Screen
