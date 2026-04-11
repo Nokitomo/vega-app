@@ -96,8 +96,6 @@ const goFullScreen = () => {
   if (Platform.OS === 'android') {
     // Hide the navigation bar
     NavigationBar.setVisibilityAsync('hidden');
-    // Make it "sticky immersive" (appears on swipe, then hides again)
-    NavigationBar.setBehaviorAsync('overlay-swipe');
     StatusBar.setHidden(true, 'slide');
   }
   // `expo-status-bar` handles the top bar
@@ -107,8 +105,6 @@ const exitFullScreen = () => {
   if (Platform.OS === 'android') {
     // Show the navigation bar
     NavigationBar.setVisibilityAsync('visible');
-    // Reset behavior
-    NavigationBar.setBehaviorAsync('overlay-swipe');
     StatusBar.setHidden(false, 'slide');
   }
 };
