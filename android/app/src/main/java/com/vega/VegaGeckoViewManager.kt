@@ -495,11 +495,12 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
 
       Log.w(TAG, "loadUriWithAdBlockGate timeout source=$source generation=$generation")
       clearLoadGateTimeout(holder)
+      val stillInstalling = VegaGeckoRuntime.isAdGuardInstalling()
       emitAdBlockStatus(
         holder,
-        source = "${source}_timeout",
-        error = "AdBlock install timeout, continuing without wait",
-        installing = false,
+        source = "${source}_timeout_continue",
+        error = if (stillInstalling) null else "AdBlock install timed out",
+        installing = stillInstalling,
         installed = VegaGeckoRuntime.isAdGuardInstalled(),
       )
       val pending = holder.pendingUrl

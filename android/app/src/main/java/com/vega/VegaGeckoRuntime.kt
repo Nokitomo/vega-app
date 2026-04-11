@@ -1,6 +1,8 @@
 package com.vega
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
@@ -18,6 +20,7 @@ object VegaGeckoRuntime {
   const val ADGUARD_EXTENSION_ID = "adguardadblocker@adguard.com"
   private const val ADGUARD_EXTENSION_URI =
     "https://addons.mozilla.org/firefox/downloads/latest/adguard-adblocker/latest.xpi"
+  private const val ADGUARD_INSTALL_HARD_TIMEOUT_MS = 15000L
 
   @Volatile
   private var runtime: GeckoRuntime? = null
@@ -42,6 +45,14 @@ object VegaGeckoRuntime {
 
   @Volatile
   private var adGuardLastError: String? = null
+
+  @Volatile
+  private var adGuardInitGeneration = 0
+
+  @Volatile
+  private var adGuardInitTimeoutRunnable: Runnable? = null
+
+  private val timeoutHandler = Handler(Looper.getMainLooper())
 
   private val extensionCallbacks = mutableListOf<(WebExtension?) -> Unit>()
   private val adGuardCallbacks = mutableListOf<(Boolean, String?) -> Unit>()
@@ -104,6 +115,7 @@ object VegaGeckoRuntime {
 
     val runtimeInstance = getOrCreate(context.applicationContext)
     val controller = runtimeInstance.webExtensionController
+    var timeoutGeneration = 0
 
     synchronized(this) {
       if (!adGuardWanted) {
@@ -124,7 +136,11 @@ object VegaGeckoRuntime {
         return
       }
       adGuardInitInFlight = true
+      adGuardInitGeneration += 1
+      timeoutGeneration = adGuardInitGeneration
     }
+
+    scheduleAdGuardInitHardTimeout(timeoutGeneration)
 
     try {
       controller
@@ -338,6 +354,8 @@ object VegaGeckoRuntime {
     Log.d(TAG, "completeAdGuardInit success=$success error=$error")
     val callbacks = synchronized(this) {
       adGuardInitInFlight = false
+      adGuardInitTimeoutRunnable?.let { timeoutHandler.removeCallbacks(it) }
+      adGuardInitTimeoutRunnable = null
       if (success) {
         adGuardInstalled = true
         adGuardLastError = null
@@ -354,6 +372,27 @@ object VegaGeckoRuntime {
     callbacks.forEach { callback ->
       callback(success, error)
     }
+  }
+
+  private fun scheduleAdGuardInitHardTimeout(generation: Int) {
+    val timeoutRunnable = Runnable {
+      val shouldTrigger = synchronized(this) {
+        adGuardInitInFlight && adGuardInitGeneration == generation
+      }
+      if (!shouldTrigger) {
+        return@Runnable
+      }
+
+      Log.e(TAG, "AdGuard install hard-timeout generation=$generation")
+      completeAdGuardInit(false, "AdGuard install timed out")
+    }
+
+    synchronized(this) {
+      adGuardInitTimeoutRunnable?.let { timeoutHandler.removeCallbacks(it) }
+      adGuardInitTimeoutRunnable = timeoutRunnable
+    }
+
+    timeoutHandler.postDelayed(timeoutRunnable, ADGUARD_INSTALL_HARD_TIMEOUT_MS)
   }
 
   private fun completeAdGuardDisable(success: Boolean, error: String?) {
