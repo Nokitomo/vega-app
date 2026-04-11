@@ -40,6 +40,7 @@ npm test
     - assenza header superiore ("Webview", open-in-browser, close).
     - status bar e navigation bar Android nascoste.
     - lock landscape finche il contenuto resta fullscreen.
+  - Durante fullscreen in Webview, mettere app in background e poi tornare in foreground: verificare che status/navigation bar restino nascoste finche il provider resta fullscreen.
   - Uscendo dal fullscreen provider, verificare ripristino header e system bars.
   - Simulare errore fatale init Gecko (o disabilitare feature flag) e verificare fallback a WebView legacy.
 - iOS:

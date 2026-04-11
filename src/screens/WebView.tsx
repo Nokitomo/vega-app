@@ -6,8 +6,9 @@ import {
   Platform,
   NativeSyntheticEvent,
   StatusBar,
+  AppState,
 } from 'react-native';
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {WebView as LegacyWebView} from 'react-native-webview';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../App';
@@ -21,6 +22,7 @@ import {settingsStorage} from '../lib/storage';
 import * as NavigationBar from 'expo-navigation-bar';
 import Orientation from 'react-native-orientation-locker';
 import {applyAndroidUserOrientation} from '../lib/utils/vegaOrientation';
+import {useFocusEffect} from '@react-navigation/native';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Webview'>;
 
@@ -28,6 +30,7 @@ const Webview = ({route, navigation}: Props) => {
   const {t} = useTranslation();
   const [forceLegacyWebView, setForceLegacyWebView] = useState(false);
   const [isWebContentFullscreen, setIsWebContentFullscreen] = useState(false);
+  const reapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canUseGecko = useMemo(
     () =>
@@ -62,33 +65,86 @@ const Webview = ({route, navigation}: Props) => {
     }
   }, [canUseGecko, isWebContentFullscreen]);
 
+  const clearReapplyTimer = useCallback(() => {
+    if (reapplyTimerRef.current) {
+      clearTimeout(reapplyTimerRef.current);
+      reapplyTimerRef.current = null;
+    }
+  }, []);
+
+  const applySystemUiForFullscreenState = useCallback(
+    async (fullScreen: boolean) => {
+      if (Platform.OS !== 'android') {
+        return;
+      }
+
+      try {
+        await NavigationBar.setBehaviorAsync('overlay-swipe');
+        await NavigationBar.setVisibilityAsync(fullScreen ? 'hidden' : 'visible');
+      } catch {}
+
+      StatusBar.setHidden(fullScreen, 'slide');
+
+      if (fullScreen) {
+        Orientation.lockToLandscape();
+      } else {
+        const applied = applyAndroidUserOrientation();
+        if (!applied) {
+          Orientation.unlockAllOrientations();
+        }
+      }
+    },
+    [],
+  );
+
+  const reapplyImmersiveIfNeeded = useCallback(() => {
+    if (Platform.OS !== 'android' || !isWebContentFullscreen) {
+      return;
+    }
+
+    clearReapplyTimer();
+    applySystemUiForFullscreenState(true);
+    reapplyTimerRef.current = setTimeout(() => {
+      applySystemUiForFullscreenState(true);
+      reapplyTimerRef.current = null;
+    }, 120);
+  }, [
+    applySystemUiForFullscreenState,
+    clearReapplyTimer,
+    isWebContentFullscreen,
+  ]);
+
+  useEffect(() => {
+    applySystemUiForFullscreenState(isWebContentFullscreen);
+  }, [applySystemUiForFullscreenState, isWebContentFullscreen]);
+
+  useFocusEffect(
+    useCallback(() => {
+      reapplyImmersiveIfNeeded();
+      return () => {
+        clearReapplyTimer();
+      };
+    }, [clearReapplyTimer, reapplyImmersiveIfNeeded]),
+  );
+
   useEffect(() => {
     if (Platform.OS !== 'android') {
       return;
     }
 
-    const setSystemUi = async () => {
-      try {
-        await NavigationBar.setBehaviorAsync('overlay-swipe');
-        await NavigationBar.setVisibilityAsync(
-          isWebContentFullscreen ? 'hidden' : 'visible',
-        );
-      } catch {}
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      nextState => {
+        if (nextState === 'active') {
+          reapplyImmersiveIfNeeded();
+        }
+      },
+    );
 
-      StatusBar.setHidden(isWebContentFullscreen, 'slide');
+    return () => {
+      appStateSubscription.remove();
     };
-
-    setSystemUi();
-
-    if (isWebContentFullscreen) {
-      Orientation.lockToLandscape();
-    } else {
-      const applied = applyAndroidUserOrientation();
-      if (!applied) {
-        Orientation.unlockAllOrientations();
-      }
-    }
-  }, [isWebContentFullscreen]);
+  }, [reapplyImmersiveIfNeeded]);
 
   useEffect(() => {
     return () => {
@@ -96,6 +152,7 @@ const Webview = ({route, navigation}: Props) => {
         return;
       }
 
+      clearReapplyTimer();
       StatusBar.setHidden(false, 'slide');
       NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
       NavigationBar.setVisibilityAsync('visible').catch(() => {});
@@ -104,7 +161,7 @@ const Webview = ({route, navigation}: Props) => {
         Orientation.unlockAllOrientations();
       }
     };
-  }, []);
+  }, [clearReapplyTimer]);
 
   return (
     <SafeAreaView className="bg-black w-full h-full">
