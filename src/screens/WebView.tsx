@@ -147,7 +147,6 @@ const Webview = ({route, navigation}: Props) => {
       }
 
       try {
-        await NavigationBar.setBehaviorAsync('overlay-swipe');
         await NavigationBar.setVisibilityAsync(fullScreen ? 'hidden' : 'visible');
       } catch {}
 
@@ -222,7 +221,6 @@ const Webview = ({route, navigation}: Props) => {
 
       clearReapplyTimer();
       StatusBar.setHidden(false, 'slide');
-      NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
       NavigationBar.setVisibilityAsync('visible').catch(() => {});
       const applied = applyAndroidUserOrientation();
       if (!applied) {
