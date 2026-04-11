@@ -156,6 +156,7 @@ export type SearchStackParamList = {
     infoStack?: Array<{link: string; provider?: string; poster?: string}>;
   };
   SearchResults: {filter: string; availableProviders?: string[]};
+  Webview: {link: string};
 };
 
 export type WatchListStackParamList = {
@@ -201,27 +202,93 @@ export type TabStackParamList = {
   SettingsStack: undefined;
 };
 const Tab = createBottomTabNavigator<TabStackParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
+const HomeStack = createNativeStackNavigator<HomeStackParamList>();
+const SearchStack = createNativeStackNavigator<SearchStackParamList>();
+const WatchListStack = createNativeStackNavigator<WatchListStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
+const WatchHistoryStack =
+  createNativeStackNavigator<WatchHistoryStackParamList>();
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
-const AppContent = () => {
-  LogBox.ignoreLogs([
-    'You have passed a style to FlashList',
-    'new NativeEventEmitter()',
-  ]);
+
+const STACK_SCREEN_OPTIONS = {
+  headerShown: false,
+  animation: 'ios_from_right' as const,
+  animationDuration: 200,
+  freezeOnBlur: true,
+};
+
+function HomeStackScreen() {
+  return (
+    <HomeStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+      <HomeStack.Screen name="Home" component={Home} />
+      <HomeStack.Screen name="Info" component={Info} />
+      <HomeStack.Screen name="ScrollList" component={ScrollList} />
+      <HomeStack.Screen name="Webview" component={WebView} />
+    </HomeStack.Navigator>
+  );
+}
+
+function SearchStackScreen() {
+  return (
+    <SearchStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+      <SearchStack.Screen name="Search" component={Search} />
+      <SearchStack.Screen name="ScrollList" component={ScrollList} />
+      <SearchStack.Screen name="Info" component={Info} />
+      <SearchStack.Screen name="SearchResults" component={SearchResults} />
+      <SearchStack.Screen name="Webview" component={WebView} />
+    </SearchStack.Navigator>
+  );
+}
+
+function WatchListStackScreen() {
+  return (
+    <WatchListStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+      <WatchListStack.Screen name="WatchList" component={WatchList} />
+      <WatchListStack.Screen name="Info" component={Info} />
+    </WatchListStack.Navigator>
+  );
+}
+
+function WatchHistoryStackScreen() {
+  return (
+    <WatchHistoryStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+      <WatchHistoryStack.Screen name="WatchHistory" component={WatchHistory} />
+      <WatchHistoryStack.Screen name="Info" component={Info} />
+      <WatchHistoryStack.Screen name="SeriesEpisodes" component={SeriesEpisodes} />
+    </WatchHistoryStack.Navigator>
+  );
+}
+
+function SettingsStackScreen() {
+  return (
+    <SettingsStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
+      <SettingsStack.Screen name="Settings" component={Settings} />
+      {/* <SettingsStack.Screen
+        name="DisableProviders"
+        component={DisableProviders}
+      /> */}
+      <SettingsStack.Screen name="About" component={About} />
+      <SettingsStack.Screen name="Preferences" component={Preferences} />
+      <SettingsStack.Screen name="Downloads" component={Downloads} />
+      <SettingsStack.Screen name="Extensions" component={Extensions} />
+      <SettingsStack.Screen
+        name="WatchHistoryStack"
+        component={WatchHistoryStackScreen}
+      />
+      <SettingsStack.Screen
+        name="SubTitlesPreferences"
+        component={SubtitlePreference}
+      />
+    </SettingsStack.Navigator>
+  );
+}
+
+function TabStack() {
   const {t} = useTranslation();
-  const HomeStack = createNativeStackNavigator<HomeStackParamList>();
-  const Stack = createNativeStackNavigator<RootStackParamList>();
-  const SearchStack = createNativeStackNavigator<SearchStackParamList>();
-  const WatchListStack = createNativeStackNavigator<WatchListStackParamList>();
-  const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
-  const WatchHistoryStack =
-    createNativeStackNavigator<WatchHistoryStackParamList>();
   const {primary} = useThemeStore(state => state);
   const insets = useSafeAreaInsets();
-  const {clearCache} = useSearchCacheStore(state => ({
-    clearCache: state.clearCache,
-  }));
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
-  const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
   const showTabBarLables = useUiSettingsStore(
     state => state.showTabBarLabels,
   );
@@ -232,7 +299,8 @@ const AppContent = () => {
   const isTabletDevice =
     Math.min(windowWidth, windowHeight) >= TABLET_MIN_DIMENSION_DP;
   const allowNonPlayerRotation = isTabletDevice && tabletRotationEnabled;
-  const useSideTabLayout = isLargeScreen && !allowNonPlayerRotation;
+  const useSideTabLayout =
+    isTabletDevice && isLargeScreen && !allowNonPlayerRotation;
   const tabBarLabelLift = (() => {
     if (!showTabBarLables) {
       return 0;
@@ -241,6 +309,175 @@ const AppContent = () => {
     const labelHeight = Math.ceil(10 * fontScale + 6);
     return Math.min(insets.bottom, labelHeight);
   })();
+
+  const defaultTabBarStyle = !useSideTabLayout
+    ? {
+        position: 'absolute' as const,
+        bottom: -insets.bottom + tabBarLabelLift,
+        height: 55 + insets.bottom,
+        borderRadius: 0,
+        overflow: 'hidden' as const,
+        elevation: 0,
+        borderTopWidth: 0,
+        paddingHorizontal: 0,
+        paddingTop: 5,
+        paddingBottom: insets.bottom,
+      }
+    : {};
+
+  return (
+    <Tab.Navigator
+      detachInactiveScreens={true}
+      screenOptions={{
+        animation: 'shift',
+        tabBarLabelPosition: 'below-icon',
+        tabBarVariant: useSideTabLayout ? 'material' : 'uikit',
+        popToTopOnBlur: false,
+        tabBarPosition: useSideTabLayout ? 'left' : 'bottom',
+        headerShown: false,
+        freezeOnBlur: true,
+        tabBarActiveTintColor: primary,
+        tabBarInactiveTintColor: '#dadde3',
+        tabBarShowLabel: showTabBarLables,
+        tabBarStyle: defaultTabBarStyle,
+        tabBarBackground: () => <TabBarBackgound />,
+        tabBarHideOnKeyboard: true,
+        tabBarButton: props => {
+          return (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityState={props.accessibilityState}
+              style={props.style as StyleProp<ViewStyle>}
+              onPress={e => {
+                props.onPress && props.onPress(e);
+                if (
+                  !props?.accessibilityState?.selected &&
+                  settingsStorage.isHapticFeedbackEnabled()
+                ) {
+                  RNReactNativeHapticFeedback.trigger('effectTick', {
+                    enableVibrateFallback: true,
+                    ignoreAndroidSystemSettings: false,
+                  });
+                }
+              }}>
+              {props.children}
+            </TouchableOpacity>
+          );
+        },
+      }}>
+      <Tab.Screen
+        name="HomeStack"
+        component={HomeStackScreen}
+        options={({route}) => {
+          const focusedStackRoute = getFocusedRouteNameFromRoute(route);
+          const hideTabBar = focusedStackRoute === 'Webview';
+
+          return {
+            title: t('Home'),
+            tabBarStyle: hideTabBar
+              ? ({display: 'none'} as const)
+              : defaultTabBarStyle,
+            tabBarIcon: ({focused, color, size}) => (
+              <Animated.View
+                style={{
+                  transform: [{scale: focused ? 1.1 : 1}],
+                }}>
+                {focused ? (
+                  <Ionicons name="home" color={color} size={size} />
+                ) : (
+                  <Ionicons name="home-outline" color={color} size={size} />
+                )}
+              </Animated.View>
+            ),
+          };
+        }}
+      />
+      <Tab.Screen
+        name="SearchStack"
+        component={SearchStackScreen}
+        options={({route}) => {
+          const focusedStackRoute = getFocusedRouteNameFromRoute(route);
+          const hideTabBar = focusedStackRoute === 'Webview';
+
+          return {
+            title: t('Search'),
+            tabBarStyle: hideTabBar
+              ? ({display: 'none'} as const)
+              : defaultTabBarStyle,
+            tabBarIcon: ({focused, color, size}) => (
+              <Animated.View
+                style={{
+                  transform: [{scale: focused ? 1.1 : 1}],
+                }}>
+                {focused ? (
+                  <Ionicons name="search" color={color} size={size} />
+                ) : (
+                  <Ionicons name="search-outline" color={color} size={size} />
+                )}
+              </Animated.View>
+            ),
+          };
+        }}
+      />
+      <Tab.Screen
+        name="WatchListStack"
+        component={WatchListStackScreen}
+        options={{
+          title: t('Watch List'),
+          tabBarIcon: ({focused, color, size}) => (
+            <Animated.View
+              style={{
+                transform: [{scale: focused ? 1.1 : 1}],
+              }}>
+              {focused ? (
+                <Entypo name="folder-video" color={color} size={size} />
+              ) : (
+                <Entypo name="folder-video" color={color} size={size} />
+              )}
+            </Animated.View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="SettingsStack"
+        component={SettingsStackScreen}
+        options={{
+          title: t('Settings'),
+          tabBarIcon: ({focused, color, size}) => (
+            <Animated.View
+              style={{
+                transform: [{scale: focused ? 1.1 : 1}],
+              }}>
+              {focused ? (
+                <Ionicons name="settings" color={color} size={size} />
+              ) : (
+                <Ionicons name="settings-outline" color={color} size={size} />
+              )}
+            </Animated.View>
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+const AppContent = () => {
+  LogBox.ignoreLogs([
+    'You have passed a style to FlashList',
+    'new NativeEventEmitter()',
+  ]);
+  const {primary} = useThemeStore(state => state);
+  const {clearCache} = useSearchCacheStore(state => ({
+    clearCache: state.clearCache,
+  }));
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
+  const tabletRotationEnabled = useUiSettingsStore(
+    state => state.tabletRotationEnabled,
+  );
+  const isTabletDevice =
+    Math.min(windowWidth, windowHeight) >= TABLET_MIN_DIMENSION_DP;
+  const allowNonPlayerRotation = isTabletDevice && tabletRotationEnabled;
 
   SystemUI.setBackgroundColorAsync('black');
 
@@ -377,108 +614,6 @@ const AppContent = () => {
       updateProvidersService.stopAutomaticUpdateCheck();
     };
   }, []);
-
-  function HomeStackScreen() {
-    return (
-      <HomeStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'ios_from_right',
-          animationDuration: 200,
-          freezeOnBlur: true,
-        }}>
-        <HomeStack.Screen name="Home" component={Home} />
-        <HomeStack.Screen name="Info" component={Info} />
-        <HomeStack.Screen name="ScrollList" component={ScrollList} />
-        <HomeStack.Screen name="Webview" component={WebView} />
-      </HomeStack.Navigator>
-    );
-  }
-
-  function SearchStackScreen() {
-    return (
-      <SearchStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'ios_from_right',
-          animationDuration: 200,
-          freezeOnBlur: true,
-        }}>
-        <SearchStack.Screen name="Search" component={Search} />
-        <SearchStack.Screen name="ScrollList" component={ScrollList} />
-        <SearchStack.Screen name="Info" component={Info} />
-        <SearchStack.Screen name="SearchResults" component={SearchResults} />
-        <HomeStack.Screen name="Webview" component={WebView} />
-      </SearchStack.Navigator>
-    );
-  }
-
-  function WatchListStackScreen() {
-    return (
-      <WatchListStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'ios_from_right',
-          animationDuration: 200,
-          freezeOnBlur: true,
-        }}>
-        <WatchListStack.Screen name="WatchList" component={WatchList} />
-        <WatchListStack.Screen name="Info" component={Info} />
-      </WatchListStack.Navigator>
-    );
-  }
-
-  function WatchHistoryStackScreen() {
-    return (
-      <WatchHistoryStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'ios_from_right',
-          animationDuration: 200,
-          freezeOnBlur: true,
-        }}>
-        <WatchHistoryStack.Screen
-          name="WatchHistory"
-          component={WatchHistory}
-        />
-        <WatchHistoryStack.Screen name="Info" component={Info} />
-        <WatchHistoryStack.Screen
-          name="SeriesEpisodes"
-          component={SeriesEpisodes}
-        />
-      </WatchHistoryStack.Navigator>
-    );
-  }
-
-  function SettingsStackScreen() {
-    return (
-      <SettingsStack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'ios_from_right',
-          animationDuration: 200,
-          freezeOnBlur: true,
-        }}>
-        <SettingsStack.Screen name="Settings" component={Settings} />
-        {/* <SettingsStack.Screen
-          name="DisableProviders"
-          component={DisableProviders}
-        /> */}
-        <SettingsStack.Screen name="About" component={About} />
-        <SettingsStack.Screen name="Preferences" component={Preferences} />
-        <SettingsStack.Screen name="Downloads" component={Downloads} />
-        <SettingsStack.Screen name="Extensions" component={Extensions} />
-        <SettingsStack.Screen
-          name="WatchHistoryStack"
-          component={WatchHistoryStackScreen}
-        />
-        <SettingsStack.Screen
-          name="SubTitlesPreferences"
-          component={SubtitlePreference}
-        />
-      </SettingsStack.Navigator>
-    );
-  }
   const applyOrientationForRoute = useCallback(
     (routeName?: string) => {
       if (routeName === 'Player') {
@@ -501,158 +636,6 @@ const AppContent = () => {
     },
     [allowNonPlayerRotation],
   );
-
-  const defaultTabBarStyle = !useSideTabLayout
-    ? {
-        position: 'absolute' as const,
-        bottom: -insets.bottom + tabBarLabelLift,
-        height: 55 + insets.bottom,
-        borderRadius: 0,
-        overflow: 'hidden' as const,
-        elevation: 0,
-        borderTopWidth: 0,
-        paddingHorizontal: 0,
-        paddingTop: 5,
-        paddingBottom: insets.bottom,
-      }
-    : {};
-
-  function TabStack() {
-    return (
-      <Tab.Navigator
-        detachInactiveScreens={true}
-        screenOptions={{
-          animation: 'shift',
-          tabBarLabelPosition: 'below-icon',
-          tabBarVariant: useSideTabLayout ? 'material' : 'uikit',
-          popToTopOnBlur: false,
-          tabBarPosition: useSideTabLayout ? 'left' : 'bottom',
-          headerShown: false,
-          freezeOnBlur: true,
-          tabBarActiveTintColor: primary,
-          tabBarInactiveTintColor: '#dadde3',
-          tabBarShowLabel: showTabBarLables,
-          tabBarStyle: defaultTabBarStyle,
-          tabBarBackground: () => <TabBarBackgound />,
-          tabBarHideOnKeyboard: true,
-          tabBarButton: props => {
-            return (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityState={props.accessibilityState}
-                style={props.style as StyleProp<ViewStyle>}
-                onPress={e => {
-                  props.onPress && props.onPress(e);
-                  if (
-                    !props?.accessibilityState?.selected &&
-                    settingsStorage.isHapticFeedbackEnabled()
-                  ) {
-                    RNReactNativeHapticFeedback.trigger('effectTick', {
-                      enableVibrateFallback: true,
-                      ignoreAndroidSystemSettings: false,
-                    });
-                  }
-                }}>
-                {props.children}
-              </TouchableOpacity>
-            );
-          },
-        }}>
-        <Tab.Screen
-          name="HomeStack"
-          component={HomeStackScreen}
-          options={({route}) => {
-            const focusedStackRoute = getFocusedRouteNameFromRoute(route);
-            const hideTabBar = focusedStackRoute === 'Webview';
-
-            return {
-              title: t('Home'),
-              tabBarStyle: hideTabBar
-                ? ({display: 'none'} as const)
-                : defaultTabBarStyle,
-              tabBarIcon: ({focused, color, size}) => (
-                <Animated.View
-                  style={{
-                    transform: [{scale: focused ? 1.1 : 1}],
-                  }}>
-                  {focused ? (
-                    <Ionicons name="home" color={color} size={size} />
-                  ) : (
-                    <Ionicons name="home-outline" color={color} size={size} />
-                  )}
-                </Animated.View>
-              ),
-            };
-          }}
-        />
-        <Tab.Screen
-          name="SearchStack"
-          component={SearchStackScreen}
-          options={({route}) => {
-            const focusedStackRoute = getFocusedRouteNameFromRoute(route);
-            const hideTabBar = focusedStackRoute === 'Webview';
-
-            return {
-              title: t('Search'),
-              tabBarStyle: hideTabBar
-                ? ({display: 'none'} as const)
-                : defaultTabBarStyle,
-              tabBarIcon: ({focused, color, size}) => (
-                <Animated.View
-                  style={{
-                    transform: [{scale: focused ? 1.1 : 1}],
-                  }}>
-                  {focused ? (
-                    <Ionicons name="search" color={color} size={size} />
-                  ) : (
-                    <Ionicons name="search-outline" color={color} size={size} />
-                  )}
-                </Animated.View>
-              ),
-            };
-          }}
-        />
-        <Tab.Screen
-          name="WatchListStack"
-          component={WatchListStackScreen}
-          options={{
-            title: t('Watch List'),
-            tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Entypo name="folder-video" color={color} size={size} />
-                ) : (
-                  <Entypo name="folder-video" color={color} size={size} />
-                )}
-              </Animated.View>
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="SettingsStack"
-          component={SettingsStackScreen}
-          options={{
-            title: t('Settings'),
-            tabBarIcon: ({focused, color, size}) => (
-              <Animated.View
-                style={{
-                  transform: [{scale: focused ? 1.1 : 1}],
-                }}>
-                {focused ? (
-                  <Ionicons name="settings" color={color} size={size} />
-                ) : (
-                  <Ionicons name="settings-outline" color={color} size={size} />
-                )}
-              </Animated.View>
-            ),
-          }}
-        />
-      </Tab.Navigator>
-    );
-  }
 
   useEffect(() => {
     cleanupDownloadedUpdateApk().catch(error => {
@@ -752,7 +735,7 @@ const AppContent = () => {
                 notification: primary,
               },
             }}>
-            <Stack.Navigator
+            <RootStack.Navigator
               screenOptions={{
                 headerShown: false,
                 animation: 'ios_from_right',
@@ -760,9 +743,9 @@ const AppContent = () => {
                 freezeOnBlur: true,
                 contentStyle: {backgroundColor: 'transparent'},
               }}>
-              <Stack.Screen name="TabStack" component={TabStack} />
-              <Stack.Screen name="Player" component={Player} />
-            </Stack.Navigator>
+              <RootStack.Screen name="TabStack" component={TabStack} />
+              <RootStack.Screen name="Player" component={Player} />
+            </RootStack.Navigator>
           </NavigationContainer>
         </SafeAreaView>
       </QueryClientProvider>
