@@ -78,6 +78,7 @@ const AnimatedVideoPlayer = (
     pan: {horizontal: horizontalPan, inverted: invertedPan} = {},
     testID,
     disableGesture = false,
+    enable2xGesture = true,
     hideAllControlls = false,
   } = props;
 
@@ -754,7 +755,9 @@ const AnimatedVideoPlayer = (
                   tapAnywhereToPause={tapAnywhereToPause}
                   showControls={showControls}
                   disableGesture={disableGesture}
+                  enable2xGesture={enable2xGesture}
                   setPlayback={setPlaybackRate}
+                  playbackRate={_playbackRate}
                 />
                 <BottomControls
                   animations={animations}

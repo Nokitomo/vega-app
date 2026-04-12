@@ -87,7 +87,7 @@ const Preferences = () => {
     settingsStorage.hideSeekButtons(),
   );
 
-  const [_enable2xGesture, _setEnable2xGesture] = useState<boolean>(
+  const [enable2xGesture, setEnable2xGesture] = useState<boolean>(
     settingsStorage.isEnable2xGestureEnabled(),
   );
 
@@ -521,7 +521,7 @@ const Preferences = () => {
             </View>
 
             {/* Swipe Gestures */}
-            <View className="flex-row items-center justify-between p-4">
+            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
               <Text className="text-white text-base">
                 {t('Enable Swipe Gestures')}
               </Text>
@@ -531,6 +531,22 @@ const Preferences = () => {
                 onValueChange={() => {
                   settingsStorage.setSwipeGestureEnabled(!enableSwipeGesture);
                   setEnableSwipeGesture(!enableSwipeGesture);
+                }}
+              />
+            </View>
+
+            {/* 2x Gesture */}
+            <View className="flex-row items-center justify-between p-4">
+              <Text className="text-white text-base">
+                {t('Enable 2x Gesture')}
+              </Text>
+              <Switch
+                thumbColor={enable2xGesture ? primary : 'gray'}
+                value={enable2xGesture}
+                onValueChange={() => {
+                  const next = !enable2xGesture;
+                  settingsStorage.setEnable2xGesture(next);
+                  setEnable2xGesture(next);
                 }}
               />
             </View>

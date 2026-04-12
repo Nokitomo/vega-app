@@ -453,6 +453,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     () => settingsStorage.isSwipeGestureEnabled(),
     [],
   );
+  const enable2xGesture = useMemo(
+    () => settingsStorage.isEnable2xGestureEnabled(),
+    [],
+  );
   const showMediaControls = useMemo(
     () => settingsStorage.showMediaControls(),
     [],
@@ -2623,6 +2627,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   const videoPlayerProps = useMemo(
     () => ({
       disableGesture: isPlayerLocked || !enableSwipeGesture,
+      enable2xGesture,
       doubleTapTime: 200,
       disableSeekButtons: isPlayerLocked || hideSeekButtons,
       showOnStart: !isPlayerLocked,
@@ -2727,6 +2732,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     [
       isPlayerLocked,
       enableSwipeGesture,
+      enable2xGesture,
       hideSeekButtons,
       externalSubs,
       selectedStream,

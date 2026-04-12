@@ -3,7 +3,7 @@ import {
   Text,
   Pressable,
   GestureResponderEvent,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import React, {useState, useRef, useEffect, useCallback, useMemo} from 'react';
 import Animated, {
@@ -36,7 +36,9 @@ type GesturesProps = {
   rewindTime: number;
   showControls: boolean;
   disableGesture: boolean;
+  enable2xGesture: boolean;
   setPlayback: (rate: number) => void;
+  playbackRate: number;
 };
 
 const SWIPE_RANGE = 370;
@@ -47,15 +49,16 @@ const Ripple = React.memo(
     isLeft,
     totalTime,
     showControls,
+    screenWidth,
+    screenHeight,
   }: {
     visible: boolean;
     isLeft: boolean;
     totalTime: number;
     showControls: boolean;
+    screenWidth: number;
+    screenHeight: number;
   }) => {
-    const screenDimensions = useMemo(() => Dimensions.get('window'), []);
-    const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = screenDimensions;
-
     const scale = useSharedValue(0);
     const opacity = useSharedValue(0);
 
@@ -97,11 +100,11 @@ const Ripple = React.memo(
         top: showControls ? -70 : -45,
         left: isLeft ? ('-10%' as const) : undefined,
         right: isLeft ? undefined : ('-10%' as const),
-        width: SCREEN_WIDTH / 2.5,
-        height: SCREEN_HEIGHT,
+        width: screenWidth / 2.5,
+        height: screenHeight,
         zIndex: 999,
       }),
-      [showControls, isLeft, SCREEN_WIDTH, SCREEN_HEIGHT],
+      [showControls, isLeft, screenWidth, screenHeight],
     );
 
     const innerStyle = useMemo(
@@ -112,9 +115,9 @@ const Ripple = React.memo(
         backgroundColor: 'rgba(0,0,0,0.9)',
         justifyContent: 'center' as const,
         alignItems: 'center' as const,
-        borderRadius: SCREEN_HEIGHT / 2,
+        borderRadius: screenHeight / 2,
       }),
-      [SCREEN_HEIGHT],
+      [screenHeight],
     );
 
     const textStyle = useMemo(
@@ -154,7 +157,9 @@ const Gestures = ({
   rewindTime = 10,
   showControls,
   disableGesture,
+  enable2xGesture,
   setPlayback,
+  playbackRate,
 }: GesturesProps) => {
   const [rippleVisible, setRippleVisible] = useState(false);
   const [isLeftRipple, setIsLeftRipple] = useState(false);
@@ -165,9 +170,8 @@ const Gestures = ({
   const [isBrightnessVisible, setIsBrightnessVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Memoize screen dimensions
-  const screenDimensions = useMemo(() => Dimensions.get('window'), []);
-  const {width: SCREEN_WIDTH} = screenDimensions;
+  // Keep gesture geometry reactive to orientation changes
+  const {width: screenWidth, height: screenHeight} = useWindowDimensions();
 
   // Refs
   const initialTapPosition = useRef({x: 0, y: 0});
@@ -176,6 +180,8 @@ const Gestures = ({
   const tapCountRef = useRef(0);
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapTimeRef = useRef(0);
+  const is2xBoostActiveRef = useRef(false);
+  const boostedFromRateRef = useRef(1);
   const originalSettings = useRef({
     volume: 0,
     brightness: 0,
@@ -361,7 +367,7 @@ const Gestures = ({
         .minDistance(10) // Minimum distance before gesture starts
         .onStart((event) => {
           'worklet';
-          const isLeftSide = event.x < SCREEN_WIDTH / 2;
+          const isLeftSide = event.x < screenWidth / 2;
 
           if (isLeftSide) {
             startBrightness.value = brightnessValue.value;
@@ -373,7 +379,7 @@ const Gestures = ({
         })
         .onUpdate((event) => {
           'worklet';
-          const isLeftSide = event.x < SCREEN_WIDTH / 2;
+          const isLeftSide = event.x < screenWidth / 2;
           const change = -event.translationY / SWIPE_RANGE;
 
           if (isLeftSide) {
@@ -399,7 +405,7 @@ const Gestures = ({
           runOnJS(setIsVolumeVisible)(false);
           runOnJS(setIsBrightnessVisible)(false);
         }),
-    [SCREEN_WIDTH, updateSystemBrightness, updateSystemVolume],
+    [screenWidth, updateSystemBrightness, updateSystemVolume],
   );
 
   const ControlOverlay = React.memo(
@@ -637,6 +643,8 @@ const Gestures = ({
               showControls={showControls}
               isLeft={true}
               totalTime={totalSkipTime}
+              screenWidth={screenWidth}
+              screenHeight={screenHeight}
             />
           </Pressable>
 
@@ -645,11 +653,20 @@ const Gestures = ({
             onPress={handleRightTap}
             style={rightPressableStyle}
             onLongPress={() => {
+              if (!enable2xGesture) {
+                return;
+              }
+              boostedFromRateRef.current = playbackRate;
+              is2xBoostActiveRef.current = true;
               setPlayback(2);
               show2xToast();
             }}
             onPressOut={() => {
-              setPlayback(1);
+              if (!is2xBoostActiveRef.current) {
+                return;
+              }
+              is2xBoostActiveRef.current = false;
+              setPlayback(boostedFromRateRef.current);
               hideToast();
             }}>
             <Ripple
@@ -657,6 +674,8 @@ const Gestures = ({
               showControls={showControls}
               isLeft={false}
               totalTime={totalSkipTime}
+              screenWidth={screenWidth}
+              screenHeight={screenHeight}
             />
           </Pressable>
         </View>

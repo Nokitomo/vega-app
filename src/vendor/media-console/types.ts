@@ -277,6 +277,13 @@ export interface VideoPlayerProps extends ReactVideoProps {
   disableGesture?: boolean;
 
   /**
+   * Enable long-press gesture on the right side to temporarily switch playback to 2x.
+   *
+   * @default true
+   */
+  enable2xGesture?: boolean;
+
+  /**
    * is Player Locked
    *
    * @default false

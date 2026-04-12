@@ -195,7 +195,7 @@ export class SettingsStorage {
   }
 
   isEnable2xGestureEnabled(): boolean {
-    return this.getBoolWithDefault(SettingsKeys.ENABLE_2X_GESTURE, false);
+    return this.getBoolWithDefault(SettingsKeys.ENABLE_2X_GESTURE, true);
   }
 
   setEnable2xGesture(enabled: boolean): void {
