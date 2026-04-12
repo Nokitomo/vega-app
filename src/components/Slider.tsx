@@ -33,7 +33,7 @@ const Slider = ({
   isSearch?: boolean;
   onHorizontalDragStart?: () => void;
   onHorizontalDragEnd?: () => void;
-}): JSX.Element => {
+}): React.ReactElement => {
   const {provider} = useContentStore(state => state);
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();

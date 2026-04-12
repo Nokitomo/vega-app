@@ -1,4 +1,4 @@
-import {useTVEventHandler} from 'react-native';
+import * as ReactNative from 'react-native';
 
 interface OSSupport {
   showControls: boolean;
@@ -6,7 +6,12 @@ interface OSSupport {
 }
 
 export const TVOSSupport = ({showControls, onScreenTouch}: OSSupport) => {
-  useTVEventHandler(() => {
+  const useTVEventHandlerCompat =
+    (ReactNative as {
+      useTVEventHandler?: (handler: (event: unknown) => void) => void;
+    }).useTVEventHandler || ((_handler: (event: unknown) => void) => {});
+
+  useTVEventHandlerCompat(() => {
     if (!showControls) {
       onScreenTouch();
     }

@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   useWindowDimensions,
+  type ViewStyle,
 } from 'react-native';
 import React, {useEffect, useMemo, useState, useRef, useCallback} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -137,10 +138,11 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const gridItemWidth = Math.min(gridMaxItemWidth, gridColumnWidth);
   const gridItemHeight = Math.round(gridItemWidth * 1.5);
   const gridTitleWidth = Math.max(80, Math.min(gridItemWidth, gridColumnWidth) - 4);
-  const gridItemWrapperStyle =
-    gridColumnWidth > 0
-      ? {width: gridColumnWidth, alignItems: 'center', marginVertical: 12}
-      : {width: gridMaxItemWidth, alignItems: 'center', marginVertical: 12};
+  const gridItemWrapperStyle: ViewStyle = {
+    width: gridColumnWidth > 0 ? gridColumnWidth : gridMaxItemWidth,
+    alignItems: 'center',
+    marginVertical: 12,
+  };
   const chunkPosts = (items: Post[], size: number) => {
     const rows: Post[][] = [];
     for (let i = 0; i < items.length; i += size) {

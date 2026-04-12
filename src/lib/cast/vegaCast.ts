@@ -27,6 +27,11 @@ export type VegaCastTracking = {
   apiBaseUrl: string;
 };
 
+type StoredVegaCastTracking = VegaCastTracking & {
+  infoUrl?: string;
+  updatedAt?: number;
+};
+
 export type VegaCastEpisodeProgressSnapshot = {
   episodeLink: string;
   episodeTitle?: string;
@@ -455,7 +460,7 @@ export const getActiveVegaCastTracking = (
   }
 
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as StoredVegaCastTracking;
     if (!isValidTracking(parsed)) {
       return null;
     }

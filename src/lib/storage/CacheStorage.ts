@@ -29,7 +29,8 @@ export class CacheStorage {
    * Get a boolean value from cache
    */
   getBool(key: string): boolean | undefined {
-    return cacheStorage.getBool(key, undefined);
+    const value = cacheStorage.getBool(key);
+    return value == null ? undefined : value;
   }
 
   /**

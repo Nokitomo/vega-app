@@ -52,6 +52,11 @@ export enum SettingsKeys {
  * Settings storage manager
  */
 export class SettingsStorage {
+  private getBoolWithDefault(key: SettingsKeys | string, defaultValue: boolean): boolean {
+    const storedValue = mainStorage.getBool(key);
+    return storedValue == null ? defaultValue : storedValue;
+  }
+
   // Theme settings
   getPrimaryColor(): string {
     return mainStorage.getString(SettingsKeys.PRIMARY_COLOR) || '#FF6347';
@@ -62,7 +67,7 @@ export class SettingsStorage {
   }
 
   isCustomTheme(): boolean {
-    return mainStorage.getBool(SettingsKeys.IS_CUSTOM_THEME);
+    return this.getBoolWithDefault(SettingsKeys.IS_CUSTOM_THEME, false);
   }
 
   setCustomTheme(isCustom: boolean): void {
@@ -88,9 +93,7 @@ export class SettingsStorage {
   }
 
   showTabBarLabels(): boolean {
-    return mainStorage.getBool(SettingsKeys.SHOW_TAB_BAR_LABELS) === null
-      ? false
-      : mainStorage.getBool(SettingsKeys.SHOW_TAB_BAR_LABELS);
+    return this.getBoolWithDefault(SettingsKeys.SHOW_TAB_BAR_LABELS, false);
   }
 
   setShowTabBarLabels(show: boolean): void {
@@ -98,9 +101,7 @@ export class SettingsStorage {
   }
 
   showRecentlyWatched(): boolean {
-    return mainStorage.getBool(SettingsKeys.SHOW_RECENTLY_WATCHED) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.SHOW_RECENTLY_WATCHED);
+    return this.getBoolWithDefault(SettingsKeys.SHOW_RECENTLY_WATCHED, true);
   }
 
   setShowRecentlyWatched(show: boolean): void {
@@ -108,9 +109,7 @@ export class SettingsStorage {
   }
 
   isTabletRotationEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.ALLOW_TABLET_ROTATION) === null
-      ? false
-      : mainStorage.getBool(SettingsKeys.ALLOW_TABLET_ROTATION);
+    return this.getBoolWithDefault(SettingsKeys.ALLOW_TABLET_ROTATION, false);
   }
 
   setTabletRotationEnabled(enabled: boolean): void {
@@ -118,18 +117,14 @@ export class SettingsStorage {
   }
 
   isHapticFeedbackEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.HAPTIC_FEEDBACK) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.HAPTIC_FEEDBACK);
+    return this.getBoolWithDefault(SettingsKeys.HAPTIC_FEEDBACK, true);
   }
   setHapticFeedbackEnabled(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.HAPTIC_FEEDBACK, enabled);
   }
 
   isNotificationsEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.NOTIFICATIONS_ENABLED) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.NOTIFICATIONS_ENABLED);
+    return this.getBoolWithDefault(SettingsKeys.NOTIFICATIONS_ENABLED, true);
   }
 
   setNotificationsEnabled(enabled: boolean): void {
@@ -138,9 +133,7 @@ export class SettingsStorage {
 
   // Update settings
   isAutoCheckUpdateEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.AUTO_CHECK_UPDATE) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.AUTO_CHECK_UPDATE);
+    return this.getBoolWithDefault(SettingsKeys.AUTO_CHECK_UPDATE, true);
   }
 
   setAutoCheckUpdateEnabled(enabled: boolean): void {
@@ -148,7 +141,7 @@ export class SettingsStorage {
   }
 
   isAutoDownloadEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.AUTO_DOWNLOAD);
+    return this.getBoolWithDefault(SettingsKeys.AUTO_DOWNLOAD, false);
   }
 
   setAutoDownloadEnabled(enabled: boolean): void {
@@ -178,9 +171,7 @@ export class SettingsStorage {
 
   // Player settings
   showMediaControls(): boolean {
-    return mainStorage.getBool(SettingsKeys.SHOW_MEDIA_CONTROLS) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.SHOW_MEDIA_CONTROLS);
+    return this.getBoolWithDefault(SettingsKeys.SHOW_MEDIA_CONTROLS, true);
   }
 
   setShowMediaControls(show: boolean): void {
@@ -188,9 +179,7 @@ export class SettingsStorage {
   }
 
   showHamburgerMenu(): boolean {
-    return mainStorage.getBool(SettingsKeys.SHOW_HAMBURGER_MENU) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.SHOW_HAMBURGER_MENU);
+    return this.getBoolWithDefault(SettingsKeys.SHOW_HAMBURGER_MENU, true);
   }
 
   setShowHamburgerMenu(show: boolean): void {
@@ -198,7 +187,7 @@ export class SettingsStorage {
   }
 
   hideSeekButtons(): boolean {
-    return mainStorage.getBool(SettingsKeys.HIDE_SEEK_BUTTONS);
+    return this.getBoolWithDefault(SettingsKeys.HIDE_SEEK_BUTTONS, false);
   }
 
   setHideSeekButtons(hide: boolean): void {
@@ -206,7 +195,7 @@ export class SettingsStorage {
   }
 
   isEnable2xGestureEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.ENABLE_2X_GESTURE);
+    return this.getBoolWithDefault(SettingsKeys.ENABLE_2X_GESTURE, false);
   }
 
   setEnable2xGesture(enabled: boolean): void {
@@ -214,9 +203,7 @@ export class SettingsStorage {
   }
 
   isSwipeGestureEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.ENABLE_SWIPE_GESTURE, true) === null
-      ? true
-      : mainStorage.getBool(SettingsKeys.ENABLE_SWIPE_GESTURE, true);
+    return this.getBoolWithDefault(SettingsKeys.ENABLE_SWIPE_GESTURE, true);
   }
 
   setSwipeGestureEnabled(enabled: boolean): void {
@@ -286,9 +273,8 @@ export class SettingsStorage {
 
   // Telemetry / Privacy
   isTelemetryOptIn(): boolean {
-    const val = mainStorage.getBool(SettingsKeys.TELEMETRY_OPT_IN);
-    // Default to true (opted in) unless explicitly disabled
-    return val === null ? true : (val as boolean);
+    // Default to true (opted in) unless explicitly disabled.
+    return this.getBoolWithDefault(SettingsKeys.TELEMETRY_OPT_IN, true);
   }
 
   setTelemetryOptIn(enabled: boolean): void {
@@ -296,10 +282,10 @@ export class SettingsStorage {
   }
 
   isAndroidGeckoWebViewEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED) ===
-      null
-      ? true
-      : mainStorage.getBool(SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED);
+    return this.getBoolWithDefault(
+      SettingsKeys.ANDROID_GECKO_WEBVIEW_ENABLED,
+      true,
+    );
   }
 
   setAndroidGeckoWebViewEnabled(enabled: boolean): void {
@@ -307,10 +293,10 @@ export class SettingsStorage {
   }
 
   isAndroidGeckoAdGuardEnabled(): boolean {
-    return mainStorage.getBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED) ===
-      null
-      ? true
-      : mainStorage.getBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED);
+    return this.getBoolWithDefault(
+      SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED,
+      true,
+    );
   }
 
   setAndroidGeckoAdGuardEnabled(enabled: boolean): void {
@@ -319,7 +305,8 @@ export class SettingsStorage {
 
   // Generic get/set methods for settings not covered by specific methods
   getBool(key: string, defaultValue = false): boolean {
-    return mainStorage.getBool(key, defaultValue);
+    const value = mainStorage.getBool(key, defaultValue);
+    return value == null ? defaultValue : value;
   }
 
   setBool(key: string, value: boolean): void {

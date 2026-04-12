@@ -3,6 +3,7 @@ import type {
   MediaQueueItem,
   MediaTrack,
 } from 'react-native-google-cast';
+import {MediaStreamType} from 'react-native-google-cast';
 import type {EpisodeLink, Stream} from '../providers/types';
 import {providerManager} from '../services/ProviderManager';
 
@@ -88,6 +89,21 @@ export type PrepareVegaCastSessionInput = PrepareNativeCastQueueInput;
 type QueueSource = {
   episode: CastEpisode;
   stream: Stream;
+};
+
+type CastQueueCustomData = {
+  headers?: Record<string, unknown>;
+  episodeLink?: string;
+  episodeTitle?: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+  aniSkipMalId?: number;
+};
+
+type CastQueueMetadata = {
+  title?: string;
+  subtitle?: string;
+  seriesTitle?: string;
 };
 
 const isHttpUrl = (value?: string): value is string =>
@@ -286,12 +302,11 @@ const buildQueueItem = (
     mediaInfo: {
       contentUrl: source.stream.link,
       contentType: mapVideoContentType(source.stream),
-      streamType: 'buffered',
+      streamType: MediaStreamType.BUFFERED,
       ...(mediaTracks.length > 0 ? {mediaTracks} : {}),
       metadata: {
         type: 'tvShow',
         title: source.episode.title || context.secondaryTitle || '',
-        subtitle: context.secondaryTitle || '',
         seriesTitle: context.primaryTitle || '',
         ...(typeof episodeNumber === 'number' ? {episodeNumber} : {}),
         ...(typeof seasonNumber === 'number' ? {seasonNumber} : {}),
@@ -509,8 +524,16 @@ export const prepareVegaCastSession = async ({
         return null;
       }
 
-      const customData = mediaInfo.customData || {};
-      const metadata = mediaInfo.metadata || {};
+      const customData = (
+        mediaInfo.customData && typeof mediaInfo.customData === 'object'
+          ? mediaInfo.customData
+          : {}
+      ) as CastQueueCustomData;
+      const metadata = (
+        mediaInfo.metadata && typeof mediaInfo.metadata === 'object'
+          ? mediaInfo.metadata
+          : {}
+      ) as CastQueueMetadata;
       const subtitles: VegaCastSessionSubtitle[] = Array.isArray(mediaInfo.mediaTracks)
         ? mediaInfo.mediaTracks
             .filter(track => track?.type === 'text' && isHttpUrl(track?.contentId))

@@ -74,7 +74,7 @@ const parseHeroHistory = (raw: string | null): string[] => {
 
 const readHeroHistory = (providerValue: string): string[] => {
   const key = `heroHistory:${providerValue}`;
-  return parseHeroHistory(cacheStorage.getString(key));
+  return parseHeroHistory(cacheStorage.getString(key) ?? null);
 };
 
 const writeHeroHistory = (providerValue: string, link: string) => {

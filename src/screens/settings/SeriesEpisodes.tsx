@@ -1,11 +1,12 @@
 import React, {useMemo, useState} from 'react';
 import {View, Text, Image, TouchableOpacity, Platform} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {NativeStackScreenProps, NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useNavigation} from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import {RootStackParamList} from '../../App';
+import {RootStackParamList, WatchHistoryStackParamList} from '../../App';
 import {downloadsStorage, settingsStorage} from '../../lib/storage';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useThemeStore from '../../lib/zustand/themeStore';
@@ -13,11 +14,12 @@ import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../../lib/utils/helpers';
 
 type SeriesEpisodesRouteProp = NativeStackScreenProps<
-  RootStackParamList,
+  WatchHistoryStackParamList,
   'SeriesEpisodes'
 >;
 
 const SeriesEpisodes = ({navigation, route}: SeriesEpisodesRouteProp) => {
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const {series, episodes: initialEpisodes, thumbnails} = route.params;
@@ -189,7 +191,7 @@ const SeriesEpisodes = ({navigation, route}: SeriesEpisodesRouteProp) => {
                     toggleSelection(item.uri);
                     return;
                   }
-                  navigation.navigate('Player', {
+                  rootNavigation.navigate('Player', {
                     episodeList: [{title: fileName || '', link: item.uri}],
                     linkIndex: 0,
                     type: '',

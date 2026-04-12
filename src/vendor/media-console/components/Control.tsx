@@ -1,11 +1,11 @@
 import React, {ReactNode, RefObject, useState} from 'react';
-import {TouchableHighlight, ViewProps} from 'react-native';
+import {TouchableHighlight, TouchableHighlightProps} from 'react-native';
 import {styles} from './styles';
 
-interface ControlProps extends ViewProps {
+interface ControlProps extends Omit<TouchableHighlightProps, 'onPress'> {
   children: ReactNode;
   callback?: () => void;
-  controlRef?: RefObject<TouchableHighlight>;
+  controlRef?: RefObject<React.ElementRef<typeof TouchableHighlight> | null>;
   disabled?: boolean;
   style?: any;
   resetControlTimeout?: () => void;

@@ -31,9 +31,11 @@ import {QueryErrorBoundary} from '../../components/ErrorBoundary';
 import SkeletonLoader from '../../components/Skeleton';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../../lib/utils/helpers';
+import type {Info as ProviderInfo} from '../../lib/providers/types';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
+type RelatedItem = NonNullable<ProviderInfo['related']>[number];
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
 const PROVIDER_FIRST_TITLE_PROVIDERS = new Set([
@@ -386,7 +388,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return filtered.length > 0 ? filtered : info.linkList;
   }, [info?.linkList]);
 
-  const relatedItems = useMemo(() => info?.related || [], [info?.related]);
+  const relatedItems = useMemo<RelatedItem[]>(
+    () => (info?.related || []) as RelatedItem[],
+    [info?.related],
+  );
   const statusTag = useMemo(() => {
     if (!hasAnimeExternalIds) {
       return null;
@@ -394,7 +399,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     const tags = info?.tags ?? [];
     const tagKeys = info?.tagKeys ?? {};
     const statusKeys = new Set(['Ongoing', 'Completed', 'Upcoming', 'Dropped']);
-    const matched = tags.find(tag => statusKeys.has(tagKeys[tag] || ''));
+    const matched = tags.find((tag: string) => statusKeys.has(tagKeys[tag] || ''));
     if (matched) {
       return {tag: matched, key: tagKeys[matched]};
     }
@@ -420,7 +425,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       }
       return [statusTag.key ? t(statusTag.key) : statusTag.tag];
     }
-    return info.tags.slice(0, 3).map(tag => {
+    return info.tags.slice(0, 3).map((tag: string) => {
       const key = info.tagKeys?.[tag];
       return key ? t(key) : tag;
     });
@@ -437,7 +442,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     if (!info?.genres || info.genres.length === 0) {
       return [];
     }
-    return info.genres.map(genre => {
+    return info.genres.map((genre: string) => {
       const key = info.tagKeys?.[genre];
       return key ? t(key) : genre;
     });
@@ -706,7 +711,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         })}
                       </Text>
                     ) : null}
-                    {displayTags.map(tag => (
+                    {displayTags.map((tag: string) => (
                       <Text
                         key={tag}
                         className="text-white text-xs bg-tertiary px-2 rounded-md">
@@ -734,7 +739,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         {t('Cast')}
                       </Text>
                       <View className="flex-row gap-1 flex-wrap">
-                        {displayCast.slice(0, 3).map((actor, index) => (
+                        {displayCast
+                          .slice(0, 3)
+                          .map((actor: string, index: number) => (
                           <Text
                             key={`${actor}-${index}`}
                             numberOfLines={1}
@@ -747,7 +754,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                             }`}>
                             {actor}
                           </Text>
-                        ))}
+                          ))}
                       </View>
                     </View>
                   )}
@@ -977,7 +984,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                               {t('No related items available.')}
                             </Text>
                           ) : (
-                            relatedItems.map((item, index) => (
+                            relatedItems.map((item: RelatedItem, index: number) => (
                               <TouchableOpacity
                                 key={`${item.link}-${index}`}
                                 className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"

@@ -81,7 +81,7 @@ const ProviderImage = ({
   }, [hasTriedFallback, link, providerValue]);
 
   const handleError: ImageProps['onError'] = useCallback(
-    event => {
+    (event: Parameters<NonNullable<ImageProps['onError']>>[0]) => {
       if (onError) {
         onError(event);
       }

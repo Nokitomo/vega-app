@@ -142,6 +142,11 @@ type PlayableItem = {
   seasonNumber?: number;
 };
 
+type LinkWithDisplayTitle = Link & {
+  displayTitle: string;
+  seasonValue: string;
+};
+
 const formatResumeTime = (seconds: number) => {
   const safeSeconds = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(safeSeconds / 3600);
@@ -259,6 +264,37 @@ const resolveSeasonNumber = (item?: Link): number | undefined => {
     return parsedSeasonNumber;
   }
   return undefined;
+};
+
+const resolveSeasonValue = (item?: Link): string | null => {
+  if (!item) {
+    return null;
+  }
+
+  const episodesLink = String(item.episodesLink || '').trim();
+  if (episodesLink) {
+    return `episodes:${episodesLink}`;
+  }
+
+  const seasonNumber = resolveSeasonNumber(item);
+  if (seasonNumber) {
+    return `season:${seasonNumber}`;
+  }
+
+  if (Array.isArray(item.directLinks) && item.directLinks.length > 0) {
+    const firstDirectLink = String(item.directLinks[0]?.link || '').trim();
+    if (firstDirectLink) {
+      return `direct:${firstDirectLink}`;
+    }
+  }
+
+  const normalizedTitleKey = String(item.titleKey || '').trim();
+  const normalizedTitle = String(item.title || '').trim();
+  if (normalizedTitleKey || normalizedTitle) {
+    return `title:${normalizedTitleKey}:${normalizedTitle}`;
+  }
+
+  return null;
 };
 
 const parseIsoDateAsUtc = (value: string): Date | null => {
@@ -401,10 +437,24 @@ const SeasonList: React.FC<SeasonListProps> = ({
     if (cached) {
       try {
         const parsedSeason = JSON.parse(cached);
-        // Verify the cached season still exists in LinkList
-        const seasonExists = LinkList.find(
-          link => link.title === parsedSeason.title,
+        const parsedEpisodesLink = String(parsedSeason?.episodesLink || '').trim();
+        const parsedSeasonNumber = normalizeNumericValue(
+          parsedSeason?.seasonNumber ?? parsedSeason?.titleParams?.number,
         );
+        const parsedTitle = String(parsedSeason?.title || '').trim();
+        const seasonExists = LinkList.find(link => {
+          const linkEpisodesLink = String(link.episodesLink || '').trim();
+          if (parsedEpisodesLink && linkEpisodesLink) {
+            return parsedEpisodesLink === linkEpisodesLink;
+          }
+
+          const linkSeasonNumber = resolveSeasonNumber(link);
+          if (parsedSeasonNumber && linkSeasonNumber) {
+            return parsedSeasonNumber === linkSeasonNumber;
+          }
+
+          return parsedTitle.length > 0 && link.title === parsedTitle;
+        });
         if (seasonExists) {
           return seasonExists;
         }
@@ -415,17 +465,27 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
     return LinkList[0];
   });
-  const linkListWithDisplayTitle = useMemo(
+  const linkListWithDisplayTitle = useMemo<LinkWithDisplayTitle[]>(
     () =>
-      LinkList.map(item => ({
+      LinkList.map((item, index) => ({
         ...item,
         displayTitle: resolveTitle(item) || item.title,
+        seasonValue: resolveSeasonValue(item) || `index:${index}`,
       })),
     [LinkList, resolveTitle],
   );
-  const activeSeasonValue = useMemo(() => {
+  const activeSeasonValue = useMemo<LinkWithDisplayTitle | undefined>(() => {
     if (!activeSeason) {
       return linkListWithDisplayTitle[0];
+    }
+    const activeSeasonValueKey = resolveSeasonValue(activeSeason);
+    if (activeSeasonValueKey) {
+      const byValue = linkListWithDisplayTitle.find(
+        item => item.seasonValue === activeSeasonValueKey,
+      );
+      if (byValue) {
+        return byValue;
+      }
     }
     const match = linkListWithDisplayTitle.find(item =>
       activeSeason.episodesLink
@@ -433,12 +493,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
         : item.directLinks === activeSeason.directLinks &&
           item.title === activeSeason.title,
     );
-    return (
-      match || {
-        ...activeSeason,
-        displayTitle: resolveTitle(activeSeason) || activeSeason.title,
-      }
-    );
+    if (match) {
+      return match;
+    }
+
+    return undefined;
   }, [activeSeason, linkListWithDisplayTitle, resolveTitle]);
   const isSameSeason = useCallback(
     (current: Link, candidate: Link) => {
@@ -2406,11 +2465,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
               includeFontPadding: false,
             }}
             labelField={'displayTitle'}
-            valueField={
-              LinkList[0]?.episodesLink ? 'episodesLink' : 'directLinks'
-            }
+            valueField={'seasonValue'}
             onChange={handleSeasonChange}
-            value={activeSeasonValue}
+            value={activeSeasonValue?.seasonValue}
             data={linkListWithDisplayTitle}
             style={{
               overflow: 'hidden',
@@ -2502,11 +2559,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
             includeFontPadding: false,
           }}
           labelField={'displayTitle'}
-          valueField={
-            LinkList[0]?.episodesLink ? 'episodesLink' : 'directLinks'
-          }
+          valueField={'seasonValue'}
           onChange={handleSeasonChange}
-          value={activeSeasonValue}
+          value={activeSeasonValue?.seasonValue}
           data={linkListWithDisplayTitle}
           style={{
             overflow: 'hidden',

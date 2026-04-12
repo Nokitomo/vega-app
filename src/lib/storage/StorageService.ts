@@ -6,7 +6,7 @@ import {MMKVLoader} from 'react-native-mmkv-storage';
 export interface IStorageService {
   getString(key: string): string | undefined;
   setString(key: string, value: string): void;
-  getBool(key: string, defaultValue?: boolean): boolean;
+  getBool(key: string, defaultValue?: boolean): boolean | null;
   setBool(key: string, value: boolean): void;
   getNumber(key: string): number | undefined;
   setNumber(key: string, value: number): void;
@@ -35,7 +35,7 @@ export class StorageService implements IStorageService {
 
   // String operations
   getString(key: string): string | undefined {
-    return this.storage.getString(key);
+    return this.storage.getString(key) ?? undefined;
   }
 
   setString(key: string, value: string): void {
@@ -43,9 +43,9 @@ export class StorageService implements IStorageService {
   }
 
   // Boolean operations
-  getBool(key: string, defaultValue?: boolean): boolean {
+  getBool(key: string, defaultValue?: boolean): boolean | null {
     const value = this.storage.getBool(key);
-    return value === undefined ? defaultValue || false : value;
+    return value == null ? defaultValue ?? null : value;
   }
 
   setBool(key: string, value: boolean): void {
@@ -55,7 +55,7 @@ export class StorageService implements IStorageService {
   // Number operations
   getNumber(key: string): number | undefined {
     // Use getInt or getFloat equivalent methods which exist in MMKV
-    return this.storage.getInt(key);
+    return this.storage.getInt(key) ?? undefined;
   }
 
   setNumber(key: string, value: number): void {
@@ -97,11 +97,10 @@ export class StorageService implements IStorageService {
 
   // Check if key exists
   contains(key: string): boolean {
-    // Check if key exists by attempting to get the value
     return (
-      this.storage.getString(key) !== undefined ||
-      this.storage.getBool(key) !== undefined ||
-      this.storage.getInt(key) !== undefined
+      this.getString(key) != null ||
+      this.getBool(key) != null ||
+      this.getNumber(key) != null
     );
   }
 

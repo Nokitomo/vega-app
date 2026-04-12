@@ -65,6 +65,16 @@ const hashString = (value: string): string => {
   return Math.abs(hash).toString(16);
 };
 
+const getFileInfoSize = (
+  info: Awaited<ReturnType<typeof FileSystem.getInfoAsync>>,
+): number => {
+  if (!('size' in info)) {
+    return 0;
+  }
+  const size = info.size;
+  return typeof size === 'number' && Number.isFinite(size) ? size : 0;
+};
+
 const normalizeSubtitleHeaders = (
   headers?: Record<string, string>,
 ): Record<string, string> | undefined => {
@@ -112,8 +122,9 @@ const resolveSubtitleTrack = async (
 
   try {
     const info = await FileSystem.getInfoAsync(fileUri);
-    console.log('[subs] cache info', {exists: info.exists, size: info.size});
-    if (!info.exists || !info.size) {
+    const infoSize = getFileInfoSize(info);
+    console.log('[subs] cache info', {exists: info.exists, size: infoSize});
+    if (!info.exists || infoSize <= 0) {
       console.log('[subs] downloading subtitle', {
         from: uri,
         to: fileUri,
@@ -123,9 +134,10 @@ const resolveSubtitleTrack = async (
         headers,
       });
       const downloadedInfo = await FileSystem.getInfoAsync(fileUri);
+      const downloadedSize = getFileInfoSize(downloadedInfo);
       console.log('[subs] download result', {
         exists: downloadedInfo.exists,
-        size: downloadedInfo.size,
+        size: downloadedSize,
       });
     }
     return {

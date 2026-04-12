@@ -1,6 +1,12 @@
-import {FFmpegKit, FFprobeKit, ReturnCode} from 'ffmpeg-kit-react-native';
+import {
+  FFmpegKit,
+  FFprobeKit,
+  ReturnCode,
+  type FFmpegSession,
+  type FFmpegLog,
+} from 'ffmpeg-kit-react-native';
 import notifee from '@notifee/react-native';
-import {Downloads} from './zustand/downloadsStore';
+import type {Downloads} from './zustand/downloadsStore';
 import {settingsStorage} from './storage';
 import i18n from '../i18n';
 
@@ -52,7 +58,7 @@ export const hlsDownloader = async ({
     const duration = (await getVideoDuration(videoUrl)) || 0;
     await FFmpegKit.executeAsync(
       command,
-      async session => {
+      async (session: FFmpegSession) => {
         console.log(
           'FFmpeg process started with sessionId: ' + session.getSessionId(),
         );
@@ -96,7 +102,7 @@ export const hlsDownloader = async ({
           });
         }
       },
-      async log => {
+      async (log: FFmpegLog) => {
         const message = log.getMessage();
         const regex = /time=(\d{2}:\d{2}:\d{2}.\d{2})/;
         const currentTime = regex.exec(message as string);

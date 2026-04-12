@@ -265,7 +265,6 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
               className="w-[95%] px-4 h-10 rounded-full border-white border"
               placeholderTextColor="#999"
               textAlignVertical="center"
-              includeFontPadding={false}
               style={{paddingVertical: 0}}
             />
           </Animated.View>
