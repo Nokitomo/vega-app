@@ -110,6 +110,7 @@ const exitFullScreen = () => {
 };
 
 const STREAM_RETRY_COOLDOWN_MS = 3000;
+const STREAM_START_TIMEOUT_MS = 18000;
 const SUBTITLE_GATE_TIMEOUT_MS = 1500;
 const ANISKIP_BASE_URL = 'https://api.aniskip.com/v2/skip-times';
 const ANISKIP_TYPES = ['op', 'mixed-op'];
@@ -241,6 +242,12 @@ const Player = ({route}: Props): React.JSX.Element => {
     count: 0,
     lastAttempt: 0,
   });
+  const streamStartupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const streamStartupGuardKeyRef = useRef('');
+  const streamStartupProgressSeenRef = useRef(false);
+  const streamStartupHandlingRef = useRef(false);
 
   // Shared values for animations
   const loadingOpacity = useSharedValue(0);
@@ -1166,10 +1173,111 @@ const Player = ({route}: Props): React.JSX.Element => {
     [extractHttpStatus],
   );
 
+  const clearStreamStartupGuard = useCallback(() => {
+    if (streamStartupTimeoutRef.current) {
+      clearTimeout(streamStartupTimeoutRef.current);
+      streamStartupTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleStartupTimeoutFallback = useCallback(() => {
+    if (streamStartupHandlingRef.current) {
+      return;
+    }
+    streamStartupHandlingRef.current = true;
+
+    try {
+      const switched = switchToNextStream();
+      if (!switched) {
+        ToastAndroid.show(
+          t('Video could not be played, try again later'),
+          ToastAndroid.SHORT,
+        );
+        navigation.goBack();
+      }
+      setShowControls(true);
+    } finally {
+      streamStartupHandlingRef.current = false;
+    }
+  }, [navigation, setShowControls, switchToNextStream, t]);
+
+  const armStreamStartupGuard = useCallback(
+    (reason: string) => {
+      if (isPreparingPlayer || !selectedStream?.link) {
+        clearStreamStartupGuard();
+        return;
+      }
+
+      const guardKey = `${activeEpisode?.link || ''}|${
+        selectedStream.link
+      }|${videoReloadNonce}`;
+      streamStartupGuardKeyRef.current = guardKey;
+      streamStartupProgressSeenRef.current = false;
+      clearStreamStartupGuard();
+
+      streamStartupTimeoutRef.current = setTimeout(() => {
+        if (streamStartupGuardKeyRef.current !== guardKey) {
+          return;
+        }
+        if (streamStartupProgressSeenRef.current) {
+          return;
+        }
+
+        console.warn('[player] stream startup timeout', {
+          reason,
+          server: selectedStream?.server,
+          episode: activeEpisode?.link,
+        });
+        handleStartupTimeoutFallback();
+      }, STREAM_START_TIMEOUT_MS);
+    },
+    [
+      activeEpisode?.link,
+      clearStreamStartupGuard,
+      handleStartupTimeoutFallback,
+      isPreparingPlayer,
+      selectedStream?.link,
+      selectedStream?.server,
+      videoReloadNonce,
+    ],
+  );
+
+  const markStreamStartupProgress = useCallback(
+    (progress: {currentTime?: number}) => {
+      const currentTime = Number(progress?.currentTime || 0);
+      if (!Number.isFinite(currentTime) || currentTime < 0.5) {
+        return;
+      }
+      streamStartupProgressSeenRef.current = true;
+      clearStreamStartupGuard();
+    },
+    [clearStreamStartupGuard],
+  );
+
+  useEffect(() => {
+    if (isPreparingPlayer || !selectedStream?.link) {
+      clearStreamStartupGuard();
+      return;
+    }
+
+    armStreamStartupGuard('stream-change');
+    return () => {
+      clearStreamStartupGuard();
+    };
+  }, [
+    activeEpisode?.link,
+    armStreamStartupGuard,
+    clearStreamStartupGuard,
+    isPreparingPlayer,
+    selectedStream?.link,
+    videoReloadNonce,
+  ]);
+
   // Memoized error handler
   const handleVideoError = useCallback(
     async (e: any) => {
       console.log('PlayerError', e);
+      clearStreamStartupGuard();
       if (shouldRefetchStream(e) && activeEpisode?.link) {
         const now = Date.now();
         const retryKey = `${activeEpisode.link}|${selectedStream?.server || ''}`;
@@ -1214,6 +1322,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     },
     [
       activeEpisode?.link,
+      clearStreamStartupGuard,
       navigation,
       refetch,
       selectedStream?.server,
@@ -2517,7 +2626,13 @@ const Player = ({route}: Props): React.JSX.Element => {
           imageUri: route.params?.poster?.poster,
         },
       },
-      onProgress: handleProgress,
+      onProgress: (data: any) => {
+        handleProgress(data);
+        markStreamStartupProgress(data);
+      },
+      onLoadStart: () => {
+        armStreamStartupGuard('load-start');
+      },
       onLoad: (data: any) => {
         const duration =
           typeof data?.duration === 'number' ? data.duration : 0;
@@ -2602,7 +2717,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       selectedStream,
       route.params,
       activeEpisode,
+      armStreamStartupGuard,
       handleProgress,
+      markStreamStartupProgress,
       watchedDuration,
       playbackRate,
       setPlaybackRate,
