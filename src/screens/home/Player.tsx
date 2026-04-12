@@ -110,7 +110,7 @@ const exitFullScreen = () => {
 };
 
 const STREAM_RETRY_COOLDOWN_MS = 3000;
-const STREAM_START_TIMEOUT_MS = 18000;
+const STREAM_START_TIMEOUT_MS = 8000;
 const SUBTITLE_GATE_TIMEOUT_MS = 1500;
 const ANISKIP_BASE_URL = 'https://api.aniskip.com/v2/skip-times';
 const ANISKIP_TYPES = ['op', 'mixed-op'];
