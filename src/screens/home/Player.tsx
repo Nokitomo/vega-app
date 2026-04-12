@@ -19,7 +19,10 @@ import Animated, {
   withSequence,
   withDelay,
 } from 'react-native-reanimated';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../App';
 import {
   cacheStorage,
@@ -213,7 +216,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const {provider} = useContentStore();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const [isAppActive, setIsAppActive] = useState(
     AppState.currentState === 'active',
@@ -234,7 +237,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   }, []);
 
   // Player ref
-  const playerRef: React.RefObject<VideoRef> = useRef(null);
+  const playerRef = useRef<VideoRef>(null!);
   const hasSetInitialTracksRef = useRef(false);
   const loadedDurationRef = useRef(0);
   const streamRetryRef = useRef({
@@ -297,6 +300,18 @@ const Player = ({route}: Props): React.JSX.Element => {
   const [activeEpisode, setActiveEpisode] = useState(
     route.params?.episodeList?.[route.params.linkIndex],
   );
+  const currentEpisodeNumber = useMemo(() => {
+    const episodeList = route.params?.episodeList || [];
+    const currentEpisodeIndex = episodeList.findIndex(
+      item => item?.link === activeEpisode?.link,
+    );
+    const episodeNumberFromTitle = parseEpisodeNumberFromTitle(
+      activeEpisode?.title,
+    );
+    const fallbackEpisodeNumber =
+      currentEpisodeIndex >= 0 ? currentEpisodeIndex + 1 : undefined;
+    return episodeNumberFromTitle ?? fallbackEpisodeNumber;
+  }, [activeEpisode?.link, activeEpisode?.title, route.params?.episodeList]);
 
   // Search subtitles state
   const [searchQuery, setSearchQuery] = useState('');
@@ -1081,13 +1096,13 @@ const Player = ({route}: Props): React.JSX.Element => {
       setSkipIntroInterval(null);
       return;
     }
-    if (!skipMalId || !episodeNumber || episodeDuration <= 0) {
+    if (!skipMalId || !currentEpisodeNumber || episodeDuration <= 0) {
       setSkipIntroInterval(null);
       return;
     }
 
     const duration = Math.round(episodeDuration);
-    const cacheKey = `aniskip:v2:${skipMalId}:${episodeNumber}:${duration}`;
+    const cacheKey = `aniskip:v2:${skipMalId}:${currentEpisodeNumber}:${duration}`;
     const cached = cacheStorage.getString(cacheKey);
     if (cached) {
       try {
@@ -1119,7 +1134,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     const fetchSkip = async () => {
       try {
-        const url = buildAniSkipUrl(skipMalId, episodeNumber, duration);
+        const url = buildAniSkipUrl(skipMalId, currentEpisodeNumber, duration);
         const response = await fetch(url, {signal: controller.signal});
         if (!response.ok) {
           throw new Error(`AniSkip HTTP ${response.status}`);
@@ -1153,7 +1168,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [episodeDuration, episodeNumber, providerValue, skipMalId]);
+  }, [currentEpisodeNumber, episodeDuration, providerValue, skipMalId]);
 
   const extractHttpStatus = useCallback((errorEvent: any) => {
     const stackTrace = errorEvent?.error?.errorStackTrace || '';
@@ -1725,11 +1740,11 @@ const Player = ({route}: Props): React.JSX.Element => {
         | null = null;
       let latestUpdatedAt = 0;
 
-      episodes.forEach(entry => {
+      for (const entry of episodes) {
         const episodeLink = String(entry.episodeLink || '').trim();
         const duration = Number(entry.duration);
         if (!episodeLink || !Number.isFinite(duration) || duration <= 0) {
-          return;
+          continue;
         }
 
         const rawCurrentTime = Number(entry.currentTime);
@@ -1764,7 +1779,7 @@ const Player = ({route}: Props): React.JSX.Element => {
             typeof entry.seasonNumber === 'number'
               ? entry.seasonNumber
               : route.params?.seasonNumber,
-          seasonEpisodesLink: route.params?.episodesLink || '',
+          seasonEpisodesLink: route.params?.seasonEpisodesLink || '',
           updatedAt: Date.now(),
         };
 
@@ -1788,7 +1803,7 @@ const Player = ({route}: Props): React.JSX.Element => {
             duration,
           };
         }
-      });
+      }
 
       if (!latestEntry) {
         return;
@@ -1846,7 +1861,7 @@ const Player = ({route}: Props): React.JSX.Element => {
             typeof latestEntry.seasonNumber === 'number'
               ? latestEntry.seasonNumber
               : route.params?.seasonNumber,
-          seasonEpisodesLink: route.params?.episodesLink || '',
+          seasonEpisodesLink: route.params?.seasonEpisodesLink || '',
           updatedAt: Date.now(),
         }),
       );
@@ -1858,7 +1873,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       playbackRate,
       providerValue,
       route.params?.episodeNumber,
-      route.params?.episodesLink,
+      route.params?.seasonEpisodesLink,
       route.params?.infoUrl,
       route.params?.poster?.background,
       route.params?.poster?.poster,
@@ -2744,12 +2759,6 @@ const Player = ({route}: Props): React.JSX.Element => {
   const currentEpisodeIndex = episodeList.findIndex(
     item => item?.link === activeEpisode?.link,
   );
-  const episodeNumberFromTitle = parseEpisodeNumberFromTitle(
-    activeEpisode?.title,
-  );
-  const fallbackEpisodeNumber =
-    currentEpisodeIndex >= 0 ? currentEpisodeIndex + 1 : undefined;
-  const episodeNumber = episodeNumberFromTitle ?? fallbackEpisodeNumber;
   const hasNextEpisodeInSeason =
     currentEpisodeIndex >= 0 && currentEpisodeIndex < episodeList.length - 1;
   const hasNextEpisodeFromLoadedNextSeason =
