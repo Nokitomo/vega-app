@@ -198,7 +198,7 @@ const DownloadComponent = ({
               }
             }}
             onLongPress={() => {
-              if (settingsStorage.getBool('hapticFeedback') !== false) {
+              if (settingsStorage.isHapticFeedbackEnabled()) {
                 ReactNativeHapticFeedback.trigger('effectHeavyClick', {
                   enableVibrateFallback: true,
                   ignoreAndroidSystemSettings: false,

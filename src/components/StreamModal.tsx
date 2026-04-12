@@ -40,7 +40,7 @@ const StreamModal = ({
                       downloadFile(server.link);
                     }}
                     onLongPress={() => {
-                      if (settingsStorage.getBool('hapticFeedback') !== false) {
+                      if (settingsStorage.isHapticFeedbackEnabled()) {
                         ReactNativeHapticFeedback.trigger('effectHeavyClick', {
                           enableVibrateFallback: true,
                           ignoreAndroidSystemSettings: false,

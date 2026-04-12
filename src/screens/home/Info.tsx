@@ -24,7 +24,11 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useContentStore from '../../lib/zustand/contentStore';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import useThemeStore from '../../lib/zustand/themeStore';
-import {StackActions, useNavigation} from '@react-navigation/native';
+import {
+  StackActions,
+  useFocusEffect,
+  useNavigation,
+} from '@react-navigation/native';
 import useWatchListStore from '../../lib/zustand/watchListStore';
 import {useContentDetails} from '../../lib/hooks/useContentInfo';
 import {QueryErrorBoundary} from '../../components/ErrorBoundary';
@@ -83,6 +87,16 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   // Memoized values
   const [inLibrary, setInLibrary] = useState(() =>
     watchListStorage.isInWatchList(route.params.link),
+  );
+  const [excludedQualities, setExcludedQualities] = useState<string[]>(
+    settingsStorage.getExcludedQualities(),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setExcludedQualities(settingsStorage.getExcludedQualities());
+      return () => {};
+    }, []),
   );
 
   // Memoized handlers
@@ -379,14 +393,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return [];
     }
 
-    const excludedQualities = settingsStorage.getExcludedQualities();
     const filtered = info.linkList.filter(
       (item: any) =>
         !item.quality || !excludedQualities.includes(item.quality as string),
     );
 
     return filtered.length > 0 ? filtered : info.linkList;
-  }, [info?.linkList]);
+  }, [info?.linkList, excludedQualities]);
 
   const relatedItems = useMemo<RelatedItem[]>(
     () => (info?.related || []) as RelatedItem[],
