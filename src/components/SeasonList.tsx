@@ -1452,11 +1452,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
         | null = null;
       let latestUpdatedAt = 0;
 
-      episodes.forEach(entry => {
+      for (const entry of episodes) {
         const episodeLink = String(entry.episodeLink || '').trim();
         const duration = Number(entry.duration);
         if (!episodeLink || !Number.isFinite(duration) || duration <= 0) {
-          return;
+          continue;
         }
 
         const rawCurrentTime = Number(entry.currentTime);
@@ -1515,7 +1515,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
             duration,
           };
         }
-      });
+      }
 
       if (!latestEntry) {
         return;
@@ -1852,6 +1852,16 @@ const SeasonList: React.FC<SeasonListProps> = ({
     }
   }, [stickyMenu.link]);
 
+  const getPlayableList = useCallback(() => {
+    if (sortedEpisodes.length > 0) {
+      return sortedEpisodes;
+    }
+    if (sortedDirectLinks.length > 0) {
+      return sortedDirectLinks;
+    }
+    return [];
+  }, [sortedEpisodes, sortedDirectLinks]);
+
   // Memoized sticky menu external player handler
   const handleStickyMenuExternalPlayer = useCallback(() => {
     setStickyMenu({active: false});
@@ -1862,16 +1872,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
       });
     }
   }, [getPlayableList, stickyMenu.link, stickyMenu.type, handleExternalPlayer]);
-
-  const getPlayableList = useCallback(() => {
-    if (sortedEpisodes.length > 0) {
-      return sortedEpisodes;
-    }
-    if (sortedDirectLinks.length > 0) {
-      return sortedDirectLinks;
-    }
-    return [];
-  }, [sortedEpisodes, sortedDirectLinks]);
 
   const resolveEpisodeIndex = useCallback(
     (list: PlayableItem[], target: PendingPlay) => {
