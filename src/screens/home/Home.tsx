@@ -9,9 +9,10 @@ import {
 import Slider from '../../components/Slider';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import HeroOptimized from '../../components/Hero';
-import {cacheStorage, mainStorage} from '../../lib/storage';
+import {cacheStorage} from '../../lib/storage';
 import useContentStore from '../../lib/zustand/contentStore';
 import useHeroStore from '../../lib/zustand/herostore';
+import useUiSettingsStore from '../../lib/zustand/uiSettingsStore';
 import {
   useHomePageData,
   getRandomHeroPost,
@@ -145,11 +146,7 @@ const Home = ({}: Props) => {
     null,
   );
 
-  // Memoize static values
-  const disableDrawer = useMemo(
-    () => mainStorage.getBool('disableDrawer') || false,
-    [],
-  );
+  const disableDrawer = useUiSettingsStore(state => state.disableDrawer);
 
   const {provider, installedProviders} = useContentStore(state => state);
   const {setHero} = useHeroStore(state => state);

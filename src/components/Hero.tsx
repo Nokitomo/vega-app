@@ -16,7 +16,7 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeStackParamList, SearchStackParamList} from '../App';
 import useContentStore from '../lib/zustand/contentStore';
 import useHeroStore from '../lib/zustand/herostore';
-import {settingsStorage} from '../lib/storage';
+import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
 import {Feather} from '@expo/vector-icons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
@@ -41,13 +41,10 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   const {provider} = useContentStore(state => state);
   const {hero} = useHeroStore(state => state);
 
-  // Memoize settings to prevent re-renders
-  const [showHamburgerMenu] = useState(() =>
-    settingsStorage.showHamburgerMenu(),
+  const showHamburgerMenu = useUiSettingsStore(
+    state => state.showHamburgerMenu,
   );
-  const [isDrawerDisabled] = useState(
-    () => settingsStorage.getBool('disableDrawer') || false,
-  );
+  const isDrawerDisabled = useUiSettingsStore(state => state.disableDrawer);
 
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();

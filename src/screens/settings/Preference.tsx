@@ -56,6 +56,14 @@ const Preferences = () => {
   const setTabletRotationEnabled = useUiSettingsStore(
     state => state.setTabletRotationEnabled,
   );
+  const showHamburgerMenu = useUiSettingsStore(
+    state => state.showHamburgerMenu,
+  );
+  const setShowHamburgerMenu = useUiSettingsStore(
+    state => state.setShowHamburgerMenu,
+  );
+  const disableDrawer = useUiSettingsStore(state => state.disableDrawer);
+  const setDisableDrawer = useUiSettingsStore(state => state.setDisableDrawer);
   const [language, setLanguage] = useState<SupportedLanguage>(
     settingsStorage.getAppLanguage(),
   );
@@ -63,10 +71,6 @@ const Preferences = () => {
     {label: t('English'), value: 'en'},
     {label: t('Italian'), value: 'it'},
   ];
-  const [disableDrawer, setDisableDrawer] = useState(
-    settingsStorage.getBool('disableDrawer') || false,
-  );
-
   const [ExcludedQualities, setExcludedQualities] = useState(
     settingsStorage.getExcludedQualities(),
   );
@@ -77,10 +81,6 @@ const Preferences = () => {
 
   const [showMediaControls, setShowMediaControls] = useState<boolean>(
     settingsStorage.showMediaControls(),
-  );
-
-  const [showHamburgerMenu, setShowHamburgerMenu] = useState<boolean>(
-    settingsStorage.showHamburgerMenu(),
   );
 
   const [hideSeekButtons, setHideSeekButtons] = useState<boolean>(
@@ -356,7 +356,6 @@ const Preferences = () => {
                 thumbColor={showHamburgerMenu ? primary : 'gray'}
                 value={showHamburgerMenu}
                 onValueChange={() => {
-                  settingsStorage.setShowHamburgerMenu(!showHamburgerMenu);
                   setShowHamburgerMenu(!showHamburgerMenu);
                 }}
               />
@@ -383,7 +382,6 @@ const Preferences = () => {
                 thumbColor={disableDrawer ? primary : 'gray'}
                 value={disableDrawer}
                 onValueChange={() => {
-                  settingsStorage.setBool('disableDrawer', !disableDrawer);
                   setDisableDrawer(!disableDrawer);
                 }}
               />
