@@ -97,6 +97,9 @@ File: src/lib/services/ProviderManager.ts
 File: src/lib/providers/providerContext.ts
 - axios, cheerio, Crypto (expo-crypto)
 - headers comuni e funzioni di estrazione (hubcloud, gofile, gdflix, superVideo)
+- `openWebView(url, options)` per provider che devono risolvere una challenge WAF/captcha da WebView.
+- `openWebView` mostra un dialog WebView globale, carica solo URL `http/https`, puo attendere un cookie specifico (`waitForCookie`, es. `cf_clearance`) e restituisce HTML renderizzato, cookie string e cookie map al provider.
+- I cookie WebView vengono letti tramite `@preeternal/react-native-cookie-manager`; su Android il modulo e autolinkato nel dev client. Su iOS va rieseguito il normale flusso Pods quando si aggiorna il progetto nativo.
 
 ## Storage provider
 - ExtensionStorage gestisce sorgenti provider, cache locale per sorgente e stato installato/abilitato.

@@ -65,6 +65,7 @@ import useSearchCacheStore from './lib/zustand/searchCacheStore';
 import useUiSettingsStore from './lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {applyAndroidUserOrientation} from './lib/utils/vegaOrientation';
+import WafWebViewDialog from './components/WafWebViewDialog';
 // Lazy-load Firebase modules so app runs without google-services files
 const getAnalytics = (): any | null => {
   try {
@@ -751,6 +752,7 @@ const AppContent = () => {
               <RootStack.Screen name="Player" component={Player} />
             </RootStack.Navigator>
           </NavigationContainer>
+          <WafWebViewDialog />
         </SafeAreaView>
       </QueryClientProvider>
     </GlobalErrorBoundary>

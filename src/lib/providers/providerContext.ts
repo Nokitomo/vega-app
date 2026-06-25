@@ -8,6 +8,7 @@ import {superVideoExtractor} from './superVideoExtractor';
 import {gdFlixExtracter} from './gdflixExtractor';
 import {ProviderContext} from './types';
 import * as Crypto from 'expo-crypto';
+import {openWebView} from '../services/wafResolver';
 
 /**
  * Context for provider functions.
@@ -28,4 +29,5 @@ export const providerContext: ProviderContext = {
   Crypto,
   cheerio,
   extractors,
+  openWebView,
 };

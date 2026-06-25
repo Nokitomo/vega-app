@@ -212,6 +212,23 @@ export interface ProviderType {
   }) => Promise<Post[]>;
 }
 
+export interface OpenWebViewOptions {
+  title?: string;
+  description?: string;
+  headers?: Record<string, string>;
+  waitForCookie?: string;
+  force?: boolean;
+  timeoutMs?: number;
+}
+
+export interface OpenWebViewResult {
+  data: string;
+  cookies: string;
+  cookieMap: Record<string, string>;
+  userAgent: string;
+  url: string;
+}
+
 export type ProviderContext = {
   axios: AxiosStatic;
   Crypto: typeof Crypto;
@@ -227,6 +244,10 @@ export type ProviderContext = {
     superVideoExtractor: (data: any) => Promise<string>;
     gdFlixExtracter: (link: string, signal: AbortSignal) => Promise<Stream[]>;
   };
+  openWebView: (
+    url: string,
+    options?: OpenWebViewOptions,
+  ) => Promise<OpenWebViewResult>;
 };
 
 export type ISO639_1 =
