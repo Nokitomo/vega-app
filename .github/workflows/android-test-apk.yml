@@ -1,14 +1,13 @@
 name: Android Test APK
 
-run-name: Android test APK (${{ inputs.ref || github.ref_name }} / ${{ inputs.apk_selection }})
+run-name: Android test APK (${{ inputs.ref }} / ${{ inputs.apk_selection }})
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch/ref da buildare. Lascia vuoto per usare il branch scelto nel menu Run workflow.'
-        required: false
-        default: ''
+        description: 'Branch, tag o commit da buildare'
+        required: true
       apk_selection:
         description: 'APK da caricare come artifact'
         required: true
@@ -36,7 +35,7 @@ jobs:
       - name: Checkout ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.ref_name }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Setup Node.js
