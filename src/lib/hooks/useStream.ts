@@ -1,5 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback, useMemo} from 'react';
 import {ToastAndroid} from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import {providerManager} from '../services/ProviderManager';
@@ -377,6 +377,10 @@ export const useVideoSettings = () => {
   const [audioTracks, setAudioTracks] = useState<any[]>([]);
   const [textTracks, setTextTracks] = useState<any[]>([]);
   const [videoTracks, setVideoTracks] = useState<any[]>([]);
+  const [loadedVideoSize, setLoadedVideoSize] = useState<{
+    width?: number;
+    height: number;
+  } | null>(null);
 
   const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState(0);
   const [selectedTextTrackIndex, setSelectedTextTrackIndex] = useState(1000);
@@ -412,23 +416,84 @@ export const useVideoSettings = () => {
     }
   };
 
-  const processVideoTracks = (tracks: any[]) => {
-    const uniqueMap = new Map();
-    const uniqueTracks = tracks.filter(track => {
-      const key = `${track.bitrate}-${track.height}`;
+  const processVideoTracks = useCallback((tracks: any[]) => {
+    if (!Array.isArray(tracks) || tracks.length === 0) {
+      setVideoTracks([]);
+      return;
+    }
+
+    const uniqueMap = new Map<string, any>();
+    tracks.forEach((track, index) => {
+      const trackIndex = typeof track?.index === 'number' ? track.index : index;
+      const key = `${track?.bitrate ?? 'unknown-bitrate'}-${
+        track?.height ?? 'unknown-height'
+      }`;
+
       if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, true);
-        return true;
+        uniqueMap.set(key, {
+          ...track,
+          index: trackIndex,
+        });
       }
-      return false;
     });
-    setVideoTracks(uniqueTracks);
-  };
+    setVideoTracks(Array.from(uniqueMap.values()));
+  }, []);
+
+  const handleVideoLoad = useCallback(
+    (naturalSize?: {width?: number; height?: number}) => {
+      const height = Number(naturalSize?.height);
+      if (!Number.isFinite(height) || height <= 0) {
+        return;
+      }
+
+      const width = Number(naturalSize?.width);
+      const nextSize = {
+        height,
+        ...(Number.isFinite(width) && width > 0 ? {width} : {}),
+      };
+
+      setLoadedVideoSize(previous =>
+        previous?.height === nextSize.height && previous?.width === nextSize.width
+          ? previous
+          : nextSize,
+      );
+    },
+    [],
+  );
+
+  const resetVideoTracks = useCallback(() => {
+    setVideoTracks([]);
+    setLoadedVideoSize(null);
+  }, []);
+
+  const effectiveVideoTracks = useMemo(() => {
+    if (videoTracks.length > 0) {
+      return videoTracks;
+    }
+
+    if (!loadedVideoSize?.height) {
+      return videoTracks;
+    }
+
+    return [
+      {
+        width: loadedVideoSize.width,
+        height: loadedVideoSize.height,
+        bitrate: 0,
+        codecs: '',
+        trackId: 'natural-size-fallback',
+        index: 0,
+        rotation: 0,
+        selected: true,
+        isNaturalSizeFallback: true,
+      },
+    ];
+  }, [loadedVideoSize, videoTracks]);
 
   return {
     audioTracks,
     textTracks,
-    videoTracks,
+    videoTracks: effectiveVideoTracks,
     selectedAudioTrackIndex,
     selectedTextTrackIndex,
     selectedQualityIndex,
@@ -440,5 +505,7 @@ export const useVideoSettings = () => {
     setSelectedQualityIndex,
     processAudioTracks,
     processVideoTracks,
+    handleVideoLoad,
+    resetVideoTracks,
   };
 };

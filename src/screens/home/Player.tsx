@@ -347,6 +347,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     setTextTracks,
     processAudioTracks,
     processVideoTracks,
+    handleVideoLoad,
+    resetVideoTracks,
   } = useVideoSettings();
 
   // Custom hooks for player settings
@@ -603,6 +605,24 @@ const Player = ({route}: Props): React.JSX.Element => {
       return quality;
     },
     [t],
+  );
+
+  const formatVideoTrackQuality = useCallback(
+    (track?: any) => {
+      const height = Number(track?.height);
+      if (!Number.isFinite(height) || height <= 0) {
+        return formatQuality('auto');
+      }
+
+      const width = Number(track?.width);
+      const qualityLabel = formatQuality(String(height));
+      if (Number.isFinite(width) && width > 0) {
+        return `${qualityLabel} (${width}x${height})`;
+      }
+
+      return qualityLabel;
+    },
+    [formatQuality],
   );
 
   const normalizeEpisodeList = useCallback((list: any[]) => {
@@ -2365,8 +2385,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     setSelectedAudioTrackIndex(0);
     setSelectedTextTrackIndex(1000);
     setSelectedQualityIndex(1000);
+    resetVideoTracks();
   }, [
     selectedStream,
+    resetVideoTracks,
     setSelectedAudioTrackIndex,
     setSelectedTextTrackIndex,
     setSelectedQualityIndex,
@@ -2654,6 +2676,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         armStreamStartupGuard('load-start');
       },
       onLoad: (data: any) => {
+        handleVideoLoad(data?.naturalSize);
         const duration =
           typeof data?.duration === 'number' ? data.duration : 0;
         if (Number.isFinite(duration) && duration > 0) {
@@ -2742,6 +2765,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       handleProgress,
       markStreamStartupProgress,
       watchedDuration,
+      handleVideoLoad,
       playbackRate,
       setPlaybackRate,
       primary,
@@ -2782,10 +2806,8 @@ const Player = ({route}: Props): React.JSX.Element => {
       episodeList.length > 1);
   const groupedOptionsQualityLabel =
     videoTracks?.length === 1
-      ? formatQuality(videoTracks[0]?.height?.toString() || 'auto')
-      : formatQuality(
-          videoTracks?.[selectedQualityIndex]?.height?.toString() || 'auto',
-        );
+      ? formatVideoTrackQuality(videoTracks[0])
+      : formatVideoTrackQuality(videoTracks?.[selectedQualityIndex]);
   const shouldShowSkipIntro =
     !!skipIntroInterval &&
     currentPosition >=
@@ -3514,22 +3536,26 @@ const Player = ({route}: Props): React.JSX.Element => {
                         <Text
                           className={'text-base font-semibold'}
                           style={{
-                            color:
-                              selectedQualityIndex === i ? primary : 'white',
-                          }}>
-                          {track.height + 'p'}
-                        </Text>
-                      <Text
-                        className={'text-sm italic'}
-                        style={{
                           color:
                             selectedQualityIndex === i ? primary : 'white',
-                        }}>
-                        {t('Bitrate {{bitrate}} | Codec {{codec}}', {
-                          bitrate: track.bitrate,
-                          codec: track?.codecs || t('Unknown'),
-                        })}
-                      </Text>
+                          }}>
+                          {formatVideoTrackQuality(track)}
+                        </Text>
+                        {(!!track.bitrate || !!track?.codecs) && (
+                          <Text
+                            className={'text-sm italic'}
+                            style={{
+                              color:
+                                selectedQualityIndex === i
+                                  ? primary
+                                  : 'white',
+                            }}>
+                            {t('Bitrate {{bitrate}} | Codec {{codec}}', {
+                              bitrate: track.bitrate || 0,
+                              codec: track?.codecs || t('Unknown'),
+                            })}
+                          </Text>
+                        )}
                         {selectedQualityIndex === i && (
                           <MaterialIcons name="check" size={20} color="white" />
                         )}
