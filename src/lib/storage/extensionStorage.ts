@@ -91,8 +91,12 @@ export class ExtensionStorage {
 
     if (existing) {
       // Update existing provider
-      existing.version = provider.version;
-      existing.lastUpdated = Date.now();
+      Object.assign(existing, {
+        ...provider,
+        installed: true,
+        installedAt: existing.installedAt,
+        lastUpdated: Date.now(),
+      });
     } else {
       // Add new provider
       installed.push({

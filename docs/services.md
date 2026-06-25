@@ -21,9 +21,10 @@ File: src/screens/settings/About.tsx
 
 ## Aggiornamenti provider
 File: src/lib/services/UpdateProviders.ts
-- Confronta versioni provider e avvia update automatici.
-- Mostra notifiche di progresso tramite NotificationService.
-- Controllo automatico ogni 6 ore; auto-update solo se le notifiche sono abilitate.
+- Confronta versioni provider e avvia update automatici dopo aver refreshato il manifest.
+- Scarica i moduli aggiornati prima di aggiornare il record installato, evitando di lasciare provider disinstallati se il download fallisce.
+- Mostra notifiche di progresso tramite NotificationService solo se le notifiche sono abilitate.
+- Controllo automatico ogni 6 ore; se chiamato piu volte evita timer duplicati.
 - Messaggi di update sono localizzati via i18n.
 
 ## Estensioni

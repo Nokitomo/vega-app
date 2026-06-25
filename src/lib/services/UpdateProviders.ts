@@ -14,12 +14,15 @@ export interface UpdateInfo {
 class UpdateProvidersService {
   private isUpdating = false;
   private updateCheckInterval: NodeJS.Timeout | null = null;
+  private readonly updateCheckIntervalMs = 6 * 60 * 60 * 1000;
 
   /**
    * Check for updates for all installed providers
    */
   async checkForUpdates(): Promise<UpdateInfo[]> {
     try {
+      await extensionManager.initialize();
+
       const installedProviders = extensionStorage.getInstalledProviders();
       const availableProviders = await extensionManager.fetchManifest(true);
 
@@ -62,11 +65,7 @@ class UpdateProvidersService {
    */
   async updateProvider(provider: ProviderExtension): Promise<boolean> {
     try {
-      // Uninstall old version
-      extensionStorage.uninstallProvider(provider.value);
-
-      // Install new version
-      await extensionManager.installProvider(provider);
+      await extensionManager.updateProvider(provider);
 
       return true;
     } catch (error) {
@@ -78,7 +77,10 @@ class UpdateProvidersService {
   /**
    * Update multiple providers with progress notifications
    */
-  async updateProviders(providers: ProviderExtension[]): Promise<{
+  async updateProviders(
+    providers: ProviderExtension[],
+    options?: {showNotifications?: boolean},
+  ): Promise<{
     updated: ProviderExtension[];
     failed: ProviderExtension[];
   }> {
@@ -86,13 +88,17 @@ class UpdateProvidersService {
       return {updated: [], failed: []};
     }
 
+    const shouldNotify = options?.showNotifications ?? true;
+
     this.isUpdating = true;
     const updated: ProviderExtension[] = [];
     const failed: ProviderExtension[] = [];
 
     try {
       // Show updating notification
-      await this.showUpdatingNotification(providers);
+      if (shouldNotify) {
+        await this.showUpdatingNotification(providers);
+      }
 
       for (const provider of providers) {
         const success = await this.updateProvider(provider);
@@ -104,7 +110,9 @@ class UpdateProvidersService {
       }
 
       // Show completion notification
-      await this.showUpdateCompleteNotification(updated, failed);
+      if (shouldNotify) {
+        await this.showUpdateCompleteNotification(updated, failed);
+      }
 
       return {updated, failed};
     } finally {
@@ -117,14 +125,12 @@ class UpdateProvidersService {
   async checkForUpdatesAndAutoUpdate(): Promise<UpdateInfo[]> {
     const updateInfos = await this.checkForUpdates();
     const availableUpdates = updateInfos.filter(info => info.hasUpdate);
-    if (
-      availableUpdates.length > 0 &&
-      settingsStorage.isNotificationsEnabled()
-    ) {
-      // Automatically start updating instead of just showing notification
+    if (availableUpdates.length > 0) {
+      // Automatically start updating instead of just showing notification.
       const providersToUpdate = availableUpdates.map(update => update.provider);
+      const showNotifications = settingsStorage.isNotificationsEnabled();
       // Don't await here to avoid blocking - let it run in background
-      this.updateProviders(providersToUpdate);
+      this.updateProviders(providersToUpdate, {showNotifications});
     }
     return updateInfos;
   }
@@ -140,16 +146,21 @@ class UpdateProvidersService {
    * Start automatic update checking
    */
   startAutomaticUpdateCheck(): void {
-    // Check immediately
-    this.checkForUpdatesAndAutoUpdate();
+    if (this.updateCheckInterval) {
+      clearInterval(this.updateCheckInterval);
+    }
 
-    // Check every 6 hours
-    this.updateCheckInterval = setInterval(
-      () => {
-        this.checkForUpdatesAndAutoUpdate();
-      },
-      6 * 60 * 60 * 1000,
-    );
+    // Check immediately.
+    this.checkForUpdatesAndAutoUpdate().catch(error => {
+      console.warn('Automatic provider update check failed:', error);
+    });
+
+    // Check every 6 hours.
+    this.updateCheckInterval = setInterval(() => {
+      this.checkForUpdatesAndAutoUpdate().catch(error => {
+        console.warn('Scheduled provider update check failed:', error);
+      });
+    }, this.updateCheckIntervalMs);
   }
 
   /**
