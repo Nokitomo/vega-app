@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -39,6 +40,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isDropdownFocused, setIsDropdownFocused] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const defaultSource = useMemo(() => {
     return sources.find(item => item.isDefault) || sources[0];
@@ -70,6 +72,25 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
       setShowAddDialog(true);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!showAddDialog) {
+      setKeyboardHeight(0);
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [showAddDialog]);
 
   const closeDialog = () => {
     setShowAddDialog(false);
@@ -243,19 +264,25 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
         visible={showAddDialog}
         transparent
         animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={closeDialog}>
         <KeyboardAvoidingView
           className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             className="flex-1 bg-black/70"
             contentContainerStyle={{
               flexGrow: 1,
-              justifyContent: 'center',
+              justifyContent: keyboardHeight > 0 ? 'flex-end' : 'center',
               paddingHorizontal: 24,
+              paddingTop: 24,
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 24 : 24,
             }}
             keyboardShouldPersistTaps="handled">
-            <View className="w-full bg-tertiary rounded-2xl p-4 border border-quaternary">
+            <View
+              className="w-full bg-tertiary rounded-2xl p-4 border border-quaternary"
+              style={{maxHeight: '92%'}}>
               <View className="flex-row items-center justify-between mb-3">
                 <Text
                   className="text-white text-base font-semibold flex-1"
@@ -273,34 +300,26 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
               <Text className="text-white text-sm font-medium">
                 {t('Enter source name or url to add provider')}
               </Text>
-              <Text className="text-gray-400 text-sm mt-[4px]">
+              <Text className="text-gray-400 text-sm leading-5 mt-2">
                 {t('How to get source url check instructions')}{' '}
-                <TouchableOpacity
+                <Text
+                  className="text-blue-400 text-sm leading-5"
                   onPress={() =>
                     Linking.openURL(socialLinks.github + '#vega-app')
                   }>
-                  <Text className="text-blue-400 text-sm mt-[4.5px]">
-                    {t('here')}
-                  </Text>
-                </TouchableOpacity>
-              </Text>
-              <Text className="text-gray-400 text-sm mt-[4px]">
-                {t('or join Discord for support')}{' '}
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(socialLinks.discord)}>
-                  <Text className="text-blue-400 text-sm mt-[4.5px]">
-                    Discord
-                  </Text>
-                </TouchableOpacity>
+                  {t('here')}
+                </Text>
               </Text>
               <TextInput
-                className="bg-quaternary rounded-lg px-4 py-3 text-white border border-gray-700 mt-3"
+                className="bg-quaternary rounded-lg px-4 text-white border border-gray-700 mt-3"
+                style={{minHeight: 52, textAlignVertical: 'center'}}
                 placeholder=" "
                 placeholderTextColor="#6B7280"
                 value={inputValue}
                 onChangeText={setInputValue}
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="done"
               />
               <View className="flex-row gap-2 mt-3">
                 <TouchableOpacity
