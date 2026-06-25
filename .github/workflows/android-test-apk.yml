@@ -1,0 +1,182 @@
+name: Android Test APK
+
+run-name: Android test APK (${{ inputs.ref || github.ref_name }} / ${{ inputs.apk_selection }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/ref da buildare. Lascia vuoto per usare il branch scelto nel menu Run workflow.'
+        required: false
+        default: ''
+      apk_selection:
+        description: 'APK da caricare come artifact'
+        required: true
+        type: choice
+        default: 'arm64-v8a'
+        options:
+          - arm64-v8a
+          - armeabi-v7a
+          - universal
+          - arm64-v8a + armeabi-v7a
+          - arm64-v8a + universal
+          - armeabi-v7a + universal
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-apk:
+    runs-on: ubuntu-latest
+    environment: nightly
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+    steps:
+      - name: Checkout ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - name: Configure Android signing
+        run: |
+          KEYSTORE_B64="${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          STORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_ALIAS="${{ secrets.ANDROID_KEY_ALIAS }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+          # Compatibilita con nomi legacy.
+          [ -z "$KEYSTORE_B64" ] && KEYSTORE_B64="${{ secrets.KEYSTORE_BASE64 }}"
+          [ -z "$STORE_PASSWORD" ] && STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}"
+          [ -z "$KEY_ALIAS" ] && KEY_ALIAS="${{ secrets.KEY_ALIAS }}"
+          [ -z "$KEY_PASSWORD" ] && KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
+
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Missing Android signing secrets."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/ci-release.jks
+          if [ ! -s android/ci-release.jks ]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore android/ci-release.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::Keystore validation failed. Check alias/password/base64 secrets."
+            exit 1
+          fi
+
+          {
+            echo "storeFile=${GITHUB_WORKSPACE}/android/ci-release.jks"
+            echo "storePassword=${STORE_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "keyPassword=${KEY_PASSWORD}"
+            echo "useReleaseSigningForDebug=false"
+          } > android/signing.local.properties
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android release APKs
+        run: |
+          cd android
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon --max-workers=2 -x lintVitalRelease
+
+      - name: Select APK artifacts
+        id: apk_files
+        env:
+          APK_SELECTION: ${{ inputs.apk_selection }}
+        run: |
+          VERSION=$(grep -m 1 'versionName "' android/app/build.gradle | sed 's/.*versionName "\(.*\)".*/\1/')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          SAFE_SELECTION=$(printf '%s' "$APK_SELECTION" | tr ' +' '--' | tr -cd '[:alnum:]._-' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+
+          mkdir -p apks
+
+          UNIVERSAL_APK=$(find android/app/build/outputs/apk/release -name "*universal*.apk" -not -name "*unsigned*" | head -1)
+          ARMV7_APK=$(find android/app/build/outputs/apk/release -name "*armeabi-v7a*.apk" -not -name "*unsigned*" | head -1)
+          ARMV8_APK=$(find android/app/build/outputs/apk/release -name "*arm64-v8a*.apk" -not -name "*unsigned*" | head -1)
+
+          copy_apk() {
+            local source_path="$1"
+            local output_name="$2"
+
+            if [ ! -f "$source_path" ]; then
+              echo "::error::Missing APK output: $output_name"
+              exit 1
+            fi
+
+            cp "$source_path" "apks/$output_name"
+          }
+
+          case "$APK_SELECTION" in
+            "arm64-v8a")
+              copy_apk "$ARMV8_APK" "Vega-arm64-v8a-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "armeabi-v7a")
+              copy_apk "$ARMV7_APK" "Vega-armeabi-v7a-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "universal")
+              copy_apk "$UNIVERSAL_APK" "Vega-universal-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "arm64-v8a + armeabi-v7a")
+              copy_apk "$ARMV8_APK" "Vega-arm64-v8a-v${VERSION}-${SHORT_SHA}.apk"
+              copy_apk "$ARMV7_APK" "Vega-armeabi-v7a-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "arm64-v8a + universal")
+              copy_apk "$ARMV8_APK" "Vega-arm64-v8a-v${VERSION}-${SHORT_SHA}.apk"
+              copy_apk "$UNIVERSAL_APK" "Vega-universal-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "armeabi-v7a + universal")
+              copy_apk "$ARMV7_APK" "Vega-armeabi-v7a-v${VERSION}-${SHORT_SHA}.apk"
+              copy_apk "$UNIVERSAL_APK" "Vega-universal-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            "all")
+              copy_apk "$ARMV8_APK" "Vega-arm64-v8a-v${VERSION}-${SHORT_SHA}.apk"
+              copy_apk "$ARMV7_APK" "Vega-armeabi-v7a-v${VERSION}-${SHORT_SHA}.apk"
+              copy_apk "$UNIVERSAL_APK" "Vega-universal-v${VERSION}-${SHORT_SHA}.apk"
+              ;;
+            *)
+              echo "::error::Unsupported APK selection: $APK_SELECTION"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "version=${VERSION}"
+            echo "short_sha=${SHORT_SHA}"
+            echo "safe_selection=${SAFE_SELECTION}"
+          } >> "$GITHUB_OUTPUT"
+
+          ls -la apks/
+
+      - name: Upload selected APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vega-test-v${{ steps.apk_files.outputs.version }}-${{ steps.apk_files.outputs.short_sha }}-${{ steps.apk_files.outputs.safe_selection }}
+          path: apks/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Cleanup signing files
+        if: always()
+        run: |
+          rm -f android/ci-release.jks
+          rm -f android/signing.local.properties
