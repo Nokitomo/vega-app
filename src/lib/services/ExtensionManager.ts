@@ -3,17 +3,24 @@ import {
   extensionStorage,
   ProviderExtension,
   ProviderModule,
+  ProviderSource,
 } from '../storage/extensionStorage';
+import {mainStorage} from '../storage/StorageService';
+import {createProviderSource} from '../utils/helpers';
 import i18n from '../../i18n';
+
+const DEFAULT_PROVIDER_SOURCE: ProviderSource = {
+  author: 'Nokitomo',
+  url: 'https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main',
+  isDefault: true,
+};
+
 /**
  * Extension manager service for handling dynamic provider loading
  */
 export class ExtensionManager {
   private static instance: ExtensionManager;
-  private primaryBaseUrl =
-    'https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main';
-  private fallbackBaseUrl =
-    'https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main';
+  private readonly legacyCustomProviderBaseUrlKey = 'customProviderBaseUrl';
 
   private testMode = false;
   private baseUrlTestMode = '';
@@ -32,45 +39,138 @@ export class ExtensionManager {
     return ExtensionManager.instance;
   }
 
+  private getManifestUrl(url: string): string {
+    return `${url}/manifest.json`;
+  }
+
+  private getActiveSource(source?: ProviderSource): ProviderSource | undefined {
+    return source || extensionStorage.getProviderSource();
+  }
+
+  private ensureDefaultProviderSource(): void {
+    if (extensionStorage.getProviderSources().length > 0) {
+      return;
+    }
+
+    extensionStorage.addProviderSources(
+      DEFAULT_PROVIDER_SOURCE.author,
+      DEFAULT_PROVIDER_SOURCE.url,
+    );
+    extensionStorage.setDefaultProviderSource(DEFAULT_PROVIDER_SOURCE.author);
+  }
+
+  private migrateLegacyCustomProviderSource(): void {
+    if (extensionStorage.getProviderSources().length > 0) {
+      return;
+    }
+
+    const legacyValue =
+      mainStorage.getString(this.legacyCustomProviderBaseUrlKey)?.trim() || '';
+    if (!legacyValue) {
+      return;
+    }
+
+    try {
+      const source = createProviderSource(legacyValue);
+      extensionStorage.addProviderSources(source.author, source.url);
+      extensionStorage.setDefaultProviderSource(source.author);
+      console.log('Migrated customProviderBaseUrl to provider source');
+    } catch (error) {
+      console.warn('Failed to migrate customProviderBaseUrl:', error);
+    } finally {
+      mainStorage.delete(this.legacyCustomProviderBaseUrlKey);
+    }
+  }
+
+  private migrateInstalledProvidersToSource(source?: ProviderSource): void {
+    if (!source) {
+      return;
+    }
+
+    const installedProviders = extensionStorage.getInstalledProviders();
+    let hasChanges = false;
+    const migrated = installedProviders.map(provider => {
+      if (provider.source?.author && provider.source?.url) {
+        return provider;
+      }
+
+      hasChanges = true;
+      return {
+        ...provider,
+        source: {
+          author: source.author,
+          url: source.url,
+        },
+      };
+    });
+
+    if (hasChanges) {
+      extensionStorage.setInstalledProviders(migrated);
+    }
+  }
+
+  private resolveProviderSource(provider: ProviderExtension): ProviderSource {
+    const source = provider.source || this.getActiveSource();
+    if (!source) {
+      throw new Error(i18n.t('No provider source configured'));
+    }
+
+    return source;
+  }
+
   /**
    * Fetch latest manifest from GitHub
    */
-  async fetchManifest(force = false): Promise<ProviderExtension[]> {
+  async fetchManifest(
+    sourceOrForce?: ProviderSource | boolean,
+    force = false,
+  ): Promise<ProviderExtension[]> {
+    const source =
+      sourceOrForce && typeof sourceOrForce === 'object'
+        ? sourceOrForce
+        : undefined;
+    const shouldForce =
+      typeof sourceOrForce === 'boolean' ? sourceOrForce : force;
+    const activeSource = this.getActiveSource(source);
+
+    if (!activeSource) {
+      throw new Error(i18n.t('No provider source configured'));
+    }
+
     try {
       // Check cache first
-      if (!force && !extensionStorage.isManifestCacheExpired()) {
-        const cached = extensionStorage.getManifestCache();
+      if (
+        !shouldForce &&
+        !extensionStorage.isManifestCacheExpired(activeSource.author)
+      ) {
+        const cached = extensionStorage.getManifestCache(activeSource.author);
         if (cached.length > 0) {
           return cached;
         }
       }
 
-      const baseUrls = this.getBaseUrls();
-      let response: {data: any; source?: string} | null = null;
-      for (const baseUrl of baseUrls) {
-        const manifestUrl = `${baseUrl}/manifest.json`;
-        console.log('Fetching manifest from:', manifestUrl);
-        try {
-          const res = await axios.get(manifestUrl, {
-            timeout: 10000,
-          });
-          if (res.data && Array.isArray(res.data)) {
-            response = {data: res.data, source: manifestUrl};
-            break;
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch manifest from ${manifestUrl}:`, error);
-        }
-      }
+      const manifestUrl = this.testMode
+        ? `${this.baseUrlTestMode}/manifest.json`
+        : this.getManifestUrl(activeSource.url);
+      console.log('Fetching manifest from:', manifestUrl);
 
-      if (!response) {
+      const response = await axios.get(manifestUrl, {
+        timeout: 10000,
+      });
+
+      if (!response.data || !Array.isArray(response.data)) {
         throw new Error(i18n.t('Invalid manifest format'));
       }
 
+      const sourceRef = {
+        author: activeSource.author,
+        url: activeSource.url,
+      };
       const providers: ProviderExtension[] = response.data.map((item: any) => ({
         value: item.value,
         display_name: item.display_name,
         disabled: item.disabled || false,
+        source: sourceRef,
         version: item.version,
         icon: item.icon || '',
         type: item.type || 'global',
@@ -78,15 +178,15 @@ export class ExtensionManager {
       }));
 
       // Cache the manifest
-      extensionStorage.setManifestCache(providers);
-      extensionStorage.setAvailableProviders(providers);
+      extensionStorage.setManifestCache(providers, activeSource.author);
+      extensionStorage.setAvailableProviders(activeSource.author, providers);
 
       return providers;
     } catch (error) {
       console.error('Failed to fetch manifest:', error);
 
       // Return cached data if available
-      const cached = extensionStorage.getManifestCache();
+      const cached = extensionStorage.getManifestCache(activeSource.author);
       if (cached.length > 0) {
         return cached;
       }
@@ -101,45 +201,48 @@ export class ExtensionManager {
   async downloadProviderModules(
     providerValue: string,
     version: string,
+    source?: ProviderSource,
   ): Promise<ProviderModule> {
     if (this.testMode) {
       return this.downloadTestProviderModule(providerValue);
     }
+
+    const activeSource = this.getActiveSource(source);
+    if (!activeSource) {
+      throw new Error(i18n.t('No provider source configured'));
+    }
+
     try {
       const requiredFiles = ['posts', 'meta', 'stream', 'catalog'];
       const optionalFiles = ['episodes'];
       const allFiles = [...requiredFiles, ...optionalFiles];
 
       const modules: Record<string, string> = {};
-      const baseUrls = this.getBaseUrls();
       const downloadPromises = allFiles.map(async fileName => {
-        let lastError: unknown = null;
-        for (const baseUrl of baseUrls) {
-          const url = `${baseUrl}/dist/${providerValue}/${fileName}.js`;
+        try {
+          const url = `${activeSource.url}/dist/${providerValue}/${fileName}.js`;
           console.log(`Downloading: ${url}`);
-          try {
-            const response = await axios.get(url, {
-              timeout: 15000,
-            });
 
-            if (response.data) {
-              modules[fileName] = response.data;
-              return;
-            }
-          } catch (error) {
-            lastError = error;
+          const response = await axios.get(url, {
+            timeout: 15000,
+          });
+
+          if (response.data) {
+            modules[fileName] = response.data;
           }
-        }
-        if (requiredFiles.includes(fileName)) {
-          console.error(
-            `Failed to download ${fileName}.js for ${providerValue}:`,
-            lastError,
-          );
-          throw lastError;
-        } else {
-          console.warn(
-            `Optional file ${fileName}.js not found for ${providerValue}`,
-          );
+        } catch (error) {
+          // Only log error for required files
+          if (requiredFiles.includes(fileName)) {
+            console.error(
+              `Failed to download ${fileName}.js for ${providerValue}:`,
+              error,
+            );
+            throw error;
+          } else {
+            console.warn(
+              `Optional file ${fileName}.js not found for ${providerValue}`,
+            );
+          }
         }
       });
 
@@ -157,6 +260,7 @@ export class ExtensionManager {
 
       const providerModule: ProviderModule = {
         value: providerValue,
+        sourceAuthor: activeSource.author,
         version,
         modules: {
           posts: modules.posts,
@@ -263,11 +367,24 @@ export class ExtensionManager {
    */
   async installProvider(provider: ProviderExtension): Promise<void> {
     try {
+      const source = this.resolveProviderSource(provider);
+      const providerWithSource = {
+        ...provider,
+        source: {
+          author: source.author,
+          url: source.url,
+        },
+      };
+
       // Download the provider modules
-      await this.downloadProviderModules(provider.value, provider.version);
+      await this.downloadProviderModules(
+        providerWithSource.value,
+        providerWithSource.version,
+        source,
+      );
 
       // Mark as installed
-      extensionStorage.installProvider(provider);
+      extensionStorage.installProvider(providerWithSource);
 
       console.log(`Successfully installed provider: ${provider.display_name}`);
     } catch (error) {
@@ -282,8 +399,8 @@ export class ExtensionManager {
   /**
    * Uninstall a provider
    */
-  uninstallProvider(providerValue: string): void {
-    extensionStorage.uninstallProvider(providerValue);
+  uninstallProvider(providerValue: string, sourceAuthor?: string): void {
+    extensionStorage.uninstallProvider(providerValue, sourceAuthor);
     console.log(`Uninstalled provider: ${providerValue}`);
   }
 
@@ -292,11 +409,24 @@ export class ExtensionManager {
    */
   async updateProvider(provider: ProviderExtension): Promise<void> {
     try {
+      const source = this.resolveProviderSource(provider);
+      const providerWithSource = {
+        ...provider,
+        source: {
+          author: source.author,
+          url: source.url,
+        },
+      };
+
       // Download updated modules
-      await this.downloadProviderModules(provider.value, provider.version);
+      await this.downloadProviderModules(
+        providerWithSource.value,
+        providerWithSource.version,
+        source,
+      );
 
       // Update installation record
-      extensionStorage.installProvider(provider);
+      extensionStorage.installProvider(providerWithSource);
 
       console.log(`Successfully updated provider: ${provider.display_name}`);
     } catch (error) {
@@ -307,10 +437,14 @@ export class ExtensionManager {
       throw error;
     }
   }
+
   /**
    * Get cached provider modules (works synchronously for both normal and test mode)
    */
-  getProviderModules(providerValue: string): ProviderModule | undefined {
+  getProviderModules(
+    providerValue: string,
+    sourceAuthor?: string,
+  ): ProviderModule | undefined {
     if (this.testMode) {
       // In test mode, return cached test module and trigger background refresh
       const cached = this.testModuleCache.get(providerValue);
@@ -328,14 +462,18 @@ export class ExtensionManager {
       );
     }
 
-    return extensionStorage.getProviderModules(providerValue);
+    return extensionStorage.getProviderModules(providerValue, sourceAuthor);
   }
 
   /**
    * Check if provider needs update
    */
-  checkForUpdates(): ProviderExtension[] {
-    return extensionStorage.getProvidersNeedingUpdate();
+  checkForUpdates(author?: string): ProviderExtension[] {
+    const activeAuthor = author || this.getActiveSource()?.author;
+    if (!activeAuthor) {
+      return [];
+    }
+    return extensionStorage.getProvidersNeedingUpdate(activeAuthor);
   }
 
   /**
@@ -343,17 +481,30 @@ export class ExtensionManager {
    */
   async initialize(): Promise<void> {
     try {
+      this.migrateLegacyCustomProviderSource();
+      this.ensureDefaultProviderSource();
+
       // Load providers from cache
+      const source = this.getActiveSource();
+      this.migrateInstalledProvidersToSource(source);
+
       const installed = extensionStorage.getInstalledProviders();
-      const available = extensionStorage.getAvailableProviders();
+      const available = source
+        ? extensionStorage.getAvailableProviders(source.author)
+        : [];
 
       console.log(`Loaded ${installed.length} installed providers`);
       console.log(`Loaded ${available.length} available providers`);
 
+      if (!source) {
+        console.log('No provider source configured yet');
+        return;
+      }
+
       // Try to fetch latest manifest if cache is expired
-      if (extensionStorage.isManifestCacheExpired()) {
+      if (extensionStorage.isManifestCacheExpired(source.author)) {
         try {
-          await this.fetchManifest(false);
+          await this.fetchManifest(source, false);
         } catch (error) {
           console.warn('Failed to refresh manifest on startup:', error);
         }
@@ -370,12 +521,7 @@ export class ExtensionManager {
     this.testMode = enabled;
     console.log(`Test mode ${enabled ? 'enabled' : 'disabled'}`);
   }
-  private getBaseUrls(): string[] {
-    if (this.testMode) {
-      return this.baseUrlTestMode ? [this.baseUrlTestMode] : [];
-    }
-    return [this.primaryBaseUrl, this.fallbackBaseUrl];
-  }
+
   /**
    * Check if test module cache is expired
    */
@@ -387,6 +533,7 @@ export class ExtensionManager {
 
     return Date.now() - cached.cachedAt > this.testModuleCacheExpiry;
   }
+
   /**
    * Pre-fetch test modules to ensure they're available synchronously
    */
@@ -415,6 +562,7 @@ export class ExtensionManager {
 
     await Promise.allSettled(fetchPromises);
   }
+
   /**
    * Refresh test module in background if needed
    */

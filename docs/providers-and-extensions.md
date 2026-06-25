@@ -5,11 +5,11 @@ I contenuti non sono hardcoded: il catalogo e la logica di scraping/streaming ve
 
 ## ExtensionManager
 File: src/lib/services/ExtensionManager.ts
-- Scarica il manifest provider dal repo primario:
+- Gestisce una o piu sorgenti provider configurabili dall'app.
+- Se non esistono sorgenti locali, crea automaticamente la sorgente ufficiale:
   https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main/manifest.json
-- Se il repo primario non e disponibile, usa il fallback configurato (attualmente coincidente):
-  https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main/manifest.json
-- Gestisce installazione, aggiornamento e cache dei moduli.
+- Migra i provider installati prima del supporto multi-sorgente associandoli alla sorgente di default.
+- Gestisce installazione, aggiornamento e cache dei moduli separando manifest e moduli per sorgente.
 - Supporta modalita test con baseUrl alternativo.
 
 ## Struttura dei moduli provider
@@ -99,16 +99,16 @@ File: src/lib/providers/providerContext.ts
 - headers comuni e funzioni di estrazione (hubcloud, gofile, gdflix, superVideo)
 
 ## Storage provider
-- ExtensionStorage gestisce cache locale e stato installato/abilitato.
-- UpdateProvidersService verifica versioni e aggiorna automaticamente.
+- ExtensionStorage gestisce sorgenti provider, cache locale per sorgente e stato installato/abilitato.
+- UpdateProvidersService verifica versioni per sorgente e aggiorna automaticamente.
 - Le notifiche di aggiornamento provider usano testi localizzati.
 - Per StreamingUnity e stato introdotto un cache key versioning mirato sui metadata (`content info` e `hero metadata`) per invalidare i valori storici senza reset globale cache.
 
 ## Dove stanno i provider
 - I provider non sono hardcoded nel repository dell'app.
 - Sono moduli JS ospitati su GitHub e scaricati a runtime.
-- Repo primario: `Nokitomo/vega-providers`
-- Fallback configurato: `Nokitomo/vega-providers`
+- Sorgente ufficiale predefinita: `Nokitomo/vega-providers`
+- Sorgenti aggiuntive: configurabili dal tab "Disponibili" del Provider Manager.
 - Non esiste un backend privato: l'app consuma solo risorse pubbliche via HTTP.
 
 ## Dipendenze DNS e rete
@@ -119,5 +119,6 @@ File: src/lib/providers/providerContext.ts
 - Questo comportamento puo colpire solo alcuni provider e non altri, nella stessa installazione.
 
 ## Come aggiungere provider personalizzati
-- Devi pubblicare un tuo set di provider (manifest + moduli JS) in un repo/host accessibile via URL.
-- L'app, di default, punta al repo ufficiale: per usare il tuo repo serve cambiare la base URL in `ExtensionManager` (o aggiungere una UI di configurazione).
+- Devi pubblicare un tuo set di provider (manifest + moduli JS) in un repository GitHub accessibile pubblicamente.
+- Dal Provider Manager, tab "Disponibili", usa il selettore sorgenti e aggiungi un autore GitHub o un URL `github.com`/`raw.githubusercontent.com`.
+- L'app converte la sorgente in URL raw GitHub, scarica `manifest.json` e mantiene cache/update separati per autore.

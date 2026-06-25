@@ -12,6 +12,7 @@ import {
   settingsStorage,
   cacheStorageService,
   ProviderExtension,
+  extensionStorage,
 } from '../../lib/storage';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useContentStore from '../../lib/zustand/contentStore';
@@ -36,6 +37,19 @@ import {useTranslation} from 'react-i18next';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
+const getProviderKey = (item: ProviderExtension) =>
+  `${item.source?.author || 'legacy'}:${item.value}`;
+
+const isSameProvider = (left: ProviderExtension, right: ProviderExtension) => {
+  if (left.value !== right.value) {
+    return false;
+  }
+
+  const leftAuthor = left.source?.author;
+  const rightAuthor = right.source?.author;
+  return !leftAuthor || !rightAuthor || leftAuthor === rightAuthor;
+};
+
 const Settings = ({navigation}: Props) => {
   const {t} = useTranslation();
   const tabNavigation =
@@ -48,6 +62,9 @@ const Settings = ({navigation}: Props) => {
 
   const handleProviderSelect = useCallback(
     (item: ProviderExtension) => {
+      if (item.source?.author) {
+        extensionStorage.setDefaultProviderSource(item.source.author);
+      }
       setProvider(item);
       // Add haptic feedback
       if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -65,7 +82,7 @@ const Settings = ({navigation}: Props) => {
   const renderProviderItem = useCallback(
     (item: ProviderExtension, isSelected: boolean) => (
       <TouchableOpacity
-        key={item.value}
+        key={getProviderKey(item)}
         onPress={() => handleProviderSelect(item)}
         className={`mr-3 rounded-lg ${
           isSelected ? 'bg-[#333333]' : 'bg-[#262626]'
@@ -97,9 +114,9 @@ const Settings = ({navigation}: Props) => {
   const providersList = useMemo(
     () =>
       installedProviders.map(item =>
-        renderProviderItem(item, provider.value === item.value),
+        renderProviderItem(item, isSameProvider(provider, item)),
       ),
-    [installedProviders, provider.value, renderProviderItem],
+    [installedProviders, provider, renderProviderItem],
   );
 
   const clearCacheHandler = useCallback(() => {

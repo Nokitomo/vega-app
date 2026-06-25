@@ -23,6 +23,7 @@ import useContentStore from '../../lib/zustand/contentStore';
 import {
   extensionStorage,
   ProviderExtension,
+  ProviderSource,
 } from '../../lib/storage/extensionStorage';
 import {extensionManager} from '../../lib/services/ExtensionManager';
 import {
@@ -33,6 +34,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {settingsStorage} from '../../lib/storage';
 import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
+import ProviderSourceManager from './components/ProviderSourceManager';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Extensions'>;
 
@@ -42,12 +44,31 @@ const dedupeProviders = (providers: ProviderExtension[]) => {
   const seen = new Set<string>();
   return providers.filter(provider => {
     const value = provider?.value;
-    if (!value || seen.has(value)) {
+    const key = `${provider?.source?.author || 'legacy'}:${value}`;
+    if (!value || seen.has(key)) {
       return false;
     }
-    seen.add(value);
+    seen.add(key);
     return true;
   });
+};
+
+const getProviderKey = (provider?: ProviderExtension | null) =>
+  provider?.value
+    ? `${provider.source?.author || 'legacy'}:${provider.value}`
+    : '';
+
+const isSameProvider = (
+  left?: ProviderExtension | null,
+  right?: ProviderExtension | null,
+) => {
+  if (!left?.value || !right?.value || left.value !== right.value) {
+    return false;
+  }
+
+  const leftAuthor = left.source?.author;
+  const rightAuthor = right.source?.author;
+  return !leftAuthor || !rightAuthor || leftAuthor === rightAuthor;
 };
 
 const Extensions = ({navigation}: Props) => {
@@ -70,17 +91,23 @@ const Extensions = ({navigation}: Props) => {
   const [updatingProvider, setUpdatingProvider] = useState<string | null>(null);
   const [updateInfos, setUpdateInfos] = useState<UpdateInfo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeSourceAuthor, setActiveSourceAuthor] = useState<string>(
+    extensionStorage.getProviderSource()?.author || '',
+  );
   // Load providers on component mount
   useEffect(() => {
     const initializeExtensions = async () => {
       try {
         await extensionManager.initialize();
-        loadProviders();
+        const source = extensionStorage.getProviderSource();
+        const author = source?.author || '';
+        setActiveSourceAuthor(author);
+        loadProviders(author);
         await checkForUpdates();
 
         // Try to fetch latest providers if we don't have any
-        if (!availableProviders || availableProviders.length === 0) {
-          await handleRefresh();
+        if (author && (!availableProviders || availableProviders.length === 0)) {
+          await refreshProviders(author);
         }
       } catch (error) {
         // Still try to load from cache if initialization fails
@@ -90,17 +117,26 @@ const Extensions = ({navigation}: Props) => {
 
     initializeExtensions();
   }, []);
-  const loadProviders = () => {
+  const loadProviders = (author?: string) => {
+    const selectedAuthor =
+      author || extensionStorage.getProviderSource()?.author || '';
     const installed = dedupeProviders(
       extensionStorage.getInstalledProviders() || [],
     );
-    const available = dedupeProviders(
-      extensionStorage.getAvailableProviders() || [],
-    );
+    const available = selectedAuthor
+      ? dedupeProviders(extensionStorage.getAvailableProviders(selectedAuthor))
+      : [];
     setInstalledProviders(installed);
     setAvailableProviders(available.filter(item => item && !item.disabled));
+    setActiveSourceAuthor(selectedAuthor);
   };
   const checkForUpdates = async () => {
+    const source = extensionStorage.getProviderSource();
+    if (!source) {
+      setUpdateInfos([]);
+      return;
+    }
+
     try {
       const updates = await updateProvidersService.checkForUpdatesManual();
       setUpdateInfos(updates);
@@ -122,7 +158,8 @@ const Extensions = ({navigation}: Props) => {
       });
     }
 
-    setUpdatingProvider(provider.value);
+    const providerKey = getProviderKey(provider);
+    setUpdatingProvider(providerKey);
     try {
       const success = await updateProvidersService.updateProvider(provider);
       if (success) {
@@ -137,7 +174,7 @@ const Extensions = ({navigation}: Props) => {
         );
 
         // Update the active provider if it was the one being updated
-        if (activeExtensionProvider?.value === provider.value) {
+        if (isSameProvider(activeExtensionProvider, provider)) {
           setActiveExtensionProvider(provider);
         }
       } else {
@@ -179,7 +216,8 @@ const Extensions = ({navigation}: Props) => {
       });
     }
 
-    setInstallingProvider(provider.value);
+    const providerKey = getProviderKey(provider);
+    setInstallingProvider(providerKey);
     try {
       await extensionManager.installProvider(provider);
       loadProviders();
@@ -193,7 +231,7 @@ const Extensions = ({navigation}: Props) => {
       setInstalledProviders(extensionStorage.getInstalledProviders() || []);
       if (
         !activeExtensionProvider ||
-        activeExtensionProvider.value !== provider.value
+        !isSameProvider(activeExtensionProvider, provider)
       ) {
         setActiveExtensionProvider(provider);
       }
@@ -224,19 +262,25 @@ const Extensions = ({navigation}: Props) => {
           text: t('Uninstall'),
           style: 'destructive',
           onPress: () => {
-            extensionStorage.uninstallProvider(provider.value);
+            extensionStorage.uninstallProvider(
+              provider.value,
+              provider.source?.author,
+            );
             loadProviders();
             setInstalledProviders(
               extensionStorage.getInstalledProviders() || [],
             );
 
             // If this was the active provider, clear it
-            if (activeExtensionProvider?.value === provider?.value) {
+            if (isSameProvider(activeExtensionProvider, provider)) {
               setActiveExtensionProvider(
                 extensionStorage.getInstalledProviders()[0] || {
                   value: '',
                   display_name: '',
-                  type: '',
+                  icon: '',
+                  disabled: false,
+                  installed: false,
+                  type: 'global',
                   version: '',
                 },
               );
@@ -258,19 +302,37 @@ const Extensions = ({navigation}: Props) => {
         ignoreAndroidSystemSettings: false,
       });
     }
+    if (provider.source?.author) {
+      extensionStorage.setDefaultProviderSource(provider.source.author);
+      setActiveSourceAuthor(provider.source.author);
+    }
     setActiveExtensionProvider(provider);
   };
-  const handleRefresh = async () => {
+  const refreshProviders = async (sourceAuthor: string) => {
     setRefreshing(true);
     try {
-      const providers = await extensionManager.fetchManifest(true);
+      if (!sourceAuthor) {
+        setAvailableProviders([]);
+        return;
+      }
+
+      const source = extensionStorage
+        .getProviderSources()
+        .find(item => item.author === sourceAuthor);
+
+      if (!source) {
+        setAvailableProviders([]);
+        return;
+      }
+
+      const providers = await extensionManager.fetchManifest(source, true);
       const dedupedProviders = dedupeProviders(providers || []);
 
       // Update available providers in storage and state
-      extensionStorage.setAvailableProviders(dedupedProviders);
+      extensionStorage.setAvailableProviders(sourceAuthor, dedupedProviders);
       setAvailableProviders(dedupedProviders);
 
-      loadProviders();
+      loadProviders(sourceAuthor);
       await checkForUpdates();
     } catch (error) {
       console.error('Refresh error:', error);
@@ -284,16 +346,24 @@ const Extensions = ({navigation}: Props) => {
       setRefreshing(false);
     }
   };
+
+  const handleRefresh = async () => {
+    await refreshProviders(activeSourceAuthor);
+  };
   const renderProviderCard = ({item}: {item: ProviderExtension}) => {
     if (!item || !item.value) {
       return null;
     }
-    const isActive = activeExtensionProvider?.value === item.value;
-    const isInstalled = extensionStorage.isProviderInstalled(item.value);
-    const isInstalling = installingProvider === item.value;
-    const isUpdating = updatingProvider === item.value;
+    const itemKey = getProviderKey(item);
+    const isActive = isSameProvider(activeExtensionProvider, item);
+    const isInstalled = extensionStorage.isProviderInstalled(
+      item.value,
+      item.source?.author,
+    );
+    const isInstalling = installingProvider === itemKey;
+    const isUpdating = updatingProvider === itemKey;
     const updateInfo = updateInfos.find(
-      info => info.provider.value === item.value,
+      info => isSameProvider(info.provider, item),
     );
     const hasUpdate = updateInfo?.hasUpdate || false;
 
@@ -337,6 +407,11 @@ const Extensions = ({navigation}: Props) => {
               </Text>{' '}
               • {item.type || t('Unknown')}
             </Text>
+            {item.source?.author && (
+              <Text className="text-gray-500 text-xs" numberOfLines={1}>
+                {item.source.author}
+              </Text>
+            )}
           </View>
           {/* Right: Buttons */}
           <View className="flex-row gap-3 items-center">
@@ -466,11 +541,24 @@ const Extensions = ({navigation}: Props) => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <ProviderSourceManager
+        visible={activeTab === 'available'}
+        primary={primary}
+        onSourceChanged={async (source: ProviderSource | undefined) => {
+          const author = source?.author || '';
+          setActiveSourceAuthor(author);
+          loadProviders(author);
+          await refreshProviders(author);
+        }}
+      />
       {/* Provider list */}
       <FlatList
         data={currentData}
         keyExtractor={(item, index) =>
-          item?.value ? `${activeTab}-${item.value}` : `provider-${index}`
+          item?.value
+            ? `${activeTab}-${getProviderKey(item)}`
+            : `provider-${index}`
         }
         renderItem={renderProviderCard}
         className="flex-1 mt-4"

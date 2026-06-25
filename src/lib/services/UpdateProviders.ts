@@ -16,6 +16,37 @@ class UpdateProvidersService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private readonly updateCheckIntervalMs = 6 * 60 * 60 * 1000;
 
+  private ensureInstalledProvidersHaveSource(
+    providers: ProviderExtension[],
+  ): ProviderExtension[] {
+    const defaultSource = extensionStorage.getProviderSource();
+    if (!defaultSource) {
+      return providers;
+    }
+
+    let hasChanges = false;
+    const normalized = providers.map(provider => {
+      if (provider.source?.author && provider.source?.url) {
+        return provider;
+      }
+
+      hasChanges = true;
+      return {
+        ...provider,
+        source: {
+          author: defaultSource.author,
+          url: defaultSource.url,
+        },
+      };
+    });
+
+    if (hasChanges) {
+      extensionStorage.setInstalledProviders(normalized);
+    }
+
+    return normalized;
+  }
+
   /**
    * Check for updates for all installed providers
    */
@@ -23,15 +54,38 @@ class UpdateProvidersService {
     try {
       await extensionManager.initialize();
 
-      const installedProviders = extensionStorage.getInstalledProviders();
-      const availableProviders = await extensionManager.fetchManifest(true);
+      const installedProviders = this.ensureInstalledProvidersHaveSource(
+        extensionStorage.getInstalledProviders(),
+      );
+      const sources = new Map<string, ProviderExtension[]>();
+      const sourceByAuthor = new Map<string, {author: string; url: string}>();
+
+      for (const provider of installedProviders) {
+        if (provider.source) {
+          const author = provider.source.author || 'unknown';
+          if (!sourceByAuthor.has(author)) {
+            sourceByAuthor.set(author, provider.source);
+          }
+        }
+      }
+
+      for (const [author, source] of sourceByAuthor.entries()) {
+        try {
+          const availableProviders =
+            await extensionManager.fetchManifest(source, true);
+          sources.set(author, availableProviders);
+        } catch (error) {
+          console.warn(`Failed to fetch source ${author} for updates:`, error);
+          sources.set(author, []);
+        }
+      }
 
       const updateInfos: UpdateInfo[] = [];
 
       for (const installed of installedProviders) {
-        const available = availableProviders.find(
-          p => p.value === installed.value,
-        );
+        const available = sources
+          .get(installed.source?.author || 'unknown')
+          ?.find(p => p.value === installed.value);
 
         if (
           available &&

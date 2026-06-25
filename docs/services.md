@@ -21,7 +21,7 @@ File: src/screens/settings/About.tsx
 
 ## Aggiornamenti provider
 File: src/lib/services/UpdateProviders.ts
-- Confronta versioni provider e avvia update automatici dopo aver refreshato il manifest.
+- Confronta versioni provider per sorgente e avvia update automatici dopo aver refreshato i manifest delle sorgenti usate dai provider installati.
 - Scarica i moduli aggiornati prima di aggiornare il record installato, evitando di lasciare provider disinstallati se il download fallisce.
 - Mostra notifiche di progresso tramite NotificationService solo se le notifiche sono abilitate.
 - Controllo automatico ogni 6 ore; se chiamato piu volte evita timer duplicati.
@@ -29,7 +29,9 @@ File: src/lib/services/UpdateProviders.ts
 
 ## Estensioni
 ExtensionManager (src/lib/services/ExtensionManager.ts)
-- Download moduli, cache e modalita test.
+- Gestisce sorgenti provider multiple, con sorgente ufficiale `Nokitomo/vega-providers` creata automaticamente se non esiste configurazione locale.
+- Migra i provider installati legacy senza metadati `source` verso la sorgente di default.
+- Download moduli, cache per sorgente e modalita test.
 
 ## OMDb
 File: src/lib/services/omdb.ts
