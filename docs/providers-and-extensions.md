@@ -112,6 +112,7 @@ File: src/lib/providers/providerContext.ts
 - Sono moduli JS ospitati su GitHub e scaricati a runtime.
 - Sorgente ufficiale predefinita: `Nokitomo/vega-providers`
 - Sorgenti aggiuntive: configurabili dal tab "Disponibili" del Provider Manager.
+- Le nuove sorgenti vengono validate scaricando `manifest.json` prima di salvarle nello storage locale.
 - Non esiste un backend privato: l'app consuma solo risorse pubbliche via HTTP.
 
 ## Dipendenze DNS e rete
@@ -124,4 +125,4 @@ File: src/lib/providers/providerContext.ts
 ## Come aggiungere provider personalizzati
 - Devi pubblicare un tuo set di provider (manifest + moduli JS) in un repository GitHub accessibile pubblicamente.
 - Dal Provider Manager, tab "Disponibili", usa il selettore sorgenti e aggiungi un autore GitHub o un URL `github.com`/`raw.githubusercontent.com`.
-- L'app converte la sorgente in URL raw GitHub, scarica `manifest.json` e mantiene cache/update separati per autore.
+- L'app converte la sorgente in URL raw GitHub, scarica `manifest.json`, salva la sorgente solo se il manifest e valido e mantiene cache/update separati per autore.

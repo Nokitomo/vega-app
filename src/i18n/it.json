@@ -195,7 +195,7 @@
   "How to get source url check instructions": "Per ottenere l'URL sorgente, consulta le istruzioni",
   "here": "qui",
   "Invalid source": "Sorgente non valida",
-  "Enter a valid source URL or GitHub author.": "Inserisci un URL sorgente valido o un autore GitHub.",
+  "Provider source could not be loaded. Check the URL and try again.": "Impossibile caricare la sorgente provider. Controlla l'URL e riprova.",
   "Cannot remove": "Impossibile rimuovere",
   "At least one source must remain.": "Deve rimanere almeno una sorgente.",
   "Remove source": "Rimuovi sorgente",

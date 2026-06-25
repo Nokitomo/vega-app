@@ -545,10 +545,17 @@ const Extensions = ({navigation}: Props) => {
       <ProviderSourceManager
         visible={activeTab === 'available'}
         primary={primary}
-        onSourceChanged={async (source: ProviderSource | undefined) => {
+        onSourceChanged={async (
+          source: ProviderSource | undefined,
+          options?: {skipRefresh?: boolean},
+        ) => {
           const author = source?.author || '';
           setActiveSourceAuthor(author);
           loadProviders(author);
+          if (options?.skipRefresh) {
+            await checkForUpdates();
+            return;
+          }
           await refreshProviders(author);
         }}
       />

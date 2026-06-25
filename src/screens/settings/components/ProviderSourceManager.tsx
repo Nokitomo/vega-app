@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Keyboard,
   KeyboardAvoidingView,
@@ -19,13 +20,17 @@ import {
   extensionStorage,
   ProviderSource,
 } from '../../../lib/storage/extensionStorage';
+import {extensionManager} from '../../../lib/services/ExtensionManager';
 import {createProviderSource} from '../../../lib/utils/helpers';
 import {socialLinks} from '../../../lib/constants';
 
 type Props = {
   primary: string;
   visible: boolean;
-  onSourceChanged: (source: ProviderSource | undefined) => void | Promise<void>;
+  onSourceChanged: (
+    source: ProviderSource | undefined,
+    options?: {skipRefresh?: boolean},
+  ) => void | Promise<void>;
 };
 
 type SourceDropdownItem = {
@@ -41,6 +46,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   const [isDropdownFocused, setIsDropdownFocused] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isValidatingSource, setIsValidatingSource] = useState(false);
 
   const defaultSource = useMemo(() => {
     return sources.find(item => item.isDefault) || sources[0];
@@ -92,9 +98,16 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
     };
   }, [showAddDialog]);
 
-  const closeDialog = () => {
+  const dismissDialog = () => {
     setShowAddDialog(false);
     setInputValue('');
+  };
+
+  const closeDialog = () => {
+    if (isValidatingSource) {
+      return;
+    }
+    dismissDialog();
   };
 
   const handleSelectSource = async (source: ProviderSource) => {
@@ -104,21 +117,39 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   };
 
   const handleConfirmAdd = async () => {
+    if (isValidatingSource) {
+      return;
+    }
+
+    setIsValidatingSource(true);
     try {
       const parsedSource = createProviderSource(inputValue);
+      const providers = await extensionManager.fetchManifest(
+        parsedSource,
+        true,
+      );
+
+      if (providers.length === 0) {
+        throw new Error('Provider source manifest is empty');
+      }
+
       extensionStorage.addProviderSources(
         parsedSource.author,
         parsedSource.url,
       );
       extensionStorage.setDefaultProviderSource(parsedSource.author);
-      closeDialog();
+      dismissDialog();
       reloadSources();
-      await onSourceChanged(extensionStorage.getProviderSource());
+      await onSourceChanged(extensionStorage.getProviderSource(), {
+        skipRefresh: true,
+      });
     } catch (error) {
       Alert.alert(
         t('Invalid source'),
-        t('Enter a valid source URL or GitHub author.'),
+        t('Provider source could not be loaded. Check the URL and try again.'),
       );
+    } finally {
+      setIsValidatingSource(false);
     }
   };
 
@@ -293,7 +324,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                   <MaterialCommunityIcons
                     name="close"
                     size={22}
-                    color="#9CA3AF"
+                    color={isValidatingSource ? '#4B5563' : '#9CA3AF'}
                   />
                 </TouchableOpacity>
               </View>
@@ -324,15 +355,27 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
               <View className="flex-row gap-2 mt-3">
                 <TouchableOpacity
                   className="flex-1 rounded-lg px-4 py-3 items-center bg-gray-700"
+                  disabled={isValidatingSource}
+                  style={{opacity: isValidatingSource ? 0.6 : 1}}
                   onPress={closeDialog}>
                   <Text className="text-white font-medium">{t('Cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   className="flex-1 rounded-lg px-4 py-3 items-center"
-                  style={{backgroundColor: primary}}
+                  disabled={isValidatingSource}
+                  style={{
+                    backgroundColor: primary,
+                    opacity: isValidatingSource ? 0.7 : 1,
+                  }}
                   onPress={handleConfirmAdd}>
-                  <Text className="text-white font-medium">{t('Confirm')}</Text>
+                  {isValidatingSource ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-white font-medium">
+                      {t('Confirm')}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

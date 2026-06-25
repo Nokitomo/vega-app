@@ -195,7 +195,7 @@
   "How to get source url check instructions": "How to get source URL: check instructions",
   "here": "here",
   "Invalid source": "Invalid source",
-  "Enter a valid source URL or GitHub author.": "Enter a valid source URL or GitHub author.",
+  "Provider source could not be loaded. Check the URL and try again.": "Provider source could not be loaded. Check the URL and try again.",
   "Cannot remove": "Cannot remove",
   "At least one source must remain.": "At least one source must remain.",
   "Remove source": "Remove source",
