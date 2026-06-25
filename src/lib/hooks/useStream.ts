@@ -383,16 +383,33 @@ export const useVideoSettings = () => {
   const [selectedQualityIndex, setSelectedQualityIndex] = useState(1000);
 
   const processAudioTracks = (tracks: any[]) => {
-    const uniqueMap = new Map();
-    const uniqueTracks = tracks.filter(track => {
+    if (!Array.isArray(tracks)) {
+      setAudioTracks([]);
+      return;
+    }
+
+    const uniqueMap = new Map<string, any>();
+    tracks.forEach(track => {
       const key = `${track.type}-${track.title}-${track.language}`;
-      if (!uniqueMap.has(key)) {
-        uniqueMap.set(key, true);
-        return true;
+      const existingTrack = uniqueMap.get(key);
+
+      if (!existingTrack) {
+        uniqueMap.set(key, track);
+        return;
       }
-      return false;
+
+      if (track.selected && !existingTrack.selected) {
+        uniqueMap.set(key, {...existingTrack, ...track, selected: true});
+      }
     });
+
+    const uniqueTracks = Array.from(uniqueMap.values());
+    const selectedIndex = uniqueTracks.findIndex(track => track.selected);
+
     setAudioTracks(uniqueTracks);
+    if (selectedIndex !== -1) {
+      setSelectedAudioTrackIndex(selectedIndex);
+    }
   };
 
   const processVideoTracks = (tracks: any[]) => {
