@@ -81,6 +81,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [backgroundErrorCount, setBackgroundErrorCount] = useState(0);
   const [logoError, setLogoError] = useState(false);
   const [infoView, setInfoView] = useState<'episodes' | 'related'>('episodes');
+  const [refreshing, setRefreshing] = useState(false);
+  const [episodeRefreshVersion, setEpisodeRefreshVersion] = useState(0);
 
   const threeDotsRef = useRef<any | null>(null);
 
@@ -522,11 +524,15 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   // Optimized refresh handler
   const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
     try {
       await refetch();
+      setEpisodeRefreshVersion(version => version + 1);
     } catch (refreshError) {
       console.error('Error refreshing content:', refreshError);
       // Could show a toast or alert here if needed
+    } finally {
+      setRefreshing(false);
     }
   }, [refetch]);
 
@@ -972,7 +978,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       </View>
                       {infoView === 'episodes' ? (
                         <SeasonList
-                          refreshing={false}
+                          refreshing={refreshing}
+                          refreshVersion={episodeRefreshVersion}
                           providerValue={providerValue}
                           aniSkipMalId={
                             Number.isFinite(Number(info?.extra?.ids?.malId)) &&
@@ -1063,7 +1070,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                 colors={[primary]}
                 tintColor={primary}
                 progressBackgroundColor={'black'}
-                refreshing={false}
+                refreshing={refreshing}
                 onRefresh={handleRefresh}
               />
             }

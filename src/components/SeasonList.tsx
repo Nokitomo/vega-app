@@ -83,6 +83,7 @@ interface SeasonListProps {
   providerValue: string;
   aniSkipMalId?: number;
   refreshing?: boolean;
+  refreshVersion?: number;
   routeParams: Readonly<{
     link: string;
     provider?: string;
@@ -327,6 +328,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   providerValue,
   aniSkipMalId,
   refreshing: _refreshing,
+  refreshVersion = 0,
   routeParams,
 }) => {
   const {primary} = useThemeStore(state => state);
@@ -607,6 +609,21 @@ const SeasonList: React.FC<SeasonListProps> = ({
     providerValue,
     shouldFetchEpisodes,
   );
+
+  useEffect(() => {
+    if (!refreshVersion || !activeSeason?.episodesLink || !shouldFetchEpisodes) {
+      return;
+    }
+
+    refetchEpisodes().catch(refreshError => {
+      console.warn('Failed to refresh episodes:', refreshError);
+    });
+  }, [
+    activeSeason?.episodesLink,
+    refetchEpisodes,
+    refreshVersion,
+    shouldFetchEpisodes,
+  ]);
 
   // UI state
   const [vlcLoading, setVlcLoading] = useState<boolean>(false);
