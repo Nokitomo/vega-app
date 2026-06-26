@@ -31,6 +31,7 @@ jobs:
     environment: nightly
     env:
       GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+      ANDROID_NDK_VERSION: "27.1.12297006"
     steps:
       - name: Checkout ref
         uses: actions/checkout@v4
@@ -52,6 +53,29 @@ jobs:
         with:
           distribution: zulu
           java-version: '17'
+
+      - name: Install Android NDK
+        run: |
+          set -euo pipefail
+
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "::error::sdkmanager not found at $SDKMANAGER"
+            exit 1
+          fi
+
+          install_ndk() {
+            rm -rf "${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}"
+            rm -rf "${ANDROID_HOME}/.temp"
+            "$SDKMANAGER" --install "ndk;${ANDROID_NDK_VERSION}"
+          }
+
+          install_ndk || {
+            echo "::warning::NDK install failed, retrying after clearing partial download."
+            install_ndk
+          }
+
+          test -d "${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}"
 
       - name: Configure Android signing
         run: |
