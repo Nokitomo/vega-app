@@ -16,6 +16,7 @@ import {
 import {MaterialCommunityIcons, MaterialIcons} from '@expo/vector-icons';
 import {Dropdown} from 'react-native-element-dropdown';
 import {useTranslation} from 'react-i18next';
+import * as NavigationBar from 'expo-navigation-bar';
 import {
   extensionStorage,
   ProviderSource,
@@ -37,6 +38,15 @@ type SourceDropdownItem = {
   label: string;
   value: string;
   url: string;
+};
+
+const syncDarkNavigationBar = () => {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  NavigationBar.setStyle('dark');
+  NavigationBar.setVisibilityAsync('visible').catch(() => {});
 };
 
 const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
@@ -71,6 +81,8 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
       return;
     }
 
+    syncDarkNavigationBar();
+
     const currentSources = extensionStorage.getProviderSources();
     setSources(currentSources);
 
@@ -78,6 +90,17 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
       setShowAddDialog(true);
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    syncDarkNavigationBar();
+
+    const timer = setTimeout(syncDarkNavigationBar, 80);
+    return () => clearTimeout(timer);
+  }, [visible, showAddDialog, isDropdownFocused]);
 
   useEffect(() => {
     if (!showAddDialog) {
@@ -232,6 +255,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
             iconStyle={{width: 20, height: 20}}
             onFocus={() => setIsDropdownFocused(true)}
             onBlur={() => setIsDropdownFocused(false)}
+            backgroundColor="rgba(0,0,0,0)"
             onChange={item => {
               const selected = sources.find(
                 source => source.author === item.value,
@@ -296,7 +320,6 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
         transparent
         animationType="fade"
         statusBarTranslucent
-        navigationBarTranslucent
         onRequestClose={closeDialog}>
         <KeyboardAvoidingView
           className="flex-1"
