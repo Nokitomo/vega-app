@@ -328,9 +328,9 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
             className="flex-1 bg-black/70"
             contentContainerStyle={{
               flexGrow: 1,
-              justifyContent: keyboardHeight > 0 ? 'flex-end' : 'center',
+              justifyContent: keyboardHeight > 0 ? 'flex-start' : 'center',
               paddingHorizontal: 24,
-              paddingTop: 24,
+              paddingTop: keyboardHeight > 0 ? 48 : 24,
               paddingBottom: keyboardHeight > 0 ? keyboardHeight + 24 : 24,
             }}
             keyboardShouldPersistTaps="handled">
