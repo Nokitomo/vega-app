@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {MaterialCommunityIcons, MaterialIcons} from '@expo/vector-icons';
@@ -56,11 +57,29 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   const [isDropdownFocused, setIsDropdownFocused] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [dialogHeight, setDialogHeight] = useState(0);
   const [isValidatingSource, setIsValidatingSource] = useState(false);
+  const {height: windowHeight} = useWindowDimensions();
 
   const defaultSource = useMemo(() => {
     return sources.find(item => item.isDefault) || sources[0];
   }, [sources]);
+
+  const keyboardVisible = keyboardHeight > 0;
+  const dialogTopPadding = useMemo(() => {
+    if (!keyboardVisible || dialogHeight <= 0) {
+      return 24;
+    }
+
+    const availableHeight = Math.max(0, windowHeight - keyboardHeight);
+    return Math.max(24, Math.floor((availableHeight - dialogHeight) / 2));
+  }, [dialogHeight, keyboardHeight, keyboardVisible, windowHeight]);
+
+  const handleDialogLayout = (height: number) => {
+    setDialogHeight(previousHeight => {
+      return Math.abs(previousHeight - height) > 1 ? height : previousHeight;
+    });
+  };
 
   const dropdownData: SourceDropdownItem[] = useMemo(
     () =>
@@ -328,15 +347,18 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
             className="flex-1 bg-black/70"
             contentContainerStyle={{
               flexGrow: 1,
-              justifyContent: keyboardHeight > 0 ? 'flex-start' : 'center',
+              justifyContent: keyboardVisible ? 'flex-start' : 'center',
               paddingHorizontal: 24,
-              paddingTop: keyboardHeight > 0 ? 48 : 24,
-              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 24 : 24,
+              paddingTop: dialogTopPadding,
+              paddingBottom: keyboardVisible ? keyboardHeight + 24 : 24,
             }}
             keyboardShouldPersistTaps="handled">
             <View
               className="w-full bg-tertiary rounded-2xl p-4 border border-quaternary"
-              style={{maxHeight: '92%'}}>
+              style={{maxHeight: '92%'}}
+              onLayout={event =>
+                handleDialogLayout(event.nativeEvent.layout.height)
+              }>
               <View className="flex-row items-center justify-between mb-3">
                 <Text
                   className="text-white text-base font-semibold flex-1"
