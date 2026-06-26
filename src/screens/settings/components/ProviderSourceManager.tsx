@@ -24,7 +24,6 @@ import {
 } from '../../../lib/storage/extensionStorage';
 import {extensionManager} from '../../../lib/services/ExtensionManager';
 import {createProviderSource} from '../../../lib/utils/helpers';
-import {socialLinks} from '../../../lib/constants';
 
 type Props = {
   primary: string;
@@ -49,6 +48,9 @@ const syncDarkNavigationBar = () => {
   NavigationBar.setStyle('dark');
   NavigationBar.setVisibilityAsync('visible').catch(() => {});
 };
+
+const PROVIDER_SOURCE_GUIDE_URL =
+  'https://vega.8man.in/guide/adding-providers/';
 
 const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   const {t} = useTranslation();
@@ -381,7 +383,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                 <Text
                   className="text-blue-400 text-sm leading-5"
                   onPress={() =>
-                    Linking.openURL(socialLinks.github + '#vega-app')
+                    Linking.openURL(PROVIDER_SOURCE_GUIDE_URL)
                   }>
                   {t('here')}
                 </Text>
