@@ -72,11 +72,15 @@ const SeriesEpisodes = ({navigation, route}: SeriesEpisodesRouteProp) => {
           if (!fileInfo.exists) {
             return;
           }
-          const path =
-            Platform.OS === 'android'
-              ? fileUri.replace('file://', '')
-              : fileUri;
-          await RNFS.unlink(path);
+          if (fileUri.startsWith('content://')) {
+            await FileSystem.StorageAccessFramework.deleteAsync(fileUri);
+          } else {
+            const path =
+              Platform.OS === 'android'
+                ? fileUri.replace('file://', '')
+                : fileUri;
+            await RNFS.unlink(path);
+          }
         }),
       );
 

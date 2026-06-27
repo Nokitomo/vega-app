@@ -1,4 +1,11 @@
 import {mainStorage} from './StorageService';
+import {
+  defaultDownloadLocationConfig,
+  DownloadLocationConfig,
+  getDownloadLocationDisplayValue,
+  parseDownloadLocation,
+  serializeDownloadLocation,
+} from '../downloadLocation';
 
 /**
  * Storage keys for settings
@@ -31,6 +38,9 @@ export enum SettingsKeys {
 
   // Quality settings
   EXCLUDED_QUALITIES = 'excludedQualities',
+
+  // Download settings
+  DOWNLOAD_LOCATION = 'downloadLocation',
 
   // Subtitle settings
   SUBTITLE_FONT_SIZE = 'subtitleFontSize',
@@ -217,6 +227,39 @@ export class SettingsStorage {
 
   setExcludedQualities(qualities: string[]): void {
     mainStorage.setArray(SettingsKeys.EXCLUDED_QUALITIES, qualities);
+  }
+
+  getDownloadLocationConfig(): DownloadLocationConfig {
+    return parseDownloadLocation(
+      mainStorage.getString(SettingsKeys.DOWNLOAD_LOCATION),
+    );
+  }
+
+  getDownloadLocation(): string {
+    return getDownloadLocationDisplayValue(this.getDownloadLocationConfig());
+  }
+
+  setDownloadLocation(location: string | DownloadLocationConfig): void {
+    const nextLocation =
+      typeof location === 'string'
+        ? {
+            type: 'path' as const,
+            path: location.trim(),
+            label: location.trim(),
+          }
+        : location;
+
+    mainStorage.setString(
+      SettingsKeys.DOWNLOAD_LOCATION,
+      serializeDownloadLocation(nextLocation),
+    );
+  }
+
+  resetDownloadLocation(): void {
+    mainStorage.setString(
+      SettingsKeys.DOWNLOAD_LOCATION,
+      serializeDownloadLocation(defaultDownloadLocationConfig),
+    );
   }
 
   // Subtitle settings

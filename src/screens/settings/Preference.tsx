@@ -20,6 +20,7 @@ import Constants from 'expo-constants';
 import useUiSettingsStore from '../../lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {setAppLanguage, SupportedLanguage} from '../../i18n';
+import DownloadLocationPreference from './components/DownloadLocationPreference';
 // Lazy-load Firebase to allow running without google-services.json
 const getAnalytics = (): any | null => {
   try {
@@ -402,6 +403,8 @@ const Preferences = () => {
                 />
               </View>
             )}
+
+            <DownloadLocationPreference primary={primary} />
 
             {/* Always Use External Downloader */}
             <View className="flex-row items-center justify-between p-4">

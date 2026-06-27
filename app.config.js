@@ -13,6 +13,7 @@ const castPairApiBaseUrl =
 module.exports = () => {
   const plugins = [
     './plugins/android-native-config.js',
+    './plugins/with-saf-copy-module.js',
     './plugins/with-android-notification-icons.js',
     './plugins/with-android-release-gradle.js',
     './plugins/with-android-signing.js',

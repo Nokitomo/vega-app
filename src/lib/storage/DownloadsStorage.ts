@@ -8,6 +8,7 @@ export enum DownloadsKeys {
   FILES = 'downloadFiles',
   THUMBNAILS = 'downloadThumbnails',
   DOWNLOADED_FILES = 'downloadedFiles',
+  CACHE_LOCATION = 'downloadCacheLocation',
 }
 
 export interface DownloadPayload {
@@ -59,8 +60,11 @@ export class DownloadsStorage {
   /**
    * Save download files information
    */
-  saveFilesInfo(files: FileSystem.FileInfo[]): void {
+  saveFilesInfo(files: FileSystem.FileInfo[], location?: string): void {
     cacheStorage.setObject(DownloadsKeys.FILES, files);
+    if (location) {
+      cacheStorage.setString(DownloadsKeys.CACHE_LOCATION, location);
+    }
   }
 
   /**
@@ -75,8 +79,11 @@ export class DownloadsStorage {
   /**
    * Save download thumbnails
    */
-  saveThumbnails(thumbnails: Record<string, string>): void {
+  saveThumbnails(thumbnails: Record<string, string>, location?: string): void {
     cacheStorage.setObject(DownloadsKeys.THUMBNAILS, thumbnails);
+    if (location) {
+      cacheStorage.setString(DownloadsKeys.CACHE_LOCATION, location);
+    }
   }
 
   /**
@@ -91,11 +98,19 @@ export class DownloadsStorage {
   }
 
   /**
+   * Get the download location used to populate the cached files/thumbnails.
+   */
+  getCacheLocation(): string | undefined {
+    return cacheStorage.getString(DownloadsKeys.CACHE_LOCATION);
+  }
+
+  /**
    * Clear downloads cache
    */
   clearCache(): void {
     cacheStorage.delete(DownloadsKeys.FILES);
     cacheStorage.delete(DownloadsKeys.THUMBNAILS);
+    cacheStorage.delete(DownloadsKeys.CACHE_LOCATION);
   }
 }
 

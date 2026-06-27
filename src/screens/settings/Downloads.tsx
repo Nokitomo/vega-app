@@ -1,20 +1,25 @@
 import {View, Text, Image, Platform, TouchableOpacity} from 'react-native';
 import requestStoragePermission from '../../lib/file/getStoragePermission';
 import * as FileSystem from 'expo-file-system/legacy';
-import {downloadFolder} from '../../lib/constants';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useState, useEffect} from 'react';
 import {settingsStorage, downloadsStorage} from '../../lib/storage';
 import useThemeStore from '../../lib/zustand/themeStore';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../../App';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {FlashList} from '@shopify/flash-list';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../../lib/utils/helpers';
+import {
+  DownloadLocationConfig,
+  getSafEntryName,
+  isSafDownloadLocation,
+  serializeDownloadLocation,
+} from '../../lib/downloadLocation';
 
 // Define supported video extensions
 const VIDEO_EXTENSIONS = [
@@ -37,6 +42,7 @@ const isVideoFile = (filename: string): boolean => {
 interface DownloadedFile {
   uri: string;
   exists: boolean;
+  name?: string;
   isDirectory?: boolean;
   size?: number;
   modificationTime?: number;
@@ -106,6 +112,82 @@ const getEpisodeInfo = (
   return {season: 1, episode: 0};
 };
 
+const getFileName = (file: DownloadedFile): string => {
+  if (file.name) {
+    return file.name;
+  }
+
+  return decodeURIComponent(file.uri.split('/').pop() || '');
+};
+
+const normalizeDownloadedFile = (
+  fileInfo: FileSystem.FileInfo,
+  name?: string,
+): DownloadedFile | null => {
+  if (!fileInfo.uri || !fileInfo.exists) {
+    return null;
+  }
+
+  return {
+    uri: fileInfo.uri,
+    exists: fileInfo.exists,
+    name,
+    isDirectory: 'isDirectory' in fileInfo ? fileInfo.isDirectory : undefined,
+    size: 'size' in fileInfo ? (fileInfo as any).size : undefined,
+    modificationTime:
+      'modificationTime' in fileInfo
+        ? (fileInfo as any).modificationTime
+        : undefined,
+  };
+};
+
+const loadFilesFromPathLocation = async (
+  downloadLocation: Extract<DownloadLocationConfig, {type: 'path'}>,
+): Promise<DownloadedFile[]> => {
+  const properPath =
+    Platform.OS === 'android'
+      ? `file://${downloadLocation.path}`
+      : downloadLocation.path;
+
+  const allFiles = await FileSystem.readDirectoryAsync(properPath);
+  const videoFiles = allFiles.filter(file => isVideoFile(file));
+
+  const filesInfo = await Promise.all(
+    videoFiles.map(async file => {
+      const filePath =
+        Platform.OS === 'android'
+          ? `file://${downloadLocation.path}/${file}`
+          : `${downloadLocation.path}/${file}`;
+
+      const fileInfo = await FileSystem.getInfoAsync(filePath);
+      return normalizeDownloadedFile(fileInfo, file);
+    }),
+  );
+
+  return filesInfo.filter((file): file is DownloadedFile => Boolean(file));
+};
+
+const loadFilesFromSafLocation = async (
+  downloadLocation: Extract<DownloadLocationConfig, {type: 'saf'}>,
+): Promise<DownloadedFile[]> => {
+  const entries = await FileSystem.StorageAccessFramework.readDirectoryAsync(
+    downloadLocation.uri,
+  );
+
+  const videoEntries = entries.filter(entryUri =>
+    isVideoFile(getSafEntryName(entryUri)),
+  );
+
+  const filesInfo = await Promise.all(
+    videoEntries.map(async entryUri => {
+      const fileInfo = await FileSystem.getInfoAsync(entryUri);
+      return normalizeDownloadedFile(fileInfo, getSafEntryName(entryUri));
+    }),
+  );
+
+  return filesInfo.filter((file): file is DownloadedFile => Boolean(file));
+};
+
 const Downloads = () => {
   const [files, setFiles] = useState<DownloadedFile[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
@@ -120,89 +202,69 @@ const Downloads = () => {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {t} = useTranslation();
 
-  // Load cached data first, then refresh from filesystem
-  useEffect(() => {
-    const loadData = async () => {
-      // Load from cache first for instant display
-      const cachedFiles = downloadsStorage.getFilesInfo();
-      const cachedThumbnails = downloadsStorage.getThumbnails();
+  const loadData = useCallback(async () => {
+    const downloadLocation = settingsStorage.getDownloadLocationConfig();
+    const locationKey = serializeDownloadLocation(downloadLocation);
+    const cachedLocation = downloadsStorage.getCacheLocation();
 
-      if (cachedFiles && cachedFiles.length > 0) {
-        // Filter and validate cached files
-        const validCachedFiles: DownloadedFile[] = cachedFiles
-          .filter(f => f.uri)
-          .map(f => ({
-            uri: f.uri!,
-            exists: f.exists,
-            isDirectory:
-              'isDirectory' in f ? (f.isDirectory as boolean) : undefined,
-            size: 'size' in f ? (f as any).size : undefined,
-            modificationTime:
-              'modificationTime' in f ? (f as any).modificationTime : undefined,
-          }));
-        setFiles(validCachedFiles);
-        setLoading(false);
-      }
-      if (cachedThumbnails) {
-        setThumbnails(cachedThumbnails);
-      }
+    setLoading(true);
 
-      // Then refresh from filesystem
-      const granted = await requestStoragePermission();
-      if (granted) {
-        try {
-          const properPath =
-            Platform.OS === 'android'
-              ? `file://${downloadFolder}`
-              : downloadFolder;
+    if (cachedLocation && cachedLocation !== locationKey) {
+      downloadsStorage.clearCache();
+      setFiles([]);
+      setThumbnails({});
+    }
 
-          const allFiles = await FileSystem.readDirectoryAsync(properPath);
+    const cachedFiles = downloadsStorage.getFilesInfo();
+    const cachedThumbnails = downloadsStorage.getThumbnails();
 
-          // Filter video files
-          const videoFiles = allFiles.filter(file => isVideoFile(file));
+    if (cachedFiles && cachedFiles.length > 0) {
+      const validCachedFiles = cachedFiles
+        .map(file => normalizeDownloadedFile(file as FileSystem.FileInfo))
+        .filter((file): file is DownloadedFile => Boolean(file));
 
-          const filesInfo = await Promise.all(
-            videoFiles.map(async file => {
-              const filePath =
-                Platform.OS === 'android'
-                  ? `file://${downloadFolder}/${file}`
-                  : `${downloadFolder}/${file}`;
-
-              const fileInfo = await FileSystem.getInfoAsync(filePath);
-              return fileInfo;
-            }),
-          );
-
-          // Filter out files without uri and cast to DownloadedFile
-          const validFiles: DownloadedFile[] = filesInfo
-            .filter(f => f.uri && f.exists)
-            .map(f => ({
-              uri: f.uri!,
-              exists: f.exists,
-              isDirectory: 'isDirectory' in f ? f.isDirectory : undefined,
-              size: 'size' in f ? (f as any).size : undefined,
-              modificationTime:
-                'modificationTime' in f
-                  ? (f as any).modificationTime
-                  : undefined,
-            }));
-
-          // Save files info to storage
-          downloadsStorage.saveFilesInfo(validFiles as any);
-          setFiles(validFiles);
-        } catch (error) {
-          console.error('Error reading files:', error);
-        }
-      }
+      setFiles(validCachedFiles);
       setLoading(false);
-    };
-    loadData();
+    } else {
+      setFiles([]);
+    }
+
+    setThumbnails(cachedThumbnails || {});
+
+    const granted = await requestStoragePermission();
+    if (!granted) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const nextFiles = isSafDownloadLocation(downloadLocation)
+        ? await loadFilesFromSafLocation(downloadLocation)
+        : await loadFilesFromPathLocation(downloadLocation);
+
+      downloadsStorage.saveFilesInfo(nextFiles as any, locationKey);
+      setFiles(nextFiles);
+    } catch (error) {
+      console.error('Error reading files:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   async function getThumbnail(file: DownloadedFile) {
     try {
       // Verify it's a video file before attempting to generate thumbnail
-      const fileName = file.uri.split('/').pop();
+      const fileName = getFileName(file);
       if (!fileName || !isVideoFile(fileName)) {
         return null;
       }
@@ -246,7 +308,10 @@ const Downloads = () => {
 
         if (Object.keys(newThumbnails).length > 0) {
           const mergedThumbnails = {...thumbnails, ...newThumbnails};
-          downloadsStorage.saveThumbnails(mergedThumbnails);
+          downloadsStorage.saveThumbnails(
+            mergedThumbnails,
+            serializeDownloadLocation(settingsStorage.getDownloadLocationConfig()),
+          );
           setThumbnails(mergedThumbnails);
         }
       } catch (error) {
@@ -265,15 +330,17 @@ const Downloads = () => {
       await Promise.all(
         groupSelected.map(async fileUri => {
           try {
-            // Remove the 'file://' prefix for Android
-            const path =
-              Platform.OS === 'android'
-                ? fileUri.replace('file://', '')
-                : fileUri;
-
             const fileInfo = await FileSystem.getInfoAsync(fileUri);
             if (fileInfo.exists) {
-              await RNFS.unlink(path);
+              if (fileUri.startsWith('content://')) {
+                await FileSystem.StorageAccessFramework.deleteAsync(fileUri);
+              } else {
+                const path =
+                  Platform.OS === 'android'
+                    ? fileUri.replace('file://', '')
+                    : fileUri;
+                await RNFS.unlink(path);
+              }
             }
           } catch (error) {
             console.error(`Error deleting file ${fileUri}:`, error);
@@ -300,7 +367,7 @@ const Downloads = () => {
 
     // First pass: Group by normalized base name
     files.forEach(file => {
-      const fileName = file.uri.split('/').pop() || '';
+      const fileName = getFileName(file);
       const baseName = getBaseName(fileName);
       const normalizedBaseName = normalizeString(baseName);
 
@@ -318,7 +385,7 @@ const Downloads = () => {
     // Second pass: Determine if each group is a movie or series and assign thumbnails
     Object.values(groups).forEach(group => {
       const hasEpisodeIndicators = group.episodes.some(file => {
-        const fileName = file.uri.split('/').pop() || '';
+        const fileName = getFileName(file);
         return getEpisodeInfo(fileName).episode > 0;
       });
 
@@ -327,8 +394,8 @@ const Downloads = () => {
       // Sort episodes by season and episode number if it's a series
       if (!group.isMovie) {
         group.episodes.sort((a, b) => {
-          const aName = a.uri.split('/').pop() || '';
-          const bName = b.uri.split('/').pop() || '';
+          const aName = getFileName(a);
+          const bName = getFileName(b);
           const aInfo = getEpisodeInfo(aName);
           const bInfo = getEpisodeInfo(bName);
 
@@ -347,7 +414,7 @@ const Downloads = () => {
         }
       }
       group.isIta = group.episodes.some(episode => {
-        const fileName = episode.uri.split('/').pop() || '';
+        const fileName = getFileName(episode);
         return hasItaBadge(fileName);
       });
     });
@@ -456,7 +523,7 @@ const Downloads = () => {
                 // Direct play for movies, navigate to episodes for series
                 if (item.isMovie) {
                   const file = item.episodes[0];
-                  const fileName = file.uri.split('/').pop() || '';
+                  const fileName = getFileName(file);
                   navigation.navigate('Player', {
                     episodeList: [{title: fileName, link: file.uri}],
                     linkIndex: 0,

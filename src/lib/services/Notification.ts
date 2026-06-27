@@ -5,10 +5,10 @@ import notifee, {
 } from '@notifee/react-native';
 import {settingsStorage} from '../storage';
 import * as RNFS from '@dr.pogodin/react-native-fs';
-import {downloadFolder} from '../constants';
 import {cancelHlsDownload} from '../hlsDownloader2';
 import RNApkInstaller from '@himanshu8443/react-native-apk-installer';
 import i18n from '../../i18n';
+import {deleteDownloadedFileByBaseName} from '../downloadLocation';
 
 export interface NotificationOptions {
   id: string;
@@ -275,17 +275,11 @@ class NotificationService {
 
       // setAlreadyDownloaded(false);
       try {
-        const files = await RNFS.readDir(downloadFolder);
-        // Find a file with the given name (without extension)
-        const foundFile = files.find(fileItem => {
-          const nameWithoutExtension = fileItem.name
-            .split('.')
-            .slice(0, -1)
-            .join('.');
-          return nameWithoutExtension === detail.notification?.data?.fileName;
-        });
-        if (foundFile) {
-          await RNFS.unlink(foundFile.path);
+        if (detail.notification?.data?.fileName) {
+          await deleteDownloadedFileByBaseName(
+            settingsStorage.getDownloadLocationConfig(),
+            detail.notification.data.fileName,
+          );
         }
       } catch (error) {
         console.log(error);
