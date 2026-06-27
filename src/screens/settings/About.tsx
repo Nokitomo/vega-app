@@ -31,6 +31,7 @@ type GitHubRelease = {
   body?: string | null;
   html_url?: string;
   draft?: boolean;
+  prerelease?: boolean;
   assets?: GitHubReleaseAsset[];
 };
 
@@ -84,6 +85,20 @@ export const cleanupDownloadedUpdateApk = async () => {
 const extractSemver = (tag: string): string | null => {
   const match = String(tag || '').match(/(\d+\.\d+\.\d+)/);
   return match ? match[1] : null;
+};
+
+const parseSemverParts = (version: string): number[] | null => {
+  const semver = extractSemver(version);
+  if (!semver) {
+    return null;
+  }
+
+  const parts = semver.split('.').map(Number);
+  if (parts.length !== 3 || parts.some(part => Number.isNaN(part))) {
+    return null;
+  }
+
+  return parts;
 };
 
 const classifyApkArch = (assetName: string): AndroidApkArch => {
@@ -176,9 +191,35 @@ const pickAndroidApkAsset = (
   return apkAssets[0];
 };
 
-const selectBestRelease = (releases: GitHubRelease[]): GitHubRelease | undefined => {
+const compareSemverParts = (left: number[], right: number[]): number => {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] > right[index]) {
+      return 1;
+    }
+    if (left[index] < right[index]) {
+      return -1;
+    }
+  }
+
+  return 0;
+};
+
+const selectBestRelease = (
+  releases: GitHubRelease[],
+): GitHubRelease | undefined => {
   const usable = Array.isArray(releases)
-    ? releases.filter(release => !release?.draft)
+    ? releases
+        .filter(release => !release?.draft && !release?.prerelease)
+        .filter(release => Boolean(parseSemverParts(String(release?.tag_name || ''))))
+        .sort((left, right) => {
+          const leftParts = parseSemverParts(String(left?.tag_name || ''));
+          const rightParts = parseSemverParts(String(right?.tag_name || ''));
+          if (!leftParts || !rightParts) {
+            return 0;
+          }
+
+          return compareSemverParts(rightParts, leftParts);
+        })
     : [];
 
   if (usable.length === 0) {

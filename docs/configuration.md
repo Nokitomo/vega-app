@@ -66,7 +66,7 @@ File: app.config.js
 ## GitHub Nightly (Android)
 - Workflow: `.github/workflows/main.yml`
 - Il job Android usa `environment: nightly`.
-- La nightly pubblica una release GitHub normale (`prerelease: false`).
+- La nightly pubblica una release GitHub `prerelease: true`.
 - Firma in CI:
   - decodifica il keystore dal secret base64 in `android/ci-release.jks`
   - genera `android/signing.local.properties` al volo
