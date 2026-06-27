@@ -27,6 +27,7 @@ type Props = {
   setModal: (value: boolean) => void;
   onPressVideo: (item: any) => void;
   onPressSubs: (item: any) => void;
+  error?: string | null;
 };
 const DownloadBottomSheet = ({
   data,
@@ -36,6 +37,7 @@ const DownloadBottomSheet = ({
   title,
   onPressSubs,
   onPressVideo,
+  error,
 }: Props) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const {primary} = useThemeStore(state => state);
@@ -188,7 +190,7 @@ const DownloadBottomSheet = ({
                   : null}
                 {data.length === 0 && !loading && (
                   <Text className="text-red-500 text-lg text-center">
-                    {t('No server found')}
+                    {error || t('No server found')}
                   </Text>
                 )}
               </BottomSheetScrollView>

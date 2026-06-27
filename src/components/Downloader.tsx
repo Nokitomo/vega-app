@@ -57,6 +57,7 @@ const DownloadComponent = ({
   const [downloadId, setDownloadId] = useState<number | null>(null);
   const [servers, setServers] = useState<Stream[]>([]);
   const [serverLoading, setServerLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [downloadActive, setDownloadActive] = useState(false);
 
   // check if file already exists
@@ -92,28 +93,48 @@ const DownloadComponent = ({
     }
     const getServer = async () => {
       setServerLoading(true);
-      const streamServers = await providerManager.getStream({
-        link,
-        type,
-        signal: controller.signal,
-        providerValue: effectiveProviderValue,
-      });
-      const filteredServers = streamServers;
-      // .filter(
-      //   server =>
-      //     !manifest[
-      //       providerValue || provider.value
-      //     ].nonDownloadableServer?.includes(server.server),
-      // );
-      setServerLoading(false);
-      setServers(filteredServers);
+      setServerError(null);
+      try {
+        const streamServers = await providerManager.getStream({
+          link,
+          type,
+          signal: controller.signal,
+          providerValue: effectiveProviderValue,
+        });
+        if (controller.signal.aborted) {
+          return;
+        }
+        const filteredServers = streamServers;
+        // .filter(
+        //   server =>
+        //     !manifest[
+        //       providerValue || provider.value
+        //     ].nonDownloadableServer?.includes(server.server),
+        // );
+        setServers(filteredServers);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error('Error fetching servers:', error);
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : t('Failed to fetch servers');
+        setServerError(errorMessage);
+        setServers([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setServerLoading(false);
+        }
+      }
     };
     getServer();
 
     return () => {
       controller.abort();
     };
-  }, [downloadModal, longPressModal, effectiveProviderValue, link, type]);
+  }, [downloadModal, longPressModal, effectiveProviderValue, link, type, t]);
 
   const downloadServers = useMemo(() => {
     if (!servers || servers.length === 0) {
@@ -240,6 +261,7 @@ const DownloadComponent = ({
           showModal={downloadModal}
           data={servers}
           loading={serverLoading}
+          error={serverError}
           title={t('Select server to download')}
           onPressVideo={(server: Stream) => {
             const serverName = (server.server || '').toLowerCase();
@@ -287,6 +309,7 @@ const DownloadComponent = ({
           showModal={longPressModal}
           data={downloadServers}
           loading={serverLoading}
+          error={serverError}
           title={t('Select server to open')}
           onPressVideo={(server: Stream) => {
             longPressDownload(server.link);

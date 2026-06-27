@@ -1002,13 +1002,17 @@ const SeasonList: React.FC<SeasonListProps> = ({
         );
       } catch (error) {
         console.error('Error fetching streams:', error);
-        ToastAndroid.show(t('Failed to load streams'), ToastAndroid.SHORT);
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : t('Failed to load streams');
+        ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
       } finally {
         setVlcLoading(false);
         setIsLoadingStreams(false);
       }
     },
-    [fetchStreams, providerValue],
+    [fetchStreams, providerValue, t],
   );
 
   // Memoized external player opener

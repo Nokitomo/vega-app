@@ -5,6 +5,22 @@ import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
 
 export class ProviderManager {
+  private getProviderErrorMessage(
+    error: unknown,
+    fallbackKey: string,
+    params: Record<string, string>,
+  ): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    if (typeof error === 'string' && error.trim()) {
+      return error.trim();
+    }
+
+    return i18n.t(fallbackKey, params);
+  }
+
   private createExecutionContext() {
     return {
       exports: {},
@@ -151,12 +167,13 @@ export class ProviderManager {
         providerContext,
       });
     } catch (error) {
-      console.error('Error creating posts function:', error);
-      console.error('Module content:', getPostsModule);
+      console.error('Error in posts function:', error);
       throw new Error(
-        i18n.t('Invalid posts module for provider: {{provider}}', {
-          provider: providerValue,
-        }),
+        this.getProviderErrorMessage(
+          error,
+          'Failed to get posts from provider: {{provider}}',
+          {provider: providerValue},
+        ),
       );
     }
   };
@@ -200,12 +217,13 @@ export class ProviderManager {
         providerContext,
       });
     } catch (error) {
-      console.error('Error creating search posts function:', error);
-      console.error('Module content:', getPostsModule);
+      console.error('Error in search posts function:', error);
       throw new Error(
-        i18n.t('Invalid posts module for provider: {{provider}}', {
-          provider: providerValue,
-        }),
+        this.getProviderErrorMessage(
+          error,
+          'Failed to search posts from provider: {{provider}}',
+          {provider: providerValue},
+        ),
       );
     }
   };
@@ -241,12 +259,13 @@ export class ProviderManager {
         providerContext,
       });
     } catch (error) {
-      console.error('Error creating meta data function:', error);
-      console.error('Module content:', getMetaDataModule);
+      console.error('Error in meta data function:', error);
       throw new Error(
-        i18n.t('Invalid meta data module for provider: {{provider}}', {
-          provider,
-        }),
+        this.getProviderErrorMessage(
+          error,
+          'Failed to get metadata from provider: {{provider}}',
+          {provider},
+        ),
       );
     }
   };
@@ -288,12 +307,13 @@ export class ProviderManager {
         providerContext,
       });
     } catch (error) {
-      console.error('Error creating stream function:', error);
-      console.error('Module content:', getStreamModule);
+      console.error('Error in stream function:', error);
       throw new Error(
-        i18n.t('Invalid stream module for provider: {{provider}}', {
-          provider: providerValue,
-        }),
+        this.getProviderErrorMessage(
+          error,
+          'Failed to get stream from provider: {{provider}}',
+          {provider: providerValue},
+        ),
       );
     }
   };
@@ -327,19 +347,14 @@ export class ProviderManager {
         providerContext,
       });
     } catch (error) {
-      console.error('Error creating episode links function:', error);
-      console.error('Module content:', getEpisodeLinksModule);
-      ToastAndroid.show(
-        i18n.t('Invalid episode links module for provider: {{provider}}', {
-          provider: providerValue,
-        }),
-        ToastAndroid.LONG,
+      console.error('Error in episodes function:', error);
+      const errorMessage = this.getProviderErrorMessage(
+        error,
+        'Failed to get episodes from provider: {{provider}}',
+        {provider: providerValue},
       );
-      throw new Error(
-        i18n.t('Invalid episode links module for provider: {{provider}}', {
-          provider: providerValue,
-        }),
-      );
+      ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+      throw new Error(errorMessage);
     }
   };
 }

@@ -338,7 +338,7 @@ export const useStream = ({
     if (error) {
       console.error('Stream fetch error:', error);
       ToastAndroid.show(
-        i18n.t('No stream found, try again later'),
+        error.message || i18n.t('No stream found, try again later'),
         ToastAndroid.SHORT,
       );
     }

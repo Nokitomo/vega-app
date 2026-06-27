@@ -24,6 +24,7 @@ const Slider = ({
   isSearch = false,
   onHorizontalDragStart,
   onHorizontalDragEnd,
+  error,
 }: {
   isLoading: boolean;
   title: string;
@@ -33,6 +34,7 @@ const Slider = ({
   isSearch?: boolean;
   onHorizontalDragStart?: () => void;
   onHorizontalDragEnd?: () => void;
+  error?: string;
 }): React.ReactElement => {
   const {provider} = useContentStore(state => state);
   const {primary} = useThemeStore(state => state);
@@ -192,7 +194,11 @@ const Slider = ({
           contentContainerStyle={{paddingHorizontal: 3, paddingTop: 7}}
           renderItem={renderItem}
           ListFooterComponent={
-            !isLoading && posts.length === 0 ? (
+            !isLoading && error ? (
+              <View className="flex flex-row w-96 justify-center h-10 items-center">
+                <Text className="text-red-500 text-center">{error}</Text>
+              </View>
+            ) : !isLoading && posts.length === 0 ? (
               <View className="flex flex-row w-96 justify-center h-10 items-center">
                 <Text className="text-whiter text-center text-white">
                   {t('No Content Found')}

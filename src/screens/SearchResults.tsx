@@ -26,6 +26,13 @@ interface SearchPageData {
   name: string;
 }
 
+interface SearchProviderLoadingState {
+  name: string;
+  value: string;
+  isLoading: boolean;
+  error?: string;
+}
+
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const buildProvidersFingerprint = (
@@ -49,7 +56,7 @@ const SearchResults = ({route}: Props): React.ReactElement => {
   const [searchData, setSearchData] = useState<SearchPageData[]>([]);
   const [emptyResults, setEmptyResults] = useState<SearchPageData[]>([]);
 
-  const trueLoading = useMemo(
+  const trueLoading = useMemo<SearchProviderLoadingState[]>(
     () =>
       installedProviders.map(item => ({
         name: item.display_name,
@@ -88,7 +95,7 @@ const SearchResults = ({route}: Props): React.ReactElement => {
   }, []);
 
   const updateLoading = useCallback(
-    (value: string, updates: Partial<{isLoading: boolean; error: boolean}>) => {
+    (value: string, updates: Partial<SearchProviderLoadingState>) => {
       setLoading(prev =>
         prev.map(i => (i.value === value ? {...i, ...updates} : i)),
       );
@@ -189,7 +196,14 @@ const SearchResults = ({route}: Props): React.ReactElement => {
               `Error fetching data for ${item.display_name}:`,
               error,
             );
-            updateLoading(item.value, {isLoading: false, error: true});
+            const errorMessage =
+              error instanceof Error && error.message
+                ? error.message
+                : t('Failed to search');
+            updateLoading(item.value, {
+              isLoading: false,
+              error: errorMessage,
+            });
           }
         })();
 
@@ -249,10 +263,11 @@ const SearchResults = ({route}: Props): React.ReactElement => {
           filter={route.params.filter}
           providerValue={item.value}
           isSearch={true}
+          error={loadingState?.error}
         />
       );
     },
-    [loading, searchData, emptyResults, route.params.filter],
+    [loading, searchData, emptyResults, route.params.filter, t],
   );
 
   const searchSliders = useMemo(

@@ -3,6 +3,7 @@ import {providerManager} from '../services/ProviderManager';
 import {cacheStorage} from '../storage';
 import {EpisodeLink} from '../providers/types';
 import {extensionManager} from '../services';
+import i18n from '../../i18n';
 
 export const useEpisodes = (
   episodesLink: string | undefined,
@@ -94,7 +95,11 @@ export const useStreamData = () => {
       return stream || [];
     } catch (error) {
       console.error('Error fetching streams:', error);
-      throw `Failed to fetch streams for ${type} at ${link} : ${error}`;
+      const errorMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : i18n.t('Failed to fetch streams');
+      throw new Error(errorMessage);
     }
   };
 
