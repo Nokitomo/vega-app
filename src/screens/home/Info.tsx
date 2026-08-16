@@ -52,6 +52,17 @@ const PROVIDER_FIRST_TITLE_PROVIDERS = new Set([
   'altadefinizionez',
 ]);
 
+const normalizeTrailerUrl = (value?: string): string => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(normalized)}`;
+};
+
 export default function Info({route, navigation}: Props): React.JSX.Element {
   const searchNavigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
@@ -171,6 +182,18 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     () => (forceProviderTitle ? providerTitle : meta?.name || providerTitle),
     [forceProviderTitle, meta?.name, providerTitle],
   );
+  const posterImage = useMemo(() => {
+    if (providerValue === 'animeunity' && info?.poster) {
+      return info.poster;
+    }
+    return (
+      meta?.poster ||
+      info?.poster ||
+      activePoster ||
+      info?.image ||
+      PLACEHOLDER_IMAGE
+    );
+  }, [providerValue, info?.poster, info?.image, meta?.poster, activePoster]);
   // Optimized library management
   const addLibrary = useCallback(() => {
     ReactNativeHapticFeedback.trigger('effectClick', {
@@ -179,12 +202,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     });
     addItem({
       title: libraryTitle,
-      poster: meta?.poster || activePoster || info?.poster || info?.image,
+      poster: posterImage,
       link: activeLink,
       provider: providerValue,
     });
     setInLibrary(true);
-  }, [libraryTitle, meta, activePoster, info, activeLink, providerValue, addItem]);
+  }, [libraryTitle, posterImage, activeLink, providerValue, addItem]);
 
   const removeLibrary = useCallback(() => {
     if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -349,18 +372,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return false;
   }, [providerValue, info?.extra?.flags?.dub]);
 
-  const posterImage = useMemo(() => {
-    return (
-      meta?.poster ||
-      activePoster ||
-      info?.poster ||
-      info?.image ||
-      PLACEHOLDER_IMAGE
-    );
-  }, [meta?.poster, activePoster, info?.poster, info?.image]);
   const logoImage = info?.logo || meta?.logo;
 
   const backgroundImage = useMemo(() => {
+    if (providerValue === 'animeunity' && info?.background) {
+      return info.background;
+    }
     if (meta?.background) {
       return meta.background;
     }
@@ -372,7 +389,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return info?.background || info?.image || PLACEHOLDER_IMAGE;
     }
     return (
-      info?.image ||
+      info?.background || info?.image ||
       PLACEHOLDER_IMAGE
     );
   }, [meta?.background, providerValue, hasImdbMeta, info?.background, info?.image]);
@@ -386,6 +403,23 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     setBackgroundFallback(null);
     setBackgroundErrorCount(0);
   }, [backgroundImage, providerBackgroundFallback, activeLink]);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [activeLink, logoImage]);
+
+  const trailerUrl = useMemo(() => {
+    const providerTrailer = info?.trailers?.find(
+      (item: string) => !!item?.trim(),
+    );
+    if (providerTrailer) {
+      return normalizeTrailerUrl(providerTrailer);
+    }
+    const enhancedTrailer = meta?.trailers?.find(
+      (item: {source?: string}) => !!item?.source,
+    )?.source;
+    return normalizeTrailerUrl(enhancedTrailer);
+  }, [info?.trailers, meta?.trailers]);
 
   const handleBackgroundError = useCallback(
     (event: any) => {
@@ -856,19 +890,14 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       </View>
                     </SkeletonLoader>
                     <View className="flex-row items-center gap-4 mb-1">
-                      {meta?.trailers && meta?.trailers.length > 0 && (
+                      {trailerUrl ? (
                         <MaterialCommunityIcons
                           name="movie-open"
                           size={25}
                           color="rgb(156 163 175)"
-                          onPress={() =>
-                            Linking.openURL(
-                              'https://www.youtube.com/watch?v=' +
-                                meta?.trailers?.[0]?.source,
-                            )
-                          }
+                          onPress={() => Linking.openURL(trailerUrl)}
                         />
-                      )}
+                      ) : null}
                       {inLibrary ? (
                         <Ionicons
                           name="bookmark"
