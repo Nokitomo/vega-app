@@ -318,6 +318,8 @@
   "SeasonBadge {{season}}-Ep. {{episode}}": "St. {{season}}-Ep. {{episode}}",
   "S{{season}}-Ep. {{episode}}": "S{{season}}-Ep. {{episode}}",
   "ITA": "ITA",
+  "SUB": "SUB",
+  "SUB/ITA": "SUB/ITA",
   "Search in {{provider}}": "Cerca in {{provider}}",
   "Play": "Riproduci",
   "Trending Titles": "Titoli del momento",

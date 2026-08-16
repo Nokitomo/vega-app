@@ -36,7 +36,7 @@ import {
   useWindowDimensions,
   ViewStyle,
 } from 'react-native';
-import {EpisodeLink, Link} from './lib/providers/types';
+import {EpisodeLink, Link, PostVariant} from './lib/providers/types';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import TabBarBackgound from './components/TabBarBackgound';
 import {TouchableOpacity} from 'react-native';
@@ -89,14 +89,19 @@ const LARGE_SCREEN_WIDTH = 768;
 const TABLET_MIN_DIMENSION_DP = 600;
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 
+export type InfoRouteParams = {
+  link: string;
+  provider?: string;
+  poster?: string;
+  variants?: PostVariant[];
+  dubStatus?: 'subbed' | 'dubbed' | 'both';
+  dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
+  infoStack?: Array<{link: string; provider?: string; poster?: string}>;
+};
+
 export type HomeStackParamList = {
   Home: undefined;
-  Info: {
-    link: string;
-    provider?: string;
-    poster?: string;
-    infoStack?: Array<{link: string; provider?: string; poster?: string}>;
-  };
+  Info: InfoRouteParams;
   ScrollList: {
     filter: string;
     title?: string;
@@ -151,34 +156,19 @@ export type SearchStackParamList = {
     providerValue?: string;
     isSearch: boolean;
   };
-  Info: {
-    link: string;
-    provider?: string;
-    poster?: string;
-    infoStack?: Array<{link: string; provider?: string; poster?: string}>;
-  };
+  Info: InfoRouteParams;
   SearchResults: {filter: string; availableProviders?: string[]};
   Webview: {link: string};
 };
 
 export type WatchListStackParamList = {
   WatchList: undefined;
-  Info: {
-    link: string;
-    provider?: string;
-    poster?: string;
-    infoStack?: Array<{link: string; provider?: string; poster?: string}>;
-  };
+  Info: InfoRouteParams;
 };
 
 export type WatchHistoryStackParamList = {
   WatchHistory: undefined;
-  Info: {
-    link: string;
-    provider?: string;
-    poster?: string;
-    infoStack?: Array<{link: string; provider?: string; poster?: string}>;
-  };
+  Info: InfoRouteParams;
   SeriesEpisodes: {
     series: string;
     episodes: Array<{uri: string; size: number}>;

@@ -318,6 +318,8 @@
   "SeasonBadge {{season}}-Ep. {{episode}}": "S{{season}}-Ep. {{episode}}",
   "S{{season}}-Ep. {{episode}}": "S{{season}}-Ep. {{episode}}",
   "ITA": "ITA",
+  "SUB": "SUB",
+  "SUB/ITA": "SUB/ITA",
   "Search in {{provider}}": "Search in {{provider}}",
   "Play": "Play",
   "Trending Titles": "Trending Titles",

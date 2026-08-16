@@ -95,9 +95,20 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
         link: hero.link,
         provider: provider.value,
         poster: heroData?.image || heroData?.poster || heroData?.background,
+        variants: hero?.variants,
+        dubStatus: hero?.dubStatus,
+        dubStatusKey: hero?.dubStatusKey,
       });
     }
-  }, [navigation, hero?.link, provider.value, heroData]);
+  }, [
+    navigation,
+    hero?.link,
+    hero?.variants,
+    hero?.dubStatus,
+    hero?.dubStatusKey,
+    provider.value,
+    heroData,
+  ]);
 
   const heroFallbackImage = hero?.image || '';
   const lastErrorLinkRef = useRef<string | null>(null);

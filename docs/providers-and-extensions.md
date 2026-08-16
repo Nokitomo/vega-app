@@ -43,6 +43,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 
 ## Campi card e artwork opzionali
 - I post possono includere `rating`, `dubStatus`/`dubStatusKey` e `variants`. `variants` conserva destinazioni SUB e ITA dello stesso titolo mantenendo `link` come fallback retrocompatibile.
+- Le card Home, ricerca, calendario e lista completa mostrano badge coerenti per episodio, disponibilita SUB/ITA e voto; i dati delle varianti vengono mantenuti nella navigazione verso Info.
 - I metadata possono includere `logo`, `background`, `poster` e `trailers` (URL completi). Tutti i campi sono opzionali e non cambiano il contratto dei provider esistenti.
 
 ## Disponibilita contenuti futuri (upcoming)

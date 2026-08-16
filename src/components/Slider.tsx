@@ -10,7 +10,7 @@ import type {FlashListProps} from '@shopify/flash-list';
 import SkeletonLoader from './Skeleton';
 import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
-import {hasItaBadge} from '../lib/utils/helpers';
+import PostBadges from './PostBadges';
 
 // import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import useThemeStore from '../lib/zustand/themeStore';
@@ -66,6 +66,9 @@ const Slider = ({
         link: item.link,
         provider: item.provider || providerValue || provider?.value,
         poster: item?.image,
+        variants: item.variants,
+        dubStatus: item.dubStatus,
+        dubStatusKey: item.dubStatusKey,
       });
     },
     [navigation, providerValue, provider?.value],
@@ -98,29 +101,7 @@ const Slider = ({
               providerValue={item.provider || providerValue || provider?.value}
               style={{width: 100, height: 150}}
             />
-            {(() => {
-              const episodeLabel = item.episodeLabelKey
-                ? t(item.episodeLabelKey, item.episodeLabelParams)
-                : item.episodeLabel;
-              return episodeLabel ? (
-                <View
-                  className="absolute top-1 right-1 rounded-full px-2 py-0.5"
-                  style={{backgroundColor: primary}}>
-                  <Text className="text-black text-[10px] font-semibold">
-                    {episodeLabel}
-                  </Text>
-                </View>
-              ) : null;
-            })()}
-            {hasItaBadge(item.title) ? (
-              <View
-                className="absolute top-1 left-1 rounded-full px-2 py-0.5"
-                style={{backgroundColor: primary}}>
-                <Text className="text-black text-[10px] font-semibold">
-                  {t('ITA')}
-                </Text>
-              </View>
-            ) : null}
+            <PostBadges post={item} primary={primary} />
           </View>
           {/* {isSelected === item.link && (
             <View className="absolute top-0 left-0 w-full h-full bg-black/50 flex justify-center items-center z-50">
