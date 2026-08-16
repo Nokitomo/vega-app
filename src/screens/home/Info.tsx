@@ -35,7 +35,10 @@ import {QueryErrorBoundary} from '../../components/ErrorBoundary';
 import SkeletonLoader from '../../components/Skeleton';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../../lib/utils/helpers';
-import type {Info as ProviderInfo} from '../../lib/providers/types';
+import type {
+  Info as ProviderInfo,
+  PostVariant,
+} from '../../lib/providers/types';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -57,6 +60,30 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
   const providerValue = route.params.provider || provider.value;
+  const variants = useMemo<PostVariant[]>(
+    () =>
+      (route.params.variants || []).filter(
+        variant => !!variant?.link && !!variant?.status,
+      ),
+    [route.params.variants],
+  );
+  const [selectedVariantLink, setSelectedVariantLink] = useState(
+    route.params.link,
+  );
+  const selectedVariant = useMemo(
+    () => variants.find(variant => variant.link === selectedVariantLink),
+    [selectedVariantLink, variants],
+  );
+  const activeLink = selectedVariant?.link || route.params.link;
+  const activePoster = selectedVariant?.image || route.params.poster;
+  const activeRouteParams = useMemo(
+    () => ({...route.params, link: activeLink, poster: activePoster}),
+    [activeLink, activePoster, route.params],
+  );
+
+  useEffect(() => {
+    setSelectedVariantLink(route.params.link);
+  }, [route.params.link]);
 
   // React Query for optimized data fetching
   const {
@@ -66,7 +93,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     error,
     refetch,
   } = useContentDetails(
-    route.params.link,
+    activeLink,
     providerValue,
   );
 
@@ -88,7 +115,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   // Memoized values
   const [inLibrary, setInLibrary] = useState(() =>
-    watchListStorage.isInWatchList(route.params.link),
+    watchListStorage.isInWatchList(activeLink),
   );
   const [excludedQualities, setExcludedQualities] = useState<string[]>(
     settingsStorage.getExcludedQualities(),
@@ -100,6 +127,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return () => {};
     }, []),
   );
+
+  useEffect(() => {
+    setInLibrary(watchListStorage.isInWatchList(activeLink));
+    setInfoView('episodes');
+  }, [activeLink]);
 
   // Memoized handlers
   const openThreeDotsMenu = useCallback(() => {
@@ -147,12 +179,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     });
     addItem({
       title: libraryTitle,
-      poster: meta?.poster || route.params.poster || info?.image,
-      link: route.params.link,
+      poster: meta?.poster || activePoster || info?.poster || info?.image,
+      link: activeLink,
       provider: providerValue,
     });
     setInLibrary(true);
-  }, [libraryTitle, meta, info, route.params, providerValue, addItem]);
+  }, [libraryTitle, meta, activePoster, info, activeLink, providerValue, addItem]);
 
   const removeLibrary = useCallback(() => {
     if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -161,9 +193,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
         ignoreAndroidSystemSettings: false,
       });
     }
-    removeItem(route.params.link);
+    removeItem(activeLink);
     setInLibrary(false);
-  }, [route.params.link, removeItem]);
+  }, [activeLink, removeItem]);
 
   // Memoized computed values
   const isStreamingUnity = useMemo(
@@ -320,11 +352,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const posterImage = useMemo(() => {
     return (
       meta?.poster ||
-      route.params.poster ||
+      activePoster ||
+      info?.poster ||
       info?.image ||
       PLACEHOLDER_IMAGE
     );
-  }, [meta?.poster, route.params.poster, info?.image]);
+  }, [meta?.poster, activePoster, info?.poster, info?.image]);
   const logoImage = info?.logo || meta?.logo;
 
   const backgroundImage = useMemo(() => {
@@ -352,7 +385,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   useEffect(() => {
     setBackgroundFallback(null);
     setBackgroundErrorCount(0);
-  }, [backgroundImage, providerBackgroundFallback, route.params.link]);
+  }, [backgroundImage, providerBackgroundFallback, activeLink]);
 
   const handleBackgroundError = useCallback(
     (event: any) => {
@@ -384,11 +417,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   const currentInfoEntry = useMemo(
     () => ({
-      link: route.params.link,
+      link: activeLink,
       provider: providerValue,
       poster: posterImage,
     }),
-    [route.params.link, providerValue, posterImage],
+    [activeLink, providerValue, posterImage],
   );
   const filteredLinkList = useMemo(() => {
     if (!info?.linkList) {
@@ -703,6 +736,39 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                   </View>
                 </View>
                 <View className="p-4 bg-black">
+                  {variants.length > 1 ? (
+                    <View className="mb-4">
+                      <Text className="text-gray-300 text-xs mb-2">
+                        {t('Version')}
+                      </Text>
+                      <View className="flex-row gap-2 flex-wrap">
+                        {variants.map(variant => {
+                          const isSelected = variant.link === activeLink;
+                          return (
+                            <TouchableOpacity
+                              key={`${variant.status}:${variant.link}`}
+                              onPress={() =>
+                                setSelectedVariantLink(variant.link)
+                              }
+                              className="px-3 py-1.5 rounded-md border"
+                              style={{
+                                backgroundColor: isSelected
+                                  ? primary
+                                  : '#262626',
+                                borderColor: isSelected ? primary : '#404040',
+                              }}>
+                              <Text
+                                className={`text-xs font-semibold ${
+                                  isSelected ? 'text-black' : 'text-white'
+                                }`}>
+                                {t(variant.statusKey)}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ) : null}
                   <View className="flex-row gap-x-3 gap-y-1 flex-wrap items-center mb-4">
                     {/* badges */}
                     {badgeYear && (
@@ -850,7 +916,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                 onPress={async () => {
                                   setThreeDotsMenuOpen(false);
                                   navigation.navigate('Webview', {
-                                    link: route.params.link,
+                                    link: activeLink,
                                   });
                                 }}>
                                 <MaterialCommunityIcons
@@ -978,6 +1044,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       </View>
                       {infoView === 'episodes' ? (
                         <SeasonList
+                          key={activeLink}
                           refreshing={refreshing}
                           refreshVersion={episodeRefreshVersion}
                           providerValue={providerValue}
@@ -989,13 +1056,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           }
                           LinkList={filteredLinkList}
                           poster={{
-                            logo: meta?.logo,
+                            logo: logoImage,
                             poster: posterImage,
                             background: backgroundImage,
                           }}
                           type={info?.type || 'series'}
                           metaTitle={displayTitle}
-                          routeParams={route.params}
+                          routeParams={activeRouteParams}
                         />
                       ) : (
                         <View className="gap-3">
