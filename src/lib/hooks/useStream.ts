@@ -7,6 +7,7 @@ import {settingsStorage} from '../storage';
 import {ifExists} from '../file/ifExists';
 import {Stream} from '../providers/types';
 import i18n from '../../i18n';
+import {getProviderCacheScope} from '../utils/providerCacheScope';
 
 interface UseStreamOptions {
   activeEpisode: any;
@@ -192,6 +193,8 @@ export const useStream = ({
   provider,
   enabled = true,
 }: UseStreamOptions) => {
+  const providerValue = routeParams?.providerValue || provider;
+  const providerCacheScope = getProviderCacheScope(providerValue);
   const [selectedStream, setSelectedStream] = useState<Stream>({
     server: '',
     link: '',
@@ -205,7 +208,13 @@ export const useStream = ({
     error,
     refetch,
   } = useQuery<Stream[], Error>({
-    queryKey: ['stream', activeEpisode?.link, routeParams?.type, provider],
+    queryKey: [
+      'stream',
+      activeEpisode?.link,
+      routeParams?.type,
+      providerValue,
+      providerCacheScope,
+    ],
     queryFn: async () => {
       if (!activeEpisode?.link) {
         return [];
@@ -250,7 +259,7 @@ export const useStream = ({
         link: activeEpisode.link,
         type: routeParams?.type,
         signal: controller.signal,
-        providerValue: routeParams?.providerValue || provider,
+        providerValue,
       });
 
       // Filter out excluded qualities

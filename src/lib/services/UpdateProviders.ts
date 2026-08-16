@@ -3,6 +3,8 @@ import {extensionManager} from './ExtensionManager';
 import {settingsStorage} from '../storage';
 import {notificationService} from './Notification';
 import i18n from '../../i18n';
+import {queryClient} from '../client';
+import useContentStore from '../zustand/contentStore';
 
 export interface UpdateInfo {
   provider: ProviderExtension;
@@ -15,6 +17,32 @@ class UpdateProvidersService {
   private isUpdating = false;
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private readonly updateCheckIntervalMs = 6 * 60 * 60 * 1000;
+
+  private synchronizeUpdatedProvider(provider: ProviderExtension): void {
+    const installedProviders = extensionStorage.getInstalledProviders();
+    const sourceAuthor = provider.source?.author || '';
+    const updatedProvider = installedProviders.find(
+      item =>
+        item.value === provider.value &&
+        (!sourceAuthor || item.source?.author === sourceAuthor),
+    );
+    const contentState = useContentStore.getState();
+
+    contentState.setInstalledProviders([...installedProviders]);
+
+    const activeProvider = contentState.provider;
+    const isActiveProvider =
+      !!updatedProvider &&
+      activeProvider.value === updatedProvider.value &&
+      (!sourceAuthor || activeProvider.source?.author === sourceAuthor);
+    if (isActiveProvider) {
+      contentState.setProvider(updatedProvider);
+    }
+
+    queryClient.removeQueries({
+      predicate: query => query.queryKey.includes(provider.value),
+    });
+  }
 
   private ensureInstalledProvidersHaveSource(
     providers: ProviderExtension[],
@@ -120,6 +148,7 @@ class UpdateProvidersService {
   async updateProvider(provider: ProviderExtension): Promise<boolean> {
     try {
       await extensionManager.updateProvider(provider);
+      this.synchronizeUpdatedProvider(provider);
 
       return true;
     } catch (error) {

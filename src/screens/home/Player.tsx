@@ -92,6 +92,7 @@ import {
   resolveProviderCardTitle,
   shouldResolveProviderCardTitle,
 } from '../../lib/utils/providerCardTitleResolver';
+import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -664,7 +665,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       if (!episodesLink) {
         return [];
       }
-      const cached = cacheStorage.getString(episodesLink);
+      const cached = cacheStorage.getString(
+        buildProviderCacheKey('episodes', providerValue, episodesLink),
+      );
       if (!cached) {
         return [];
       }
@@ -710,7 +713,11 @@ const Player = ({route}: Props): React.JSX.Element => {
         const normalizedEpisodes = normalizeEpisodeList(episodes);
         if (normalizedEpisodes.length > 0) {
           cacheStorage.setString(
-            season.episodesLink,
+            buildProviderCacheKey(
+              'episodes',
+              providerValue,
+              season.episodesLink,
+            ),
             JSON.stringify(normalizedEpisodes),
           );
         }

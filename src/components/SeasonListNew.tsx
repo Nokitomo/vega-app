@@ -38,6 +38,7 @@ import {providerManager} from '../lib/services/ProviderManager';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import useThemeStore from '../lib/zustand/themeStore';
 import {useTranslation} from 'react-i18next';
+import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -779,7 +780,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const prefetchEpisodesForLink = useCallback(
     async (episodesLink?: string) => {
-      if (!episodesLink || cacheStorage.getString(episodesLink)) {
+      if (!episodesLink) {
+        return;
+      }
+      const cacheKey = buildProviderCacheKey(
+        'episodes',
+        providerValue,
+        episodesLink,
+      );
+      if (cacheStorage.getString(cacheKey)) {
         return;
       }
 
@@ -796,7 +805,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         });
 
         if (episodes && episodes.length > 0) {
-          cacheStorage.setString(episodesLink, JSON.stringify(episodes));
+          cacheStorage.setString(cacheKey, JSON.stringify(episodes));
         }
       } catch (error) {
         console.error('Error prefetching episodes:', error);

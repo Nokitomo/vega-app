@@ -70,6 +70,7 @@ import {
   VegaCastTracking,
 } from '../lib/cast/vegaCast';
 import {setClipboardString} from '../lib/utils/clipboard';
+import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -385,7 +386,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return undefined;
       }
 
-      const cached = cacheStorage.getString(episodesLink);
+      const cached = cacheStorage.getString(
+        buildProviderCacheKey('episodes', providerValue, episodesLink),
+      );
       if (!cached) {
         return undefined;
       }
@@ -412,7 +415,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return undefined;
       }
     },
-    [],
+    [providerValue],
   );
 
   // Early return if no LinkList provided
@@ -1992,7 +1995,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const prefetchEpisodesForLink = useCallback(
     async (episodesLink?: string) => {
-      if (!episodesLink || cacheStorage.getString(episodesLink)) {
+      if (!episodesLink) {
+        return;
+      }
+      const cacheKey = buildProviderCacheKey(
+        'episodes',
+        providerValue,
+        episodesLink,
+      );
+      if (cacheStorage.getString(cacheKey)) {
         return;
       }
 
@@ -2009,7 +2020,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         });
 
         if (episodes && episodes.length > 0) {
-          cacheStorage.setString(episodesLink, JSON.stringify(episodes));
+          cacheStorage.setString(cacheKey, JSON.stringify(episodes));
         }
       } catch (error) {
         console.error('Error prefetching episodes:', error);

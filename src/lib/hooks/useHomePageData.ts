@@ -10,6 +10,10 @@ import {
   buildEnhancedMetaKey,
   fetchEnhancedMetadata,
 } from '../services/enhancedMeta';
+import {
+  buildProviderCacheKey,
+  getProviderCacheScope,
+} from '../utils/providerCacheScope';
 
 export interface HomePageData {
   title: string;
@@ -28,7 +32,6 @@ interface UseHomePageDataOptions {
 }
 
 const STREAMINGUNITY_PROVIDER = 'streamingunity';
-const STREAMINGUNITY_META_CACHE_VERSION = 'v2';
 const HOME_SECTION_PARALLEL_LIMIT = 4;
 const HOME_SECTION_STEP_DELAY_MS = 200;
 const HOME_STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -39,10 +42,7 @@ const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
   if (!heroLink) {
     return '';
   }
-  if (providerValue === STREAMINGUNITY_PROVIDER) {
-    return `heroMetadata:${STREAMINGUNITY_META_CACHE_VERSION}:${providerValue}:${heroLink}`;
-  }
-  return heroLink;
+  return buildProviderCacheKey('heroMetadata', providerValue, heroLink);
 };
 
 const shouldHideHomeCategory = (providerValue: string, filter: string): boolean => {
@@ -93,6 +93,7 @@ export const useHomePageData = ({
   isScreenActive = true,
 }: UseHomePageDataOptions) => {
   const providerValue = provider?.value || '';
+  const providerCacheScope = getProviderCacheScope(providerValue);
   const [staleCheckTick, setStaleCheckTick] = useState(0);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const categories = useMemo(
@@ -102,7 +103,7 @@ export const useHomePageData = ({
             category => !shouldHideHomeCategory(providerValue, category.filter),
           )
         : [],
-    [providerValue],
+    [providerCacheScope, providerValue],
   );
 
   const triggerStaleCheck = useCallback(() => {
@@ -116,7 +117,7 @@ export const useHomePageData = ({
   };
 
   const buildCategoryCacheKey = (filter: string) =>
-    `homeCategoryData:${providerValue}:${filter}`;
+    buildProviderCacheKey('homeCategoryData', providerValue, filter);
 
   const readCategoryCache = (filter: string): CategoryQueryData | undefined => {
     const raw = cacheStorage.getString(buildCategoryCacheKey(filter));
@@ -196,6 +197,9 @@ export const useHomePageData = ({
           post?.episodeLabel ?? '',
           post?.title ?? '',
           post?.image ?? '',
+          post?.rating ?? '',
+          post?.dubStatus ?? '',
+          JSON.stringify(post?.variants || []),
         ].join('|'),
       )
       .join('||');
@@ -206,6 +210,7 @@ export const useHomePageData = ({
       const queryKey = [
         'homeCategoryData',
         providerValue,
+        providerCacheScope,
         category.filter,
       ] as const;
       const cached = readCategoryCache(category.filter);
@@ -564,9 +569,15 @@ export const clearHeroCache = (providerValue?: string) => {
 // New hook for hero metadata with React Query
 export const useHeroMetadata = (heroLink: string, providerValue: string) => {
   const cacheKey = buildHeroMetadataCacheKey(heroLink, providerValue);
+  const providerCacheScope = getProviderCacheScope(providerValue);
 
   return useQuery({
-    queryKey: ['heroMetadata', heroLink, providerValue],
+    queryKey: [
+      'heroMetadata',
+      heroLink,
+      providerValue,
+      providerCacheScope,
+    ],
     queryFn: async () => {
       const {providerManager: importedProviderManager} = await import(
         '../services/ProviderManager'

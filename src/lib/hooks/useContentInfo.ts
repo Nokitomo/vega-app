@@ -3,26 +3,25 @@ import {providerManager} from '../services/ProviderManager';
 import {cacheStorage} from '../storage';
 import i18n from '../../i18n';
 import {buildEnhancedMetaKey, fetchEnhancedMetadata} from '../services/enhancedMeta';
-
-const STREAMINGUNITY_PROVIDER = 'streamingunity';
-const STREAMINGUNITY_META_CACHE_VERSION = 'v2';
+import {
+  buildProviderCacheKey,
+  getProviderCacheScope,
+} from '../utils/providerCacheScope';
 
 const buildContentInfoCacheKey = (link: string, providerValue: string) => {
   if (!link) {
     return '';
   }
-  if (providerValue === STREAMINGUNITY_PROVIDER) {
-    return `contentInfo:${STREAMINGUNITY_META_CACHE_VERSION}:${providerValue}:${link}`;
-  }
-  return link;
+  return buildProviderCacheKey('contentInfo', providerValue, link);
 };
 
 // Hook for fetching content info/metadata
 export const useContentInfo = (link: string, providerValue: string) => {
   const cacheKey = buildContentInfoCacheKey(link, providerValue);
+  const providerCacheScope = getProviderCacheScope(providerValue);
 
   return useQuery({
-    queryKey: ['contentInfo', link, providerValue],
+    queryKey: ['contentInfo', link, providerValue, providerCacheScope],
     queryFn: async () => {
       console.log('Fetching content info for:', link);
 

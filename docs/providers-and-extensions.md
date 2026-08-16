@@ -109,8 +109,8 @@ File: src/lib/providers/providerContext.ts
 ## Storage provider
 - ExtensionStorage gestisce sorgenti provider, cache locale per sorgente e stato installato/abilitato.
 - UpdateProvidersService verifica versioni per sorgente e aggiorna automaticamente.
+- Le cache di catalogo, metadata, episodi e stream includono sorgente, nome e versione del modulo provider. Dopo un aggiornamento l'app sincronizza subito il provider attivo e rimuove soltanto le query della vecchia versione, senza cancellare cronologia, watchlist o preferenze.
 - Le notifiche di aggiornamento provider usano testi localizzati.
-- Per StreamingUnity e stato introdotto un cache key versioning mirato sui metadata (`content info` e `hero metadata`) per invalidare i valori storici senza reset globale cache.
 
 ## Dove stanno i provider
 - I provider non sono hardcoded nel repository dell'app.

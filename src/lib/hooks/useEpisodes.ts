@@ -4,14 +4,27 @@ import {cacheStorage} from '../storage';
 import {EpisodeLink} from '../providers/types';
 import {extensionManager} from '../services';
 import i18n from '../../i18n';
+import {
+  buildProviderCacheKey,
+  getProviderCacheScope,
+} from '../utils/providerCacheScope';
 
 export const useEpisodes = (
   episodesLink: string | undefined,
   providerValue: string,
   enabled: boolean = true,
 ) => {
+  const providerCacheScope = getProviderCacheScope(providerValue);
+  const episodesCacheKey = episodesLink
+    ? buildProviderCacheKey('episodes', providerValue, episodesLink)
+    : '';
   return useQuery<EpisodeLink[], Error>({
-    queryKey: ['episodes', episodesLink, providerValue],
+    queryKey: [
+      'episodes',
+      episodesLink,
+      providerValue,
+      providerCacheScope,
+    ],
     queryFn: async () => {
       if (!episodesLink || !providerValue || !enabled) {
         return [];
@@ -35,8 +48,8 @@ export const useEpisodes = (
       });
 
       // Cache successful responses
-      if (episodes && episodes.length > 0) {
-        cacheStorage.setString(episodesLink, JSON.stringify(episodes));
+      if (episodes && episodes.length > 0 && episodesCacheKey) {
+        cacheStorage.setString(episodesCacheKey, JSON.stringify(episodes));
       }
 
       return episodes || [];
@@ -58,7 +71,7 @@ export const useEpisodes = (
         return undefined;
       }
 
-      const cached = cacheStorage.getString(episodesLink);
+      const cached = cacheStorage.getString(episodesCacheKey);
       if (cached) {
         try {
           return JSON.parse(cached);
