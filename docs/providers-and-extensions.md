@@ -27,6 +27,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - `catalog.js` puo esportare `archiveFilters` con metadati (order, status, type, season, years, dubbed, genres).
 - `ProviderManager.getArchiveFilters()` espone questi metadati all'interfaccia senza rendere obbligatoria l'esportazione: i provider meno recenti continuano a restituire un oggetto vuoto.
 - `genres` espone scorciatoie per filtri di archive (usabili come sezioni o menu).
+- Nelle liste basate su `archive`/`catalog/all`, il pulsante filtri viene mostrato solo se il provider esporta `archiveFilters`. Il pannello supporta titolo, anno, ordine, stato, tipo, stagione, selezione multipla dei generi, doppiaggio e ordine casuale; Applica riparte dalla prima pagina e Reset rimuove tutti i parametri.
 - AltadefinizioneZ include i filtri `catalog/all?sorting=popserie` e `catalog/all?sorting=popfilm` per le sezioni "Serie TV del momento" e "Film del momento" in home.
 - StreamingUnity usa `browse/trending`, `browse/latest`, `browse/top10`, `browse/upcoming` e `browse/genre?g=...` per le sezioni home, oltre ad `archive` per l'archivio.
 - Per le sezioni genre di StreamingUnity il provider usa i percorsi `browse/genre` (sito/API) invece del fallback `archive?genre[]`, cosi ordine e contenuti restano allineati al sito.

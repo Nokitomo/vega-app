@@ -172,6 +172,7 @@ export interface ArchiveFilterOption {
   type?: string;
   title?: string;
   titleKey?: string;
+  name?: string;
   value?: string | number | boolean;
   providerValue?: string | number | boolean;
   id?: string | number;

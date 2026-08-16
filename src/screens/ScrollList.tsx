@@ -23,6 +23,12 @@ import {providerManager} from '../lib/services/ProviderManager';
 import ProviderImage from '../components/ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from '../components/PostBadges';
+import ArchiveFilterModal from '../components/ArchiveFilterModal';
+import {
+  buildArchiveFilter,
+  hasActiveArchiveFilters,
+  parseArchiveFilterSelection,
+} from '../lib/utils/archiveFilters';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'ScrollList'>;
 
@@ -75,17 +81,41 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const navigation =
     useNavigation<NativeStackNavigationProp<SearchStackParamList>>();
   const [posts, setPosts] = useState<Post[]>([]);
-  const {filter, providerValue} = route.params;
+  const {filter: routeFilter, providerValue} = route.params;
   const [page, setPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isEnd, setIsEnd] = useState<boolean>(false);
   const {provider} = useContentStore(state => state);
+  const effectiveProviderValue = providerValue || provider.value;
+  const [activeFilter, setActiveFilter] = useState(routeFilter);
+  const [filterSelection, setFilterSelection] = useState(() =>
+    parseArchiveFilterSelection(routeFilter),
+  );
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const archiveFilters = useMemo(
+    () =>
+      effectiveProviderValue
+        ? providerManager.getArchiveFilters({
+            providerValue: effectiveProviderValue,
+          })
+        : {},
+    [effectiveProviderValue, provider.version],
+  );
+  const isArchiveView =
+    !route.params.isSearch &&
+    ['archive', 'catalog/all'].includes(
+      activeFilter.split('?', 1)[0].replace(/^\/+|\/+$/g, '').toLowerCase(),
+    );
+  const canFilterArchive =
+    isArchiveView && Object.keys(archiveFilters).length > 0;
+  const hasActiveFilters = hasActiveArchiveFilters(filterSelection);
   const {width: windowWidth} = useWindowDimensions();
   const [gridContainerWidth, setGridContainerWidth] = useState<number>(0);
   const [viewType, setViewType] = useState<number>(
     settingsStorage.getListViewType(),
   );
-  const isCalendarView = filter === 'calendar' && !route.params.isSearch;
+  const isCalendarView =
+    activeFilter === 'calendar' && !route.params.isSearch;
   // Add abort controller to cancel API requests when unmounting
   const abortController = useRef<AbortController | null>(null);
   const isMounted = useRef(true);
@@ -146,6 +176,14 @@ const ScrollList = ({route}: Props): React.ReactElement => {
 
   // Set up cleanup effect that runs on component unmount
   useEffect(() => {
+    setActiveFilter(routeFilter);
+    setFilterSelection(parseArchiveFilterSelection(routeFilter));
+    setPosts([]);
+    setPage(1);
+    setIsEnd(false);
+  }, [routeFilter]);
+
+  useEffect(() => {
     return () => {
       isMounted.current = false;
       if (abortController.current) {
@@ -190,15 +228,15 @@ const ScrollList = ({route}: Props): React.ReactElement => {
 
         const getNewPosts = route.params.isSearch
           ? providerManager.getSearchPosts({
-              searchQuery: filter,
+              searchQuery: routeFilter,
               page,
-              providerValue: providerValue || provider.value,
+              providerValue: effectiveProviderValue,
               signal,
             })
           : providerManager.getPosts({
-              filter,
+              filter: activeFilter,
               page,
-              providerValue: providerValue || provider.value,
+              providerValue: effectiveProviderValue,
               signal,
             });
 
@@ -217,7 +255,22 @@ const ScrollList = ({route}: Props): React.ReactElement => {
           return;
         }
 
-        setPosts(prev => [...prev, ...newPosts]);
+        setPosts(prev => {
+          const combined = page === 1 ? newPosts : [...prev, ...newPosts];
+          const unique = new Map<string, Post>();
+          combined.forEach(item => {
+            const key = `${item.provider || effectiveProviderValue}:${item.link}:${
+              item.episodeId ?? ''
+            }`;
+            if (!unique.has(key)) {
+              unique.set(key, item);
+            }
+          });
+          return Array.from(unique.values());
+        });
+        if (filterSelection.random) {
+          setIsEnd(true);
+        }
       } catch (error) {
         // Skip handling if component unmounted or request was aborted
         if (!isMounted.current || (error as any)?.name === 'AbortError') {
@@ -233,7 +286,27 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     };
 
     fetchPosts();
-  }, [page, route.params, filter, provider.value]);
+  }, [
+    activeFilter,
+    effectiveProviderValue,
+    filterSelection.random,
+    page,
+    route.params.isSearch,
+  ]);
+
+  const applyArchiveFilters = (
+    selection: ReturnType<typeof parseArchiveFilterSelection>,
+  ) => {
+    abortController.current?.abort();
+    setFilterSelection(selection);
+    setActiveFilter(buildArchiveFilter(routeFilter, selection));
+    setPosts([]);
+    setPage(1);
+    setIsEnd(false);
+    setIsLoading(true);
+    isLoadingMore.current = false;
+    setFilterModalVisible(false);
+  };
 
   const onEndReached = async () => {
     // Don't trigger more loading if we're already loading or at the end
@@ -278,20 +351,35 @@ const ScrollList = ({route}: Props): React.ReactElement => {
             {route.params.title}
           </Text>
         </View>
-        {!isCalendarView && (
-          <TouchableOpacity
-            onPress={() => {
-              const newViewType = viewType === 1 ? 2 : 1;
-              setViewType(newViewType);
-              settingsStorage.setListViewType(newViewType);
-            }}>
-            <MaterialIcons
-              name={viewType === 1 ? 'view-module' : 'view-list'}
-              size={27}
-              color="white"
-            />
-          </TouchableOpacity>
-        )}
+        {!isCalendarView ? (
+          <View className="flex-row items-center gap-4">
+            {canFilterArchive ? (
+              <TouchableOpacity
+                onPress={() => setFilterModalVisible(true)}
+                className="relative">
+                <MaterialIcons name="tune" size={26} color="white" />
+                {hasActiveFilters ? (
+                  <View
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                    style={{backgroundColor: primary}}
+                  />
+                ) : null}
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={() => {
+                const newViewType = viewType === 1 ? 2 : 1;
+                setViewType(newViewType);
+                settingsStorage.setListViewType(newViewType);
+              }}>
+              <MaterialIcons
+                name={viewType === 1 ? 'view-module' : 'view-list'}
+                size={27}
+                color="white"
+              />
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
       <View
         className="justify-center flex-row w-full"
@@ -455,6 +543,14 @@ const ScrollList = ({route}: Props): React.ReactElement => {
           </View>
         ) : null}
       </View>
+      <ArchiveFilterModal
+        visible={filterModalVisible}
+        filters={archiveFilters}
+        value={filterSelection}
+        primary={primary}
+        onApply={applyArchiveFilters}
+        onClose={() => setFilterModalVisible(false)}
+      />
     </View>
   );
 };
