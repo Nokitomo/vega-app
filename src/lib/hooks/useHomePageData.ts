@@ -150,7 +150,7 @@ export const useHomePageData = ({
     if (
       typeof catalogStaleTimeMs === 'number' &&
       Number.isFinite(catalogStaleTimeMs) &&
-      catalogStaleTimeMs > 0
+      catalogStaleTimeMs >= 0
     ) {
       return catalogStaleTimeMs;
     }

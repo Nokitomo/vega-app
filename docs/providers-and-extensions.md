@@ -31,6 +31,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - StreamingUnity usa `browse/trending`, `browse/latest`, `browse/top10`, `browse/upcoming` e `browse/genre?g=...` per le sezioni home, oltre ad `archive` per l'archivio.
 - Per le sezioni genre di StreamingUnity il provider usa i percorsi `browse/genre` (sito/API) invece del fallback `archive?genre[]`, cosi ordine e contenuti restano allineati al sito.
 - In home app, per StreamingUnity le sezioni `archive?type=movie` e `archive?type=tv` restano nel catalogo provider ma vengono nascoste solo nella schermata Home.
+- La UI rispetta anche `staleTimeMs: 0`: le sezioni casuali mostrano subito l'eventuale cache ma vengono aggiornate a ogni nuova attivazione della Home, invece di ereditare la cache lunga dell'archivio.
 
 ## i18n dai provider (AnimeUnity)
 - Alcuni campi possono includere chiavi i18n opzionali per tradurre etichette in app.
