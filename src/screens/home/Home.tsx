@@ -33,6 +33,10 @@ import {QueryErrorBoundary} from '../../components/ErrorBoundary';
 import {StatusBar} from 'expo-status-bar';
 import {useTranslation} from 'react-i18next';
 import {Post} from '../../lib/providers/types';
+import {
+  buildProviderCacheKey,
+  getProviderCacheScope,
+} from '../../lib/utils/providerCacheScope';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
@@ -51,7 +55,9 @@ const ARCHIVE_HERO_PROVIDERS = new Set([
   'streamingunity',
 ]);
 const getHeroBadLinkKey = (providerValue: string) =>
-  `heroBadLink:${providerValue}`;
+  buildProviderCacheKey('heroBadLink', providerValue, 'current');
+const getHeroCacheKey = (providerValue: string) =>
+  buildProviderCacheKey('heroCache', providerValue, 'selection');
 
 const getArchiveHeroFilter = (providerValue: string) =>
   providerValue === 'animeunity' || providerValue === 'streamingunity'
@@ -149,6 +155,7 @@ const Home = ({}: Props) => {
   const disableDrawer = useUiSettingsStore(state => state.disableDrawer);
 
   const {provider, installedProviders} = useContentStore(state => state);
+  const providerCacheScope = getProviderCacheScope(provider.value);
   const {setHero} = useHeroStore(state => state);
   const isHomeFocused = useIsFocused();
   const heroCacheTtlMs = HERO_CACHE_TTL_MS;
@@ -255,7 +262,7 @@ const Home = ({}: Props) => {
   // Update hero only when hero post actually changes
   React.useEffect(() => {
     heroImageErrorCountRef.current = 0;
-  }, [provider?.value]);
+  }, [provider?.value, providerCacheScope]);
 
   const handleHeroImageError = useCallback(
     (failedLink?: string) => {
@@ -290,7 +297,7 @@ const Home = ({}: Props) => {
       }
       if (hero?.link) {
         setHero(hero);
-        const cacheKey = `heroCache:${provider.value}`;
+        const cacheKey = getHeroCacheKey(provider.value);
         cacheStorage.setString(
           cacheKey,
           JSON.stringify({timestamp: Date.now(), hero}),
@@ -309,7 +316,7 @@ const Home = ({}: Props) => {
     }
 
     const badHeroLink = cacheStorage.getString(getHeroBadLinkKey(provider.value));
-    const cacheKey = `heroCache:${provider.value}`;
+    const cacheKey = getHeroCacheKey(provider.value);
     const cached = cacheStorage.getString(cacheKey);
     if (cached) {
       try {
@@ -362,7 +369,14 @@ const Home = ({}: Props) => {
       isActive = false;
       controller.abort();
     };
-  }, [heroPost, provider?.value, setHero, heroCacheTtlMs, heroRetryNonce]);
+  }, [
+    heroPost,
+    provider?.value,
+    providerCacheScope,
+    setHero,
+    heroCacheTtlMs,
+    heroRetryNonce,
+  ]);
 
   // Optimized refresh handler
   const handleRefresh = useCallback(async () => {

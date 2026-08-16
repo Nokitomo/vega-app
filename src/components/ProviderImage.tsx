@@ -2,6 +2,10 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Image, ImageProps} from 'react-native';
 import {providerManager} from '../lib/services/ProviderManager';
 import {cacheStorageService} from '../lib/storage';
+import {
+  buildProviderCacheKey,
+  getProviderCacheScope,
+} from '../lib/utils/providerCacheScope';
 
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
@@ -20,6 +24,7 @@ const ProviderImage = ({
   onError,
   ...rest
 }: ProviderImageProps): React.JSX.Element => {
+  const providerCacheScope = getProviderCacheScope(providerValue || '');
   const [sourceUri, setSourceUri] = useState(uri || PLACEHOLDER_IMAGE);
   const [hasTriedFallback, setHasTriedFallback] = useState(false);
   const isMounted = useRef(true);
@@ -34,7 +39,7 @@ const ProviderImage = ({
   useEffect(() => {
     setSourceUri(uri || PLACEHOLDER_IMAGE);
     setHasTriedFallback(false);
-  }, [uri]);
+  }, [link, providerCacheScope, uri]);
 
   const resolveFallback = useCallback(async () => {
     if (hasTriedFallback) {
@@ -49,7 +54,7 @@ const ProviderImage = ({
       return;
     }
 
-    const cacheKey = `animeunity:poster:${link}`;
+    const cacheKey = buildProviderCacheKey('poster', providerValue, link);
     const cached = cacheStorageService.getString(cacheKey);
     if (cached) {
       if (isMounted.current) {
@@ -78,7 +83,7 @@ const ProviderImage = ({
     if (isMounted.current) {
       setSourceUri(PLACEHOLDER_IMAGE);
     }
-  }, [hasTriedFallback, link, providerValue]);
+  }, [hasTriedFallback, link, providerCacheScope, providerValue]);
 
   const handleError: ImageProps['onError'] = useCallback(
     (event: Parameters<NonNullable<ImageProps['onError']>>[0]) => {
