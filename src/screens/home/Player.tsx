@@ -93,6 +93,7 @@ import {
   shouldResolveProviderCardTitle,
 } from '../../lib/utils/providerCardTitleResolver';
 import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
+import {hasStreamRequestHeaders} from '../../lib/utils/streamHeaders';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -1315,7 +1316,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     armStreamStartupGuard,
     clearStreamStartupGuard,
     isPreparingPlayer,
-    selectedStream?.link,
+    selectedStream,
     videoReloadNonce,
   ]);
 
@@ -2006,6 +2007,23 @@ const Player = ({route}: Props): React.JSX.Element => {
       return;
     }
 
+    if (hasStreamRequestHeaders(selectedStream)) {
+      Alert.alert(
+        t('Protected stream'),
+        t(
+          'Native Cast cannot forward this server\'s request headers. Open Web Video Caster instead?',
+        ),
+        [
+          {text: t('Cancel'), style: 'cancel'},
+          {
+            text: t('Open Web Video Caster'),
+            onPress: handleWebVideoCasterCast,
+          },
+        ],
+      );
+      return;
+    }
+
     if (remoteMediaClient) {
       const started = await startNativeCast();
       if (!started) {
@@ -2039,7 +2057,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     askWvcFallback,
     handleWebVideoCasterCast,
     remoteMediaClient,
-    selectedStream?.link,
+    selectedStream,
     startNativeCast,
     t,
   ]);

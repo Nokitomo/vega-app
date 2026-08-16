@@ -101,6 +101,7 @@ File: src/lib/services/ProviderManager.ts
 - Nel player, quando si arriva all'ultimo episodio di una stagione, il passaggio alla stagione successiva usa prima `directLinks`/cache locale e, se mancanti, prova un fetch on-demand tramite `getEpisodes` (se il provider espone `episodes.js`) per mantenere il tasto "Avanti" anche cross-stagione.
 - I messaggi utente (errori e toast relativi ai provider) sono localizzati via i18n.
 - Se i provider restituiscono `Stream.headers`, l'app li usa per scaricare i sottotitoli esterni protetti e li salva in cache locale, poi li passa al player come file locali.
+- Player interno, download, Vega Cast e Web Video Caster mantengono gli header stream. Per player Android generici viene mostrato un avviso con scelta tra apertura forzata e Web Video Caster; il Cast nativo propone Web Video Caster perché il receiver predefinito non puo applicare header HTTP arbitrari.
 - Se sono presenti sottotitoli esterni, il player attende brevemente il loro download prima di avviare lo stream; se arrivano in ritardo, viene fatto un solo reload automatico per agganciarli.
 
 ## ProviderContext

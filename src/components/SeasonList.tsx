@@ -71,6 +71,7 @@ import {
 } from '../lib/cast/vegaCast';
 import {setClipboardString} from '../lib/utils/clipboard';
 import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
+import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -1019,7 +1020,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   );
 
   // Memoized external player opener
-  const openExternalPlayer = useCallback(async (streamUrl: string) => {
+  const launchExternalPlayer = useCallback(async (streamUrl: string) => {
     setShowServerModal(false);
     setVlcLoading(true);
 
@@ -1037,7 +1038,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     } finally {
       setVlcLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const openWebVideoCaster = useCallback(
     async (stream: {
@@ -1099,6 +1100,39 @@ const SeasonList: React.FC<SeasonListProps> = ({
       }
     },
     [activeSeason?.title, metaTitle, poster?.background, poster?.poster, t],
+  );
+
+  const openExternalPlayer = useCallback(
+    async (stream: any) => {
+      if (!stream?.link) {
+        ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
+        return;
+      }
+      if (!hasStreamRequestHeaders(stream)) {
+        await launchExternalPlayer(stream.link);
+        return;
+      }
+
+      setShowServerModal(false);
+      Alert.alert(
+        t('Protected stream'),
+        t(
+          'This server requires request headers that generic external players may ignore.',
+        ),
+        [
+          {text: t('Cancel'), style: 'cancel'},
+          {
+            text: t('Open anyway'),
+            onPress: () => launchExternalPlayer(stream.link),
+          },
+          {
+            text: t('Open Web Video Caster'),
+            onPress: () => openWebVideoCaster(stream),
+          },
+        ],
+      );
+    },
+    [launchExternalPlayer, openWebVideoCaster, t],
   );
 
   const openVegaCast = useCallback(
@@ -1373,6 +1407,23 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return;
       }
 
+      if (hasStreamRequestHeaders(stream)) {
+        Alert.alert(
+          t('Protected stream'),
+          t(
+            'Native Cast cannot forward this server\'s request headers. Open Web Video Caster instead?',
+          ),
+          [
+            {text: t('Cancel'), style: 'cancel'},
+            {
+              text: t('Open Web Video Caster'),
+              onPress: () => openWebVideoCaster(stream),
+            },
+          ],
+        );
+        return;
+      }
+
       if (!remoteMediaClient) {
         setPendingNativeCastStream(stream);
         try {
@@ -1410,6 +1461,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       openWebVideoCaster,
       remoteMediaClient,
       startNativeCastForStream,
+      t,
     ],
   );
 
@@ -2447,7 +2499,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           style={{borderColor: primary, borderWidth: 1}}>
           <TouchableOpacity
             className="flex-1"
-            onPress={() => openExternalPlayer(item.link)}>
+            onPress={() => openExternalPlayer(item)}>
             <Text className="text-white text-lg capitalize font-bold">
               {item.server || t('Server {{number}}', {number: index + 1})}
             </Text>
@@ -2460,7 +2512,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           <View className="flex-row items-center gap-2">
             <TouchableOpacity
               className="bg-black/30 px-2 py-2 rounded-md"
-              onPress={() => openExternalPlayer(item.link)}>
+              onPress={() => openExternalPlayer(item)}>
               <MaterialCommunityIcons name="vlc" size={22} color={primary} />
             </TouchableOpacity>
             <TouchableOpacity
