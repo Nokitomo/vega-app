@@ -1,6 +1,12 @@
 import {ToastAndroid} from 'react-native';
 import {providerContext} from '../providers/providerContext';
-import {Catalog, EpisodeLink, Info, Post} from '../providers/types';
+import {
+  ArchiveFilters,
+  Catalog,
+  EpisodeLink,
+  Info,
+  Post,
+} from '../providers/types';
 import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
 
@@ -120,6 +126,29 @@ export class ProviderManager {
     } catch (error) {
       console.error('Error loading genres:', error);
       console.error('Module content:', catalogModule);
+      throw new Error(
+        i18n.t('Invalid catalog module for provider: {{provider}}', {
+          provider: providerValue,
+        }),
+      );
+    }
+  };
+  getArchiveFilters = ({
+    providerValue,
+  }: {
+    providerValue: string;
+  }): ArchiveFilters => {
+    const catalogModule =
+      extensionManager.getProviderModules(providerValue)?.modules.catalog;
+    if (!catalogModule) {
+      return {};
+    }
+    try {
+      const moduleExports = this.executeModule(catalogModule);
+      const filters = moduleExports.archiveFilters;
+      return filters && typeof filters === 'object' ? filters : {};
+    } catch (error) {
+      console.error('Error loading archive filters:', error);
       throw new Error(
         i18n.t('Invalid catalog module for provider: {{provider}}', {
           provider: providerValue,

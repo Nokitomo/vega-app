@@ -25,6 +25,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 
 ## Contratto filtri (UI)
 - `catalog.js` puo esportare `archiveFilters` con metadati (order, status, type, season, years, dubbed, genres).
+- `ProviderManager.getArchiveFilters()` espone questi metadati all'interfaccia senza rendere obbligatoria l'esportazione: i provider meno recenti continuano a restituire un oggetto vuoto.
 - `genres` espone scorciatoie per filtri di archive (usabili come sezioni o menu).
 - AltadefinizioneZ include i filtri `catalog/all?sorting=popserie` e `catalog/all?sorting=popfilm` per le sezioni "Serie TV del momento" e "Film del momento" in home.
 - StreamingUnity usa `browse/trending`, `browse/latest`, `browse/top10`, `browse/upcoming` e `browse/genre?g=...` per le sezioni home, oltre ad `archive` per l'archivio.
@@ -38,6 +39,10 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - `meta` e `episodes`: `titleKey`/`titleParams` per titoli (stagioni/episodi e fallback titolo), `tagKeys` per tradurre tag.
 - L'app usa le chiavi se presenti, altrimenti mostra il testo originale.
 - Al momento queste chiavi sono usate solo da AnimeUnity e dai provider futuri.
+
+## Campi card e artwork opzionali
+- I post possono includere `rating`, `dubStatus`/`dubStatusKey` e `variants`. `variants` conserva destinazioni SUB e ITA dello stesso titolo mantenendo `link` come fallback retrocompatibile.
+- I metadata possono includere `logo`, `background`, `poster` e `trailers` (URL completi). Tutti i campi sono opzionali e non cambiano il contratto dei provider esistenti.
 
 ## Disponibilita contenuti futuri (upcoming)
 - I provider possono valorizzare in `Info.linkList[]` i campi opzionali:

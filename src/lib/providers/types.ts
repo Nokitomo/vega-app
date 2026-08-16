@@ -22,6 +22,22 @@ export interface Post {
   episodeLabelKey?: string;
   episodeLabelParams?: I18nParams;
   episodeId?: string | number;
+  rating?: string;
+  dubStatus?: 'subbed' | 'dubbed' | 'both';
+  dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
+  variants?: PostVariant[];
+}
+
+export interface PostVariant {
+  status: 'subbed' | 'dubbed';
+  statusKey: 'Subbed' | 'Dubbed';
+  title: string;
+  link: string;
+  image: string;
+  episodeLabel?: string;
+  episodeLabelKey?: string;
+  episodeLabelParams?: I18nParams;
+  episodeId?: string | number;
 }
 
 export declare enum TextTrackType {
@@ -56,6 +72,7 @@ export interface Info {
   logo?: string;
   background?: string;
   poster?: string;
+  trailers?: string[];
   synopsis: string;
   imdbId: string;
   year?: string | number;
@@ -150,10 +167,31 @@ export interface Catalog {
   staleTimeMs?: number;
 }
 
+export interface ArchiveFilterOption {
+  key?: string;
+  type?: string;
+  title?: string;
+  titleKey?: string;
+  value?: string | number | boolean;
+  providerValue?: string | number | boolean;
+  id?: string | number;
+  min?: number;
+  max?: number;
+  maxOffset?: number;
+  values?: Array<string | number>;
+}
+
+export type ArchiveFilterDefinition =
+  | ArchiveFilterOption
+  | ArchiveFilterOption[];
+
+export type ArchiveFilters = Record<string, ArchiveFilterDefinition>;
+
 export interface ProviderType {
   searchFilter?: string;
   catalog: Catalog[];
   genres: Catalog[];
+  archiveFilters?: ArchiveFilters;
   blurImage?: boolean;
   nonStreamableServer?: string[];
   nonDownloadableServer?: string[];
