@@ -72,6 +72,7 @@ import {
 import {setClipboardString} from '../lib/utils/clipboard';
 import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
+import EpisodeMetadata from './EpisodeMetadata';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -2290,6 +2291,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
       const episodeTitle = item.titleKey
         ? t(item.titleKey, item.titleParams)
         : item.title;
+      const episodeLabel =
+        !item.titleKey && item.episodeNumber != null
+          ? t('Episode {{number}}', {number: item.episodeNumber})
+          : undefined;
+      const hasExtendedMetadata = !!(
+        item.thumbnail?.trim() || item.synopsis?.trim()
+      );
 
       return (
         <View
@@ -2303,13 +2311,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
         `}>
           <View className="flex-row w-full justify-between gap-2 items-center">
             <TouchableOpacity
-              className="rounded-md bg-white/30 w-[80%] h-12 items-center p-1 flex-row gap-x-2 relative justify-start"
+              className={`rounded-md bg-white/30 w-[80%] items-center flex-row gap-x-2 relative justify-start ${
+                hasExtendedMetadata ? 'min-h-20 p-2' : 'h-12 p-1'
+              }`}
               onPress={() =>
                 playHandler({
                   linkIndex: index,
                   type: type,
                   primaryTitle: metaTitle,
-                  secondaryTitle: item.title,
+                  secondaryTitle: episodeTitle,
                   seasonTitle: activeSeason?.title || '',
                   seasonNumber:
                     normalizeNumericValue(item.seasonNumber) ??
@@ -2319,14 +2329,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 })
               }
               onLongPress={() => onLongPressHandler(true, item.link, 'series')}>
-              <View className="w-8 items-center justify-center">
-                <Ionicons name="play-circle" size={28} color={primary} />
-              </View>
-              <Text className="text-white flex-1" numberOfLines={1}>
-                {episodeTitle.length > 30
-                  ? episodeTitle.slice(0, 30) + '...'
-                  : episodeTitle}
-              </Text>
+              <EpisodeMetadata
+                title={episodeTitle}
+                label={episodeLabel}
+                synopsis={item.synopsis}
+                thumbnail={item.thumbnail}
+                accentColor={primary}
+              />
               {episodeProgressMap[item.link] ? (
                 <View
                   className="absolute bottom-0 left-0 right-0 h-1"
@@ -2747,11 +2756,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
             maxToRenderPerBatch={10}
             windowSize={10}
             removeClippedSubviews={true}
-            getItemLayout={(data, index) => ({
-              length: 60,
-              offset: 60 * index,
-              index,
-            })}
           />
         )}
 
