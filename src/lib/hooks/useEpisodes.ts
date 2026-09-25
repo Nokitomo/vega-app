@@ -8,6 +8,12 @@ import {
   buildProviderCacheKey,
   getProviderCacheScope,
 } from '../utils/providerCacheScope';
+import {
+  readPersistedCache,
+  writePersistedCache,
+} from '../utils/persistedCache';
+
+const EPISODES_STALE_MS = 4 * 60 * 60 * 1000;
 
 export const useEpisodes = (
   episodesLink: string | undefined,
@@ -49,13 +55,13 @@ export const useEpisodes = (
 
       // Cache successful responses
       if (episodes && episodes.length > 0 && episodesCacheKey) {
-        cacheStorage.setString(episodesCacheKey, JSON.stringify(episodes));
+        writePersistedCache(cacheStorage, episodesCacheKey, episodes);
       }
 
       return episodes || [];
     },
     enabled: enabled && !!episodesLink && !!providerValue,
-    staleTime: 15 * 60 * 1000, // 15 minutes
+    staleTime: EPISODES_STALE_MS,
     gcTime: 60 * 60 * 1000, // 1 hour (was cacheTime)
     retry: (failureCount, _error) => {
       // Don't retry on provider/network errors
@@ -71,18 +77,16 @@ export const useEpisodes = (
         return undefined;
       }
 
-      const cached = cacheStorage.getString(episodesCacheKey);
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
+      return readPersistedCache<EpisodeLink[]>(cacheStorage, episodesCacheKey)
+        ?.value;
     },
+    initialDataUpdatedAt: () =>
+      episodesCacheKey
+        ? readPersistedCache<EpisodeLink[]>(cacheStorage, episodesCacheKey)
+            ?.updatedAt
+        : undefined,
     // Prevent background refetches unless data is stale
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: 'always',
   });

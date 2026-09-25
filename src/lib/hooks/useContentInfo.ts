@@ -7,6 +7,13 @@ import {
   buildProviderCacheKey,
   getProviderCacheScope,
 } from '../utils/providerCacheScope';
+import {
+  readPersistedCache,
+  writePersistedCache,
+} from '../utils/persistedCache';
+
+const CONTENT_INFO_STALE_MS = 24 * 60 * 60 * 1000;
+const ENHANCED_META_STALE_MS = 24 * 60 * 60 * 1000;
 
 const buildContentInfoCacheKey = (link: string, providerValue: string) => {
   if (!link) {
@@ -32,11 +39,13 @@ export const useContentInfo = (link: string, providerValue: string) => {
       if (!data || (!data?.title && !data?.synopsis && !data?.image)) {
         throw new Error(i18n.t('Error: No data returned from provider'));
       }
-
+      if (cacheKey) {
+        writePersistedCache(cacheStorage, cacheKey, data);
+      }
       return data;
     },
     enabled: !!link && !!providerValue,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: CONTENT_INFO_STALE_MS,
     gcTime: 60 * 60 * 1000, // 1 hour
     retry: 2,
     // Use cached data as initial data
@@ -44,24 +53,12 @@ export const useContentInfo = (link: string, providerValue: string) => {
       if (!cacheKey) {
         return undefined;
       }
-      const cached = cacheStorage.getString(cacheKey);
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
+      return readPersistedCache<any>(cacheStorage, cacheKey)?.value;
     },
-    // Cache successful responses
-    meta: {
-      onSuccess: (data: any) => {
-        if (data && cacheKey) {
-          cacheStorage.setString(cacheKey, JSON.stringify(data));
-        }
-      },
-    },
+    initialDataUpdatedAt: () =>
+      cacheKey
+        ? readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
+        : undefined,
   });
 };
 
@@ -92,15 +89,19 @@ export const useEnhancedMetadata = (
         console.log('Error validating imdbId or type:', error);
         return {};
       }
-      return fetchEnhancedMetadata({
+      const data = await fetchEnhancedMetadata({
         imdbId,
         type,
         malId: animeIds?.malId,
         anilistId: animeIds?.anilistId,
       });
+      if (metaKey) {
+        writePersistedCache(cacheStorage, metaKey, data);
+      }
+      return data;
     },
     enabled: !!metaKey,
-    staleTime: 30 * 60 * 1000, // 30 minutes - metadata changes rarely
+    staleTime: ENHANCED_META_STALE_MS,
     gcTime: 2 * 60 * 60 * 1000, // 2 hours
     retry: 1, // Don't retry too much for external API
     // Use cached data as initial data
@@ -108,24 +109,12 @@ export const useEnhancedMetadata = (
       if (!metaKey) {
         return undefined;
       }
-      const cached = cacheStorage.getString(metaKey);
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
+      return readPersistedCache<any>(cacheStorage, metaKey)?.value;
     },
-    // Cache successful responses
-    meta: {
-      onSuccess: (data: any) => {
-        if (data && metaKey) {
-          cacheStorage.setString(metaKey, JSON.stringify(data));
-        }
-      },
-    },
+    initialDataUpdatedAt: () =>
+      metaKey
+        ? readPersistedCache<any>(cacheStorage, metaKey)?.updatedAt
+        : undefined,
   });
 };
 
@@ -160,10 +149,22 @@ export const useContentDetails = (link: string, providerValue: string) => {
     externalAnimeIds,
   );
 
+  const artworkSources = info?.extra?.artworkSources;
+  const animeArtworkNeedsFallback =
+    providerValue === 'animeunity' &&
+    !!info &&
+    (artworkSources?.logo !== 'tmdb' ||
+      artworkSources?.poster !== 'tmdb' ||
+      artworkSources?.background !== 'tmdb');
+
   return {
     info,
     meta,
-    isLoading: infoLoading || metaLoading,
+    isLoading:
+      infoLoading ||
+      (providerValue === 'animeunity'
+        ? animeArtworkNeedsFallback && metaLoading
+        : metaLoading),
     error: infoError || (!info ? metaError : undefined),
     refetch: async () => {
       await Promise.all([refetchInfo(), refetchMeta()]);

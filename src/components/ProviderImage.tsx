@@ -1,11 +1,10 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Image, ImageProps} from 'react-native';
-import {providerManager} from '../lib/services/ProviderManager';
-import {cacheStorageService} from '../lib/storage';
+import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {
-  buildProviderCacheKey,
-  getProviderCacheScope,
-} from '../lib/utils/providerCacheScope';
+  getCachedProviderPoster,
+  resolveProviderPoster,
+} from '../lib/services/ProviderArtwork';
 
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
@@ -39,7 +38,25 @@ const ProviderImage = ({
   useEffect(() => {
     setSourceUri(uri || PLACEHOLDER_IMAGE);
     setHasTriedFallback(false);
-  }, [link, providerCacheScope, uri]);
+    if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+      return;
+    }
+    let cancelled = false;
+    const cached = getCachedProviderPoster(providerValue, link);
+    if (cached?.value) {
+      setSourceUri(cached.value);
+    }
+    resolveProviderPoster({providerValue, link})
+      .then(poster => {
+        if (!cancelled && poster) {
+          setSourceUri(poster);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [link, providerCacheScope, providerValue, uri]);
 
   const resolveFallback = useCallback(async () => {
     if (hasTriedFallback) {
@@ -54,23 +71,13 @@ const ProviderImage = ({
       return;
     }
 
-    const cacheKey = buildProviderCacheKey('poster', providerValue, link);
-    const cached = cacheStorageService.getString(cacheKey);
-    if (cached) {
-      if (isMounted.current) {
-        setSourceUri(cached);
-      }
-      return;
-    }
-
     try {
-      const info = await providerManager.getMetaData({
+      const image = await resolveProviderPoster({
         link,
-        provider: providerValue,
+        providerValue,
+        forceRefresh: true,
       });
-      const image = info?.poster || info?.image;
       if (image) {
-        cacheStorageService.setString(cacheKey, image);
         if (isMounted.current) {
           setSourceUri(image);
         }

@@ -9,6 +9,7 @@ import {gdFlixExtracter} from './gdflixExtractor';
 import {ProviderContext} from './types';
 import * as Crypto from 'expo-crypto';
 import {openWebView} from '../services/wafResolver';
+import {cacheStorage} from '../storage';
 
 /**
  * Context for provider functions.
@@ -28,6 +29,12 @@ export const providerContext: ProviderContext = {
   commonHeaders: headers,
   Crypto,
   cheerio,
+  cache: {
+    getString: key => cacheStorage.getString(`provider:${key}`),
+    setString: (key, value) =>
+      cacheStorage.setString(`provider:${key}`, value),
+    delete: key => cacheStorage.delete(`provider:${key}`),
+  },
   extractors,
   openWebView,
 };

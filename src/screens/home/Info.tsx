@@ -182,9 +182,28 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     () => (forceProviderTitle ? providerTitle : meta?.name || providerTitle),
     [forceProviderTitle, meta?.name, providerTitle],
   );
+  const artworkSources = info?.extra?.artworkSources;
   const posterImage = useMemo(() => {
-    if (providerValue === 'animeunity' && info?.poster) {
-      return info.poster;
+    if (providerValue === 'animeunity') {
+      if (
+        artworkSources?.poster === 'tmdb' ||
+        artworkSources?.poster === 'provider'
+      ) {
+        return (
+          info?.poster ||
+          meta?.poster ||
+          activePoster ||
+          info?.image ||
+          PLACEHOLDER_IMAGE
+        );
+      }
+      return (
+        meta?.poster ||
+        info?.poster ||
+        activePoster ||
+        info?.image ||
+        PLACEHOLDER_IMAGE
+      );
     }
     return (
       meta?.poster ||
@@ -193,7 +212,14 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       info?.image ||
       PLACEHOLDER_IMAGE
     );
-  }, [providerValue, info?.poster, info?.image, meta?.poster, activePoster]);
+  }, [
+    providerValue,
+    artworkSources?.poster,
+    info?.poster,
+    info?.image,
+    meta?.poster,
+    activePoster,
+  ]);
   // Optimized library management
   const addLibrary = useCallback(() => {
     ReactNativeHapticFeedback.trigger('effectClick', {
@@ -372,11 +398,30 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return false;
   }, [providerValue, info?.extra?.flags?.dub]);
 
-  const logoImage = info?.logo || meta?.logo;
+  const logoImage =
+    providerValue === 'animeunity' && artworkSources?.logo !== 'tmdb'
+      ? meta?.logo || info?.logo
+      : info?.logo || meta?.logo;
 
   const backgroundImage = useMemo(() => {
-    if (providerValue === 'animeunity' && info?.background) {
-      return info.background;
+    if (providerValue === 'animeunity') {
+      if (
+        artworkSources?.background === 'tmdb' ||
+        artworkSources?.background === 'provider'
+      ) {
+        return (
+          info?.background ||
+          meta?.background ||
+          info?.image ||
+          PLACEHOLDER_IMAGE
+        );
+      }
+      return (
+        meta?.background ||
+        info?.background ||
+        info?.image ||
+        PLACEHOLDER_IMAGE
+      );
     }
     if (meta?.background) {
       return meta.background;
@@ -392,7 +437,14 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       info?.background || info?.image ||
       PLACEHOLDER_IMAGE
     );
-  }, [meta?.background, providerValue, hasImdbMeta, info?.background, info?.image]);
+  }, [
+    meta?.background,
+    providerValue,
+    hasImdbMeta,
+    artworkSources?.background,
+    info?.background,
+    info?.image,
+  ]);
   const providerBackgroundFallback = useMemo(
     () => info?.background || info?.image || PLACEHOLDER_IMAGE,
     [info?.background, info?.image],

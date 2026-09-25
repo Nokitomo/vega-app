@@ -298,6 +298,40 @@ export class ProviderManager {
       );
     }
   };
+  getArtwork = async ({
+    link,
+    provider,
+    fields = ['poster'],
+  }: {
+    link: string;
+    provider: string;
+    fields?: Array<'logo' | 'poster' | 'background'>;
+  }): Promise<{logo?: string; poster?: string; background?: string}> => {
+    const metaModule =
+      extensionManager.getProviderModules(provider)?.modules.meta;
+    if (!metaModule) {
+      return {};
+    }
+    try {
+      const moduleExports = this.executeModule(
+        metaModule,
+        link,
+        provider,
+        providerContext,
+      );
+      if (typeof moduleExports.getArtwork === 'function') {
+        return await moduleExports.getArtwork({
+          link,
+          fields,
+          providerContext,
+        });
+      }
+      return {};
+    } catch (error) {
+      console.warn('Artwork lookup failed:', error);
+      return {};
+    }
+  };
   getStream = async ({
     link,
     type,

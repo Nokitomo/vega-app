@@ -14,6 +14,10 @@ import {
   buildProviderCacheKey,
   getProviderCacheScope,
 } from '../utils/providerCacheScope';
+import {
+  readPersistedCache,
+  writePersistedCache,
+} from '../utils/persistedCache';
 
 export interface HomePageData {
   title: string;
@@ -609,15 +613,29 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         const pickValue = (primary: unknown, fallback: unknown) =>
           isMeaningfulValue(primary) ? primary : fallback;
 
-        merged.image = pickValue(enhancedMeta.image, providerInfo.image);
-        merged.poster = pickValue(
-          enhancedMeta.poster,
+        const artworkSources = providerInfo?.extra?.artworkSources || {};
+        const pickArtwork = (
+          field: 'logo' | 'poster' | 'background',
+          providerValue: unknown,
+          enhancedValue: unknown,
+        ) => {
+          const source = artworkSources[field];
+          if (source === 'tmdb' || source === 'provider') {
+            return pickValue(providerValue, enhancedValue);
+          }
+          return pickValue(enhancedValue, providerValue);
+        };
+        merged.poster = pickArtwork(
+          'poster',
           providerInfo.poster || providerInfo.image,
+          enhancedMeta.poster,
         );
-        merged.background = pickValue(
-          enhancedMeta.background,
+        merged.background = pickArtwork(
+          'background',
           providerInfo.background || providerInfo.image,
+          enhancedMeta.background,
         );
+        merged.image = merged.background || merged.poster || providerInfo.image;
         merged.year = pickValue(enhancedMeta.year, providerInfo.year);
         merged.runtime = pickValue(enhancedMeta.runtime, providerInfo.runtime);
         merged.imdbRating = pickValue(
@@ -626,9 +644,14 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         );
         merged.genres = pickValue(enhancedMeta.genres, providerInfo.genres);
         merged.cast = pickValue(enhancedMeta.cast, providerInfo.cast);
-        merged.providerLogo = providerInfo.logo;
-        merged.cinemetaLogo = enhancedMeta.logo;
-        merged.logo = pickValue(providerInfo.logo, enhancedMeta.logo);
+        merged.logo = pickArtwork(
+          'logo',
+          providerInfo.logo,
+          enhancedMeta.logo,
+        );
+        merged.providerLogo = merged.logo;
+        merged.cinemetaLogo =
+          merged.logo !== enhancedMeta.logo ? enhancedMeta.logo : undefined;
 
         const providerTags = Array.isArray(providerInfo?.tags)
           ? providerInfo.tags
@@ -662,8 +685,17 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         malId: info.extra?.ids?.malId,
         anilistId: info.extra?.ids?.anilistId,
       });
+      const artworkSources = info?.extra?.artworkSources;
+      const needsAnimeArtworkFallback =
+        providerValue === 'animeunity' &&
+        (artworkSources?.logo !== 'tmdb' ||
+          artworkSources?.poster !== 'tmdb' ||
+          artworkSources?.background !== 'tmdb');
 
-      if (metaKey) {
+      if (
+        metaKey &&
+        (providerValue !== 'animeunity' || needsAnimeArtworkFallback)
+      ) {
         try {
           const enhancedMeta = await fetchEnhancedMetadata({
             imdbId: info.imdbId,
@@ -672,41 +704,39 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
             anilistId: info.extra?.ids?.anilistId,
           });
           if (enhancedMeta && Object.keys(enhancedMeta).length > 0) {
-            return mergeHeroMeta(info, enhancedMeta);
+            const merged = mergeHeroMeta(info, enhancedMeta);
+            if (cacheKey) {
+              writePersistedCache(cacheStorage, cacheKey, merged);
+            }
+            return merged;
           }
         } catch {
+          if (cacheKey) {
+            writePersistedCache(cacheStorage, cacheKey, info);
+          }
           return info;
         }
       }
 
+      if (cacheKey) {
+        writePersistedCache(cacheStorage, cacheKey, info);
+      }
       return info;
     },
     enabled: !!heroLink && !!providerValue,
     staleTime: 10 * 60 * 1000, // 10 minutes - hero metadata changes less frequently
     gcTime: 60 * 60 * 1000, // 1 hour
     retry: 2,
-    // Cache hero metadata separately
-    meta: {
-      onSuccess: (data: any) => {
-        if (cacheKey) {
-          cacheStorage.setString(cacheKey, JSON.stringify(data));
-        }
-      },
-    },
     // Use cached data as initial data
     initialData: () => {
       if (!cacheKey) {
         return undefined;
       }
-      const cached = cacheStorage.getString(cacheKey);
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
+      return readPersistedCache<any>(cacheStorage, cacheKey)?.value;
     },
+    initialDataUpdatedAt: () =>
+      cacheKey
+        ? readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
+        : undefined,
   });
 };
