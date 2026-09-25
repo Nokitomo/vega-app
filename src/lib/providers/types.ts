@@ -151,6 +151,9 @@ export interface Info {
     image?: string;
     type?: string;
     year?: string;
+    dubStatus?: 'subbed' | 'dubbed' | 'both';
+    dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
+    variants?: PostVariant[];
   }[];
   linkList: Link[];
 }

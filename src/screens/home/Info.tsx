@@ -1139,23 +1139,31 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                             </Text>
                           ) : (
                             relatedItems.map(
-                              (item: RelatedItem, index: number) => (
-                                <TouchableOpacity
-                                  key={`${item.link}-${index}`}
-                                  className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"
-                                  onPress={() =>
-                                    navigation.dispatch(
-                                      StackActions.push('Info', {
-                                        link: item.link,
-                                        provider: providerValue,
-                                        poster: item.image,
-                                        infoStack: [
-                                          ...infoStack,
-                                          currentInfoEntry,
-                                        ],
-                                      }),
-                                    )
-                                  }>
+                              (item: RelatedItem, index: number) => {
+                                const hasItalianVariant =
+                                  item.dubStatus === 'dubbed' ||
+                                  item.dubStatus === 'both' ||
+                                  hasItaBadge(item.title);
+                                return (
+                                  <TouchableOpacity
+                                    key={`${item.link}-${index}`}
+                                    className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"
+                                    onPress={() =>
+                                      navigation.dispatch(
+                                        StackActions.push('Info', {
+                                          link: item.link,
+                                          provider: providerValue,
+                                          poster: item.image,
+                                          variants: item.variants,
+                                          dubStatus: item.dubStatus,
+                                          dubStatusKey: item.dubStatusKey,
+                                          infoStack: [
+                                            ...infoStack,
+                                            currentInfoEntry,
+                                          ],
+                                        }),
+                                      )
+                                    }>
                                   <View className="relative">
                                     <Image
                                       source={{
@@ -1165,7 +1173,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                       }}
                                       style={{width: 60, height: 90}}
                                     />
-                                    {hasItaBadge(item.title) ? (
+                                    {hasItalianVariant ? (
                                       <View
                                         className="absolute top-1 left-1 rounded-full px-2 py-0.5"
                                         style={{backgroundColor: primary}}>
@@ -1185,8 +1193,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                         .join(' · ')}
                                     </Text>
                                   </View>
-                                </TouchableOpacity>
-                              ),
+                                  </TouchableOpacity>
+                                );
+                              },
                             )
                           )}
                         </View>

@@ -26,6 +26,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import Orientation from 'react-native-orientation-locker';
 import {applyAndroidUserOrientation} from '../lib/utils/vegaOrientation';
 import {useFocusEffect} from '@react-navigation/native';
+import {resolveWebViewLink} from '../lib/utils/providerLinks';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Webview'>;
 
@@ -49,6 +50,10 @@ const Webview = ({route, navigation}: Props) => {
     installing: false,
   });
   const reapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webViewLink = useMemo(
+    () => resolveWebViewLink(route.params.link),
+    [route.params.link],
+  );
 
   const canUseGecko = useMemo(
     () =>
@@ -240,7 +245,7 @@ const Webview = ({route, navigation}: Props) => {
               size={24}
               color="white"
               onPress={() => {
-                Linking.openURL(route.params.link);
+                Linking.openURL(webViewLink);
               }}
             />
             {canUseGecko && (
@@ -334,7 +339,7 @@ const Webview = ({route, navigation}: Props) => {
       {canUseGecko ? (
         <GeckoWebView
           style={{flex: 1}}
-          url={route.params.link}
+          url={webViewLink}
           javaScriptEnabled={true}
           adBlockEnabled={adBlockEnabled}
           adBlockRetryToken={adBlockRetryToken}
@@ -346,7 +351,7 @@ const Webview = ({route, navigation}: Props) => {
         <LegacyWebView
           style={{flex: 1}}
           javaScriptEnabled={false}
-          source={{uri: route.params.link}}
+          source={{uri: webViewLink}}
         />
       )}
     </SafeAreaView>

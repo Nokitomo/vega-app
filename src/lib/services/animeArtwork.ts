@@ -17,10 +17,9 @@ export const shouldFetchAniListBanner = ({
 }) =>
   Number.isFinite(anilistId) &&
   Number(anilistId) > 0 &&
-  backgroundSource !== 'provider';
+  !backgroundSource;
 
 export const selectAnimeUnityBackground = ({
-  backgroundSource,
   providerBackground,
   aniListBanner,
   fallback,
@@ -30,19 +29,11 @@ export const selectAnimeUnityBackground = ({
   aniListBanner?: string;
   fallback?: string;
 }): string | undefined => {
-  if (backgroundSource === 'provider') {
-    return hasText(providerBackground)
-      ? providerBackground
-      : hasText(fallback)
-        ? fallback
-        : undefined;
-  }
-
-  if (hasText(aniListBanner)) {
-    return aniListBanner;
-  }
   if (hasText(providerBackground)) {
     return providerBackground;
+  }
+  if (hasText(aniListBanner)) {
+    return aniListBanner;
   }
   return hasText(fallback) ? fallback : undefined;
 };
