@@ -40,6 +40,8 @@ import type {
   PostVariant,
 } from '../../lib/providers/types';
 import {selectAnimeUnityBackground} from '../../lib/services/animeArtwork';
+import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
+import {resolveWebViewLink} from '../../lib/utils/providerLinks';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -1036,6 +1038,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                 className="flex-row items-center gap-2"
                                 onPress={async () => {
                                   setThreeDotsMenuOpen(false);
+                                  if (!USER_WEBVIEW_ENABLED) {
+                                    await Linking.openURL(
+                                      resolveWebViewLink(activeLink),
+                                    );
+                                    return;
+                                  }
+
                                   navigation.navigate('Webview', {
                                     link: activeLink,
                                   });
@@ -1222,35 +1231,35 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                         }),
                                       )
                                     }>
-                                  <View className="relative">
-                                    <Image
-                                      source={{
-                                        uri:
-                                          item.image ||
-                                          'https://placehold.jp/24/363636/ffffff/100x150.png?text=Vega',
-                                      }}
-                                      style={{width: 60, height: 90}}
-                                    />
-                                    {hasItalianVariant ? (
-                                      <View
-                                        className="absolute top-1 left-1 rounded-full px-2 py-0.5"
-                                        style={{backgroundColor: primary}}>
-                                        <Text className="text-black text-[10px] font-semibold">
-                                          {t('ITA')}
-                                        </Text>
-                                      </View>
-                                    ) : null}
-                                  </View>
-                                  <View className="flex-1">
-                                    <Text className="text-white text-sm font-semibold">
-                                      {item.title}
-                                    </Text>
-                                    <Text className="text-gray-400 text-xs mt-1">
-                                      {[item.type, item.year]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                    </Text>
-                                  </View>
+                                    <View className="relative">
+                                      <Image
+                                        source={{
+                                          uri:
+                                            item.image ||
+                                            'https://placehold.jp/24/363636/ffffff/100x150.png?text=Vega',
+                                        }}
+                                        style={{width: 60, height: 90}}
+                                      />
+                                      {hasItalianVariant ? (
+                                        <View
+                                          className="absolute top-1 left-1 rounded-full px-2 py-0.5"
+                                          style={{backgroundColor: primary}}>
+                                          <Text className="text-black text-[10px] font-semibold">
+                                            {t('ITA')}
+                                          </Text>
+                                        </View>
+                                      ) : null}
+                                    </View>
+                                    <View className="flex-1">
+                                      <Text className="text-white text-sm font-semibold">
+                                        {item.title}
+                                      </Text>
+                                      <Text className="text-gray-400 text-xs mt-1">
+                                        {[item.type, item.year]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </Text>
+                                    </View>
                                   </TouchableOpacity>
                                 );
                               },

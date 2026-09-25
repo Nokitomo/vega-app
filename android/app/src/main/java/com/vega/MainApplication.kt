@@ -2,6 +2,7 @@ package com.vega
 
 import android.app.Application
 import android.content.res.Configuration
+import android.util.Log
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -17,6 +18,9 @@ import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
 class MainApplication : Application(), ReactApplication {
+  companion object {
+    private const val TAG = "MainApplication"
+  }
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
       this,
@@ -27,7 +31,14 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(SafCopyPackage())
               add(DeviceAbiPackage())
-              add(VegaGeckoViewPackage())
+              if (BuildConfig.VEGA_USER_WEBVIEW_ENABLED) {
+                try {
+                  val packageClass = Class.forName("com.vega.VegaGeckoViewPackage")
+                  add(packageClass.getDeclaredConstructor().newInstance() as ReactPackage)
+                } catch (error: Throwable) {
+                  Log.w(TAG, "VegaGeckoViewPackage unavailable", error)
+                }
+              }
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"

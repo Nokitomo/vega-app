@@ -27,6 +27,7 @@ import Orientation from 'react-native-orientation-locker';
 import {applyAndroidUserOrientation} from '../lib/utils/vegaOrientation';
 import {useFocusEffect} from '@react-navigation/native';
 import {resolveWebViewLink} from '../lib/utils/providerLinks';
+import {USER_WEBVIEW_ENABLED} from '../lib/config/features';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Webview'>;
 
@@ -55,8 +56,26 @@ const Webview = ({route, navigation}: Props) => {
     [route.params.link],
   );
 
+  useEffect(() => {
+    if (USER_WEBVIEW_ENABLED) {
+      return;
+    }
+
+    let cancelled = false;
+    Linking.openURL(webViewLink).finally(() => {
+      if (!cancelled && navigation.canGoBack()) {
+        navigation.goBack();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigation, webViewLink]);
+
   const canUseGecko = useMemo(
     () =>
+      USER_WEBVIEW_ENABLED &&
       Platform.OS === 'android' &&
       settingsStorage.isAndroidGeckoWebViewEnabled() &&
       !forceLegacyWebView,
@@ -152,7 +171,9 @@ const Webview = ({route, navigation}: Props) => {
       }
 
       try {
-        await NavigationBar.setVisibilityAsync(fullScreen ? 'hidden' : 'visible');
+        await NavigationBar.setVisibilityAsync(
+          fullScreen ? 'hidden' : 'visible',
+        );
       } catch {}
 
       StatusBar.setHidden(fullScreen, 'slide');
@@ -234,6 +255,16 @@ const Webview = ({route, navigation}: Props) => {
     };
   }, [clearReapplyTimer]);
 
+  if (!USER_WEBVIEW_ENABLED) {
+    return (
+      <SafeAreaView className="bg-black w-full h-full items-center justify-center px-6">
+        <Text className="text-white text-base text-center">
+          {t('Opening in external browser')}
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="bg-black w-full h-full">
       {!isWebContentFullscreen && (
@@ -294,7 +325,10 @@ const Webview = ({route, navigation}: Props) => {
               justifyContent: 'space-between',
             }}>
             <Text style={{color: '#E5E7EB'}}>{t('AdBlock Enabled')}</Text>
-            <Switch value={adBlockEnabled} onValueChange={handleToggleAdBlock} />
+            <Switch
+              value={adBlockEnabled}
+              onValueChange={handleToggleAdBlock}
+            />
           </View>
           <Text style={{color: '#D1D5DB', fontSize: 12}}>
             {adBlockStatus.installing
@@ -310,7 +344,8 @@ const Webview = ({route, navigation}: Props) => {
               {adBlockStatus.error}
             </Text>
           )}
-          <View style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 10}}>
+          <View
+            style={{flexDirection: 'row', justifyContent: 'flex-end', gap: 10}}>
             <Pressable
               onPress={handleRetryAdBlock}
               style={{

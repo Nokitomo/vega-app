@@ -34,12 +34,15 @@ export interface ChannelOptions {
   name: string;
   importance?: AndroidImportance;
   description?: string;
+  lights?: boolean;
+  vibration?: boolean;
 }
 
 class NotificationService {
   private _defaultChannelId = 'default';
   private _downloadChannelId = 'download';
   private _updateChannelId = 'update';
+  private _updateProgressChannelId = 'update-progress';
   private initialized = false;
 
   constructor() {
@@ -82,6 +85,15 @@ class NotificationService {
       importance: AndroidImportance.DEFAULT,
       description: i18n.t('Notifications for app and provider updates'),
     });
+
+    await notifee.createChannel({
+      id: this._updateProgressChannelId,
+      name: i18n.t('Update Progress'),
+      importance: AndroidImportance.LOW,
+      description: i18n.t('Notifications for app and provider updates'),
+      lights: false,
+      vibration: false,
+    });
   }
 
   /**
@@ -102,6 +114,8 @@ class NotificationService {
       name: options.name,
       importance: options.importance || AndroidImportance.DEFAULT,
       description: options.description,
+      lights: options.lights,
+      vibration: options.vibration,
     });
   }
 
@@ -319,12 +333,16 @@ class NotificationService {
     body: string,
     progress?: {max: number; current: number; indeterminate?: boolean},
   ): Promise<void> {
-    await this.displayUpdateNotification({
-      id: 'updateProgress',
-      title: title,
-      body: body,
-      progress: progress,
-    });
+    await this.displayNotification(
+      {
+        id: 'updateProgress',
+        title: title,
+        body: body,
+        progress: progress,
+        onlyAlertOnce: true,
+      },
+      this._updateProgressChannelId,
+    );
   }
 
   /**

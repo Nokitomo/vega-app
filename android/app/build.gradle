@@ -89,6 +89,12 @@ def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
+def isUserWebViewEnabled = (
+    findProperty('vegaUserWebViewEnabled')
+        ?: System.getenv('VEGA_USER_WEBVIEW_ENABLED')
+        ?: "false"
+).toString().toBoolean()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -100,13 +106,14 @@ android {
         applicationId 'com.vega'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 172
-        versionName "3.3.13"
+        versionCode 173
+        versionName "3.3.14"
         manifestPlaceholders = [
             googleCastReceiverAppId: (System.getenv('VEGA_CAST_RECEIVER_APP_ID') ?: 'CC1AD845')
         ]
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        buildConfigField "boolean", "VEGA_USER_WEBVIEW_ENABLED", "${isUserWebViewEnabled}"
     }
     signingConfigs {
         debug {
@@ -148,6 +155,17 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+    sourceSets {
+        main {
+            if (isUserWebViewEnabled) {
+                java.srcDirs += ["src/userWebView/java"]
+            } else {
+                assets {
+                    exclude "gecko-bridge/**"
+                }
+            }
+        }
+    }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -173,7 +191,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    implementation "org.mozilla.geckoview:geckoview:144.0.20251027123126"
+    if (isUserWebViewEnabled) {
+        implementation "org.mozilla.geckoview:geckoview:144.0.20251027123126"
+    }
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '21.4.0')}"
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";

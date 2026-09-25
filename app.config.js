@@ -7,8 +7,13 @@ const castReceiverAppId =
 const castReceiverWebUrl =
   process.env.EXPO_PUBLIC_CAST_RECEIVER_WEB_URL ||
   'https://nokitomo.github.io/vega-cast-receiver/';
-const castPairApiBaseUrl =
-  process.env.EXPO_PUBLIC_CAST_PAIR_API_BASE_URL || '';
+const castPairApiBaseUrl = process.env.EXPO_PUBLIC_CAST_PAIR_API_BASE_URL || '';
+const userWebViewEnabled =
+  String(
+    process.env.EXPO_PUBLIC_VEGA_USER_WEBVIEW_ENABLED ||
+      process.env.VEGA_USER_WEBVIEW_ENABLED ||
+      'false',
+  ).toLowerCase() === 'true';
 
 module.exports = () => {
   const plugins = [
@@ -103,7 +108,7 @@ module.exports = () => {
       autolinking: {exclude: ['expo-splash-screen']},
       plugins,
       slug: 'vega',
-      version: '3.3.13',
+      version: '3.3.14',
       userInterfaceStyle: 'dark',
       experiments: {
         reactCompiler: true,
@@ -115,7 +120,7 @@ module.exports = () => {
         minSdkVersion: 24,
         edgeToEdgeEnabled: true,
         package: 'com.vega',
-        versionCode: 172,
+        versionCode: 173,
         permissions: [
           'FOREGROUND_SERVICE',
           'FOREGROUND_SERVICE_MEDIA_PLAYBACK',
@@ -156,6 +161,7 @@ module.exports = () => {
         castReceiverAppId,
         castReceiverWebUrl,
         castPairApiBaseUrl,
+        userWebViewEnabled,
       },
     },
   };

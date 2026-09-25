@@ -335,9 +335,9 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
           request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW
 
         if (isNewWindow) {
-          if (isHttpOrHttps(uri)) {
+          if (isAllowedNewWindowNavigation(holder, uri)) {
             performSessionLoad(holder, uri)
-          } else {
+          } else if (!isHttpOrHttps(uri)) {
             openExternally(holder, uri, "new_window_external_scheme")
           }
           return GeckoResult.deny()
@@ -355,9 +355,9 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         session: GeckoSession,
         uri: String,
       ): GeckoResult<GeckoSession>? {
-        if (isHttpOrHttps(uri)) {
+        if (isAllowedNewWindowNavigation(holder, uri)) {
           performSessionLoad(holder, uri)
-        } else {
+        } else if (!isHttpOrHttps(uri)) {
           openExternally(holder, uri, "on_new_session")
         }
         return null
@@ -387,6 +387,7 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         session: GeckoSession,
         url: String,
       ) {
+        holder.currentUrl = url
         emitAdBlockStatus(holder, source = "page_start")
         emitEvent(
           holder.view,
@@ -625,6 +626,44 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
 
     val scheme = Uri.parse(uri).scheme?.lowercase() ?: return false
     return scheme == "http" || scheme == "https"
+  }
+
+  private fun isAllowedNewWindowNavigation(
+    holder: SessionHolder,
+    uri: String?,
+  ): Boolean {
+    if (!isHttpOrHttps(uri)) {
+      return false
+    }
+
+    return isSameOrigin(holder.currentUrl, uri)
+  }
+
+  private fun isSameOrigin(
+    left: String?,
+    right: String?,
+  ): Boolean {
+    if (left.isNullOrBlank() || right.isNullOrBlank()) {
+      return false
+    }
+
+    return try {
+      val leftUri = Uri.parse(left)
+      val rightUri = Uri.parse(right)
+      val leftScheme = leftUri.scheme?.lowercase()
+      val rightScheme = rightUri.scheme?.lowercase()
+      val leftHost = leftUri.host?.lowercase()
+      val rightHost = rightUri.host?.lowercase()
+      val leftPort = leftUri.port
+      val rightPort = rightUri.port
+
+      leftScheme == rightScheme &&
+        !leftHost.isNullOrBlank() &&
+        leftHost == rightHost &&
+        leftPort == rightPort
+    } catch (_: Throwable) {
+      false
+    }
   }
 
   private fun openExternally(
