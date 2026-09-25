@@ -47,7 +47,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Le card Home, ricerca, calendario e lista completa mostrano badge coerenti per episodio, disponibilita SUB/ITA e voto; i dati delle varianti vengono mantenuti nella navigazione verso Info.
 - Quando un post contiene piu `variants`, Info mostra il selettore di versione e ricarica metadata, episodi, player e azioni libreria usando il link SUB/ITA realmente selezionato. Il `Post.link` originario resta la selezione predefinita.
 - I metadata possono includere `logo`, `background`, `poster` e `trailers` (URL completi). Tutti i campi sono opzionali e non cambiano il contratto dei provider esistenti.
-- Per AnimeUnity Info preferisce poster, background, logo e trailer del provider; se un campo manca continua a usare metadata esterni, immagine card e placeholder. I trailer provider possono essere URL completi, mentre gli ID delle fonti esterne vengono normalizzati come URL YouTube.
+- Per AnimeUnity poster e logo arrivano gia ordinati dal provider metadata. Il background usa la priorita: background AnimeUnity, banner stagionale AniList, background TMDB, Cinemeta, AniZip Fanart e AniZip Banner; immagine card e placeholder restano gli ultimi fallback. AniList viene interrogato per l'artwork soltanto quando esiste un `anilistId` e il provider non ha gia un proprio background. I trailer provider possono essere URL completi, mentre gli ID delle fonti esterne vengono normalizzati come URL YouTube.
 
 ## Disponibilita contenuti futuri (upcoming)
 - I provider possono valorizzare in `Info.linkList[]` i campi opzionali:
@@ -73,7 +73,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 
 ## Priorita metadati (sinossi)
 - Quando sono presenti metadati esterni (Stremio per imdbId, AniList/Jikan per malId/anilistId), la UI usa quelli esterni.
-- Se manca l'imdbId ma sono disponibili malId/anilistId, la UI prova prima AniList e poi Jikan.
+- Per AnimeUnity la UI usa AniList tramite `anilistId` anche quando e presente un IMDb ID, cosi il banner stagionale resta separato dal background generale; Jikan resta fallback per i metadata non-artwork quando e disponibile soltanto `malId`.
 - Per AnimeUnity, se mancano malId/anilistId non viene richiesto alcun metadata esterno.
 - Per AnimeUnity la sinossi usa sempre quella del provider.
 - Per AnimeUnity con malId/anilistId, i metadati del provider vengono usati per sinossi, stato e studio; generi/cast/anno/durata/rating usano i metadata esterni quando disponibili, con fallback al provider se mancanti.

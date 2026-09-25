@@ -10,6 +10,7 @@ type AnimeMeta = {
   description?: string;
   poster?: string;
   background?: string;
+  banner?: string;
   year?: number | string;
   runtime?: string;
   imdbRating?: string;
@@ -22,6 +23,27 @@ const ANILIST_API_URL = 'https://graphql.anilist.co';
 const JIKAN_API_URL = 'https://api.jikan.moe/v4/anime';
 const REQUEST_TIMEOUT = 10000;
 const MAX_CAST = 8;
+
+export const fetchAniListBanner = async (
+  anilistId: number,
+): Promise<string | undefined> => {
+  if (!Number.isFinite(anilistId) || anilistId <= 0) {
+    return undefined;
+  }
+  const response = await axios.post(
+    ANILIST_API_URL,
+    {
+      query: 'query ($id: Int) { Media(id: $id, type: ANIME) { bannerImage } }',
+      variables: {id: anilistId},
+    },
+    {
+      timeout: REQUEST_TIMEOUT,
+      headers: {'Content-Type': 'application/json'},
+    },
+  );
+  const banner = response.data?.data?.Media?.bannerImage;
+  return typeof banner === 'string' && banner.trim() ? banner.trim() : undefined;
+};
 
 const cleanText = (value?: string) => {
   if (!value) {
@@ -169,6 +191,7 @@ const fetchFromAniList = async (anilistId: number): Promise<AnimeMeta> => {
     name: pickTitle(media.title),
     description: cleanText(media.description),
     poster: media.coverImage?.extraLarge || media.coverImage?.large,
+    banner: media.bannerImage || undefined,
     background: media.bannerImage || media.coverImage?.extraLarge,
     year: media.startDate?.year,
     runtime: media.duration ? `${media.duration} min` : undefined,
@@ -190,10 +213,7 @@ const fetchFromJikan = async (malId: number): Promise<AnimeMeta> => {
   }
 
   const title =
-    anime.title_english ||
-    anime.title ||
-    anime.title_japanese ||
-    undefined;
+    anime.title_english || anime.title || anime.title_japanese || undefined;
 
   const trailerId = anime.trailer?.youtube_id || undefined;
 
@@ -212,11 +232,9 @@ const fetchFromJikan = async (malId: number): Promise<AnimeMeta> => {
     name: title,
     description: cleanText(anime.synopsis),
     poster:
-      anime.images?.webp?.large_image_url ||
-      anime.images?.jpg?.large_image_url,
+      anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url,
     background:
-      anime.images?.webp?.large_image_url ||
-      anime.images?.jpg?.large_image_url,
+      anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url,
     year: anime.year || anime.aired?.from?.slice(0, 4),
     runtime: anime.duration || undefined,
     imdbRating: formatScoreDirect(anime.score),

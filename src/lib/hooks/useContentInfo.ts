@@ -2,15 +2,16 @@ import {useQuery} from '@tanstack/react-query';
 import {providerManager} from '../services/ProviderManager';
 import {cacheStorage} from '../storage';
 import i18n from '../../i18n';
-import {buildEnhancedMetaKey, fetchEnhancedMetadata} from '../services/enhancedMeta';
+import {
+  buildEnhancedMetaKey,
+  fetchEnhancedMetadata,
+} from '../services/enhancedMeta';
 import {
   buildProviderCacheKey,
   getProviderCacheScope,
 } from '../utils/providerCacheScope';
-import {
-  readPersistedCache,
-  writePersistedCache,
-} from '../utils/persistedCache';
+import {readPersistedCache, writePersistedCache} from '../utils/persistedCache';
+import {shouldFetchAniListBanner} from '../services/animeArtwork';
 
 const CONTENT_INFO_STALE_MS = 24 * 60 * 60 * 1000;
 const ENHANCED_META_STALE_MS = 24 * 60 * 60 * 1000;
@@ -133,8 +134,11 @@ export const useContentDetails = (link: string, providerValue: string) => {
     providerValue !== 'animeunity' ||
     !!animeIds?.malId ||
     !!animeIds?.anilistId;
-  const externalImdbId = allowExternalMeta ? info?.imdbId || '' : '';
-  const externalType = allowExternalMeta ? info?.type || '' : '';
+  const preferAnimeMeta = providerValue === 'animeunity';
+  const externalImdbId =
+    allowExternalMeta && !preferAnimeMeta ? info?.imdbId || '' : '';
+  const externalType =
+    allowExternalMeta && !preferAnimeMeta ? info?.type || '' : '';
   const externalAnimeIds = allowExternalMeta ? animeIds : undefined;
 
   // Then, get enhanced metadata if external IDs are available
@@ -143,19 +147,16 @@ export const useContentDetails = (link: string, providerValue: string) => {
     isLoading: metaLoading,
     error: metaError,
     refetch: refetchMeta,
-  } = useEnhancedMetadata(
-    externalImdbId,
-    externalType,
-    externalAnimeIds,
-  );
+  } = useEnhancedMetadata(externalImdbId, externalType, externalAnimeIds);
 
   const artworkSources = info?.extra?.artworkSources;
   const animeArtworkNeedsFallback =
     providerValue === 'animeunity' &&
     !!info &&
-    (artworkSources?.logo !== 'tmdb' ||
-      artworkSources?.poster !== 'tmdb' ||
-      artworkSources?.background !== 'tmdb');
+    shouldFetchAniListBanner({
+      anilistId: animeIds?.anilistId,
+      backgroundSource: artworkSources?.background,
+    });
 
   return {
     info,

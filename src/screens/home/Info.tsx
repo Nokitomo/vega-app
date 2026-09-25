@@ -39,6 +39,7 @@ import type {
   Info as ProviderInfo,
   PostVariant,
 } from '../../lib/providers/types';
+import {selectAnimeUnityBackground} from '../../lib/services/animeArtwork';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -103,10 +104,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     isLoading: infoLoading,
     error,
     refetch,
-  } = useContentDetails(
-    activeLink,
-    providerValue,
-  );
+  } = useContentDetails(activeLink, providerValue);
 
   // UI state
   const [threeDotsMenuOpen, setThreeDotsMenuOpen] = useState(false);
@@ -185,21 +183,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const artworkSources = info?.extra?.artworkSources;
   const posterImage = useMemo(() => {
     if (providerValue === 'animeunity') {
-      if (
-        artworkSources?.poster === 'tmdb' ||
-        artworkSources?.poster === 'provider'
-      ) {
-        return (
-          info?.poster ||
-          meta?.poster ||
-          activePoster ||
-          info?.image ||
-          PLACEHOLDER_IMAGE
-        );
-      }
       return (
-        meta?.poster ||
         info?.poster ||
+        meta?.poster ||
         activePoster ||
         info?.image ||
         PLACEHOLDER_IMAGE
@@ -273,12 +259,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return true;
     }
     return !hasAnimeExternalIds;
-  }, [
-    allowProviderMetadata,
-    info?.studio,
-    providerValue,
-    hasAnimeExternalIds,
-  ]);
+  }, [allowProviderMetadata, info?.studio, providerValue, hasAnimeExternalIds]);
   const hasMetaYear = useMemo(
     () => meta?.year != null && String(meta.year).trim() !== '',
     [meta?.year],
@@ -340,7 +321,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return info?.year;
     }
     return allowProviderYear ? info?.year : undefined;
-  }, [hasMetaYear, meta?.year, isStreamingUnity, allowProviderYear, info?.year]);
+  }, [
+    hasMetaYear,
+    meta?.year,
+    isStreamingUnity,
+    allowProviderYear,
+    info?.year,
+  ]);
   const badgeRuntime = useMemo(() => {
     if (hasMetaRuntime) {
       return meta.runtime;
@@ -362,9 +349,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
         ? meta?.imdbRating
         : isStreamingUnity
           ? info?.rating
-        : allowProviderRating
-          ? info?.rating
-          : undefined,
+          : allowProviderRating
+            ? info?.rating
+            : undefined,
     [
       hasMetaRating,
       meta?.imdbRating,
@@ -399,28 +386,17 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   }, [providerValue, info?.extra?.flags?.dub]);
 
   const logoImage =
-    providerValue === 'animeunity' && artworkSources?.logo !== 'tmdb'
-      ? meta?.logo || info?.logo
-      : info?.logo || meta?.logo;
+    providerValue === 'animeunity' ? info?.logo : info?.logo || meta?.logo;
 
   const backgroundImage = useMemo(() => {
     if (providerValue === 'animeunity') {
-      if (
-        artworkSources?.background === 'tmdb' ||
-        artworkSources?.background === 'provider'
-      ) {
-        return (
-          info?.background ||
-          meta?.background ||
-          info?.image ||
-          PLACEHOLDER_IMAGE
-        );
-      }
       return (
-        meta?.background ||
-        info?.background ||
-        info?.image ||
-        PLACEHOLDER_IMAGE
+        selectAnimeUnityBackground({
+          backgroundSource: artworkSources?.background,
+          providerBackground: info?.background,
+          aniListBanner: meta?.banner,
+          fallback: info?.image,
+        }) || PLACEHOLDER_IMAGE
       );
     }
     if (meta?.background) {
@@ -433,11 +409,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     ) {
       return info?.background || info?.image || PLACEHOLDER_IMAGE;
     }
-    return (
-      info?.background || info?.image ||
-      PLACEHOLDER_IMAGE
-    );
+    return info?.background || info?.image || PLACEHOLDER_IMAGE;
   }, [
+    meta?.banner,
     meta?.background,
     providerValue,
     hasImdbMeta,
@@ -533,7 +507,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     const tags = info?.tags ?? [];
     const tagKeys = info?.tagKeys ?? {};
     const statusKeys = new Set(['Ongoing', 'Completed', 'Upcoming', 'Dropped']);
-    const matched = tags.find((tag: string) => statusKeys.has(tagKeys[tag] || ''));
+    const matched = tags.find((tag: string) =>
+      statusKeys.has(tagKeys[tag] || ''),
+    );
     if (matched) {
       return {tag: matched, key: tagKeys[matched]};
     }
@@ -598,14 +574,19 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return localizedGenres.slice(0, 2);
     }
     return [];
-  }, [meta?.genres, isStreamingUnity, providerLocalizedGenres, localizedGenres]);
+  }, [
+    meta?.genres,
+    isStreamingUnity,
+    providerLocalizedGenres,
+    localizedGenres,
+  ]);
   const metaCast = useMemo(() => meta?.cast ?? [], [meta?.cast]);
   const providerCast = useMemo(
     () =>
       isStreamingUnity
-        ? info?.cast ?? []
+        ? (info?.cast ?? [])
         : allowProviderCast
-          ? info?.cast ?? []
+          ? (info?.cast ?? [])
           : [],
     [isStreamingUnity, allowProviderCast, info?.cast],
   );
@@ -624,7 +605,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       showMetaDetails &&
       (allowProviderStudio ||
         (allowProviderGenres && info?.genres && info.genres.length > 0) ||
-        ((showProviderFallback && !hasAnimeExternalIds) &&
+        (showProviderFallback &&
+          !hasAnimeExternalIds &&
           (!!info?.country || !!info?.director))),
     [
       showMetaDetails,
@@ -913,18 +895,18 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         {displayCast
                           .slice(0, 3)
                           .map((actor: string, index: number) => (
-                          <Text
-                            key={`${actor}-${index}`}
-                            numberOfLines={1}
-                            className={`text-xs bg-tertiary p-1 px-2 rounded-md ${
-                              index % 3 === 0
-                                ? 'text-red-500'
-                                : index % 3 === 1
-                                  ? 'text-blue-500'
-                                  : 'text-green-500'
-                            }`}>
-                            {actor}
-                          </Text>
+                            <Text
+                              key={`${actor}-${index}`}
+                              numberOfLines={1}
+                              className={`text-xs bg-tertiary p-1 px-2 rounded-md ${
+                                index % 3 === 0
+                                  ? 'text-red-500'
+                                  : index % 3 === 1
+                                    ? 'text-blue-500'
+                                    : 'text-green-500'
+                              }`}>
+                              {actor}
+                            </Text>
                           ))}
                       </View>
                     </View>
@@ -1067,12 +1049,16 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           })}
                         </Text>
                       ) : null}
-                      {showProviderFallback && !hasAnimeExternalIds && info?.country ? (
+                      {showProviderFallback &&
+                      !hasAnimeExternalIds &&
+                      info?.country ? (
                         <Text className="text-gray-400 text-xs mt-1">
                           {t('Country: {{name}}', {name: info.country})}
                         </Text>
                       ) : null}
-                      {showProviderFallback && !hasAnimeExternalIds && info?.director ? (
+                      {showProviderFallback &&
+                      !hasAnimeExternalIds &&
+                      info?.director ? (
                         <Text className="text-gray-400 text-xs mt-1">
                           {t('Director: {{name}}', {name: info.director})}
                         </Text>
@@ -1152,54 +1138,56 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                               {t('No related items available.')}
                             </Text>
                           ) : (
-                            relatedItems.map((item: RelatedItem, index: number) => (
-                              <TouchableOpacity
-                                key={`${item.link}-${index}`}
-                                className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"
-                                onPress={() =>
-                                  navigation.dispatch(
-                                    StackActions.push('Info', {
-                                      link: item.link,
-                                      provider: providerValue,
-                                      poster: item.image,
-                                      infoStack: [
-                                        ...infoStack,
-                                        currentInfoEntry,
-                                      ],
-                                    }),
-                                  )
-                                }>
-                                <View className="relative">
-                                  <Image
-                                    source={{
-                                      uri:
-                                        item.image ||
-                                        'https://placehold.jp/24/363636/ffffff/100x150.png?text=Vega',
-                                    }}
-                                    style={{width: 60, height: 90}}
-                                  />
-                                  {hasItaBadge(item.title) ? (
-                                    <View
-                                      className="absolute top-1 left-1 rounded-full px-2 py-0.5"
-                                      style={{backgroundColor: primary}}>
-                                      <Text className="text-black text-[10px] font-semibold">
-                                        {t('ITA')}
-                                      </Text>
-                                    </View>
-                                  ) : null}
-                                </View>
-                                <View className="flex-1">
-                                  <Text className="text-white text-sm font-semibold">
-                                    {item.title}
-                                  </Text>
-                                  <Text className="text-gray-400 text-xs mt-1">
-                                    {[item.type, item.year]
-                                      .filter(Boolean)
-                                      .join(' · ')}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            ))
+                            relatedItems.map(
+                              (item: RelatedItem, index: number) => (
+                                <TouchableOpacity
+                                  key={`${item.link}-${index}`}
+                                  className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"
+                                  onPress={() =>
+                                    navigation.dispatch(
+                                      StackActions.push('Info', {
+                                        link: item.link,
+                                        provider: providerValue,
+                                        poster: item.image,
+                                        infoStack: [
+                                          ...infoStack,
+                                          currentInfoEntry,
+                                        ],
+                                      }),
+                                    )
+                                  }>
+                                  <View className="relative">
+                                    <Image
+                                      source={{
+                                        uri:
+                                          item.image ||
+                                          'https://placehold.jp/24/363636/ffffff/100x150.png?text=Vega',
+                                      }}
+                                      style={{width: 60, height: 90}}
+                                    />
+                                    {hasItaBadge(item.title) ? (
+                                      <View
+                                        className="absolute top-1 left-1 rounded-full px-2 py-0.5"
+                                        style={{backgroundColor: primary}}>
+                                        <Text className="text-black text-[10px] font-semibold">
+                                          {t('ITA')}
+                                        </Text>
+                                      </View>
+                                    ) : null}
+                                  </View>
+                                  <View className="flex-1">
+                                    <Text className="text-white text-sm font-semibold">
+                                      {item.title}
+                                    </Text>
+                                    <Text className="text-gray-400 text-xs mt-1">
+                                      {[item.type, item.year]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              ),
+                            )
                           )}
                         </View>
                       )}

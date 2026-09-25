@@ -14,10 +14,12 @@ import {
   buildProviderCacheKey,
   getProviderCacheScope,
 } from '../utils/providerCacheScope';
+import {readPersistedCache, writePersistedCache} from '../utils/persistedCache';
 import {
-  readPersistedCache,
-  writePersistedCache,
-} from '../utils/persistedCache';
+  selectAnimeUnityBackground,
+  shouldFetchAniListBanner,
+} from '../services/animeArtwork';
+import {fetchAniListBanner} from '../services/animeMeta';
 
 export interface HomePageData {
   title: string;
@@ -36,6 +38,7 @@ interface UseHomePageDataOptions {
 }
 
 const STREAMINGUNITY_PROVIDER = 'streamingunity';
+const HERO_METADATA_STALE_MS = 24 * 60 * 60 * 1000;
 const HOME_SECTION_PARALLEL_LIMIT = 4;
 const HOME_INITIAL_SECTION_COUNT = 4;
 const HOME_STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -49,7 +52,10 @@ const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
   return buildProviderCacheKey('heroMetadata', providerValue, heroLink);
 };
 
-const shouldHideHomeCategory = (providerValue: string, filter: string): boolean => {
+const shouldHideHomeCategory = (
+  providerValue: string,
+  filter: string,
+): boolean => {
   if (providerValue !== STREAMINGUNITY_PROVIDER) {
     return false;
   }
@@ -130,7 +136,8 @@ export const useHomePageData = ({
         Posts: parsed.Posts.slice(0, HOME_CATEGORY_MAX_ITEMS),
         signature: typeof parsed.signature === 'string' ? parsed.signature : '',
         updatedAt:
-          typeof parsed.updatedAt === 'number' && Number.isFinite(parsed.updatedAt)
+          typeof parsed.updatedAt === 'number' &&
+          Number.isFinite(parsed.updatedAt)
             ? parsed.updatedAt
             : Date.now(),
       };
@@ -143,7 +150,10 @@ export const useHomePageData = ({
     cacheStorage.setString(buildCategoryCacheKey(filter), JSON.stringify(data));
   };
 
-  const getCategoryStaleTime = (filter: string, catalogStaleTimeMs?: number) => {
+  const getCategoryStaleTime = (
+    filter: string,
+    catalogStaleTimeMs?: number,
+  ) => {
     if (
       typeof catalogStaleTimeMs === 'number' &&
       Number.isFinite(catalogStaleTimeMs) &&
@@ -234,7 +244,8 @@ export const useHomePageData = ({
             ? posts.slice(0, HOME_CATEGORY_MAX_ITEMS)
             : [];
           const nextSignature = buildPostsSignature(nextPosts);
-          const previous = queryClient.getQueryData<CategoryQueryData>(queryKey);
+          const previous =
+            queryClient.getQueryData<CategoryQueryData>(queryKey);
 
           if (previous && previous.signature === nextSignature) {
             const sameData = {
@@ -273,7 +284,9 @@ export const useHomePageData = ({
   }, [queryResults]);
 
   const categoryDataFingerprint = queryResults
-    .map(result => (result.data as CategoryQueryData | undefined)?.updatedAt || 0)
+    .map(
+      result => (result.data as CategoryQueryData | undefined)?.updatedAt || 0,
+    )
     .join(',');
   const staleCategoryIndexes = useMemo(
     () =>
@@ -379,7 +392,8 @@ export const useHomePageData = ({
   };
 
   const prioritizedStaleCategoryIndexes = useMemo(
-    () => sortCategoryIndexesByPriority(eligibleStaleCategoryIndexes, categories),
+    () =>
+      sortCategoryIndexesByPriority(eligibleStaleCategoryIndexes, categories),
     [categories, eligibleStaleCategoryIndexes],
   );
 
@@ -407,7 +421,7 @@ export const useHomePageData = ({
       .filter(index => !fetchingCategoryIndexesRef.current.has(index))
       .slice(0, availableSlots);
     batch.forEach(index => fetchingCategoryIndexesRef.current.add(index));
-    void Promise.all(
+    Promise.all(
       batch.map(async index => {
         try {
           const queryResult = queryResultsRef.current[index];
@@ -420,13 +434,8 @@ export const useHomePageData = ({
           fetchingCategoryIndexesRef.current.delete(index);
         }
       }),
-    );
-  }, [
-    enabled,
-    isScreenActive,
-    providerValue,
-    prioritizedStaleCategoryIndexes,
-  ]);
+    ).catch(() => undefined);
+  }, [enabled, isScreenActive, providerValue, prioritizedStaleCategoryIndexes]);
 
   const homeData = useMemo<HomePageData[]>(
     () =>
@@ -459,8 +468,7 @@ export const useHomePageData = ({
       (result.isLoading || result.isPending),
   );
   const isRefetching = queryResults.some(result => result.isRefetching);
-  const firstError =
-    queryResults.find(result => result.error)?.error || null;
+  const firstError = queryResults.find(result => result.error)?.error || null;
 
   return {
     data: homeData,
@@ -469,9 +477,7 @@ export const useHomePageData = ({
     error: firstError as Error | null,
     activateCategories,
     refetch: async () => {
-      await runBatchedRefetch(
-        categories.map((_, index) => index),
-      );
+      await runBatchedRefetch(categories.map((_, index) => index));
       return {data: homeData};
     },
     refetchCategory: async (filter: string) => {
@@ -502,7 +508,10 @@ export const getRandomHeroPost = (
   const heroCategoryIndex = [...homeData]
     .map((category, index) => ({category, index}))
     .reverse()
-    .find(item => Array.isArray(item.category.Posts) && item.category.Posts.length > 0);
+    .find(
+      item =>
+        Array.isArray(item.category.Posts) && item.category.Posts.length > 0,
+    );
 
   if (!heroCategoryIndex) {
     return null;
@@ -541,16 +550,10 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
   const providerCacheScope = getProviderCacheScope(providerValue);
 
   return useQuery({
-    queryKey: [
-      'heroMetadata',
-      heroLink,
-      providerValue,
-      providerCacheScope,
-    ],
+    queryKey: ['heroMetadata', heroLink, providerValue, providerCacheScope],
     queryFn: async () => {
-      const {providerManager: importedProviderManager} = await import(
-        '../services/ProviderManager'
-      );
+      const {providerManager: importedProviderManager} =
+        await import('../services/ProviderManager');
       const info = await importedProviderManager.getMetaData({
         link: heroLink,
         provider: providerValue,
@@ -582,25 +585,38 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         const artworkSources = providerInfo?.extra?.artworkSources || {};
         const pickArtwork = (
           field: 'logo' | 'poster' | 'background',
-          providerValue: unknown,
+          providerArtworkValue: unknown,
           enhancedValue: unknown,
         ) => {
           const source = artworkSources[field];
           if (source === 'tmdb' || source === 'provider') {
-            return pickValue(providerValue, enhancedValue);
+            return pickValue(providerArtworkValue, enhancedValue);
           }
-          return pickValue(enhancedValue, providerValue);
+          return pickValue(enhancedValue, providerArtworkValue);
         };
-        merged.poster = pickArtwork(
-          'poster',
-          providerInfo.poster || providerInfo.image,
-          enhancedMeta.poster,
-        );
-        merged.background = pickArtwork(
-          'background',
-          providerInfo.background || providerInfo.image,
-          enhancedMeta.background,
-        );
+        const isAnimeUnity = providerValue === 'animeunity';
+        merged.poster = isAnimeUnity
+          ? pickValue(
+              providerInfo.poster || providerInfo.image,
+              enhancedMeta.poster,
+            )
+          : pickArtwork(
+              'poster',
+              providerInfo.poster || providerInfo.image,
+              enhancedMeta.poster,
+            );
+        merged.background = isAnimeUnity
+          ? selectAnimeUnityBackground({
+              backgroundSource: artworkSources.background,
+              providerBackground: providerInfo.background,
+              aniListBanner: enhancedMeta.banner,
+              fallback: providerInfo.image,
+            })
+          : pickArtwork(
+              'background',
+              providerInfo.background || providerInfo.image,
+              enhancedMeta.background,
+            );
         merged.image = merged.background || merged.poster || providerInfo.image;
         merged.year = pickValue(enhancedMeta.year, providerInfo.year);
         merged.runtime = pickValue(enhancedMeta.runtime, providerInfo.runtime);
@@ -610,11 +626,9 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         );
         merged.genres = pickValue(enhancedMeta.genres, providerInfo.genres);
         merged.cast = pickValue(enhancedMeta.cast, providerInfo.cast);
-        merged.logo = pickArtwork(
-          'logo',
-          providerInfo.logo,
-          enhancedMeta.logo,
-        );
+        merged.logo = isAnimeUnity
+          ? providerInfo.logo
+          : pickArtwork('logo', providerInfo.logo, enhancedMeta.logo);
         merged.providerLogo = merged.logo;
         merged.cinemetaLogo =
           merged.logo !== enhancedMeta.logo ? enhancedMeta.logo : undefined;
@@ -646,29 +660,37 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       };
 
       const metaKey = buildEnhancedMetaKey({
-        imdbId: info.imdbId,
-        type: info.type,
+        imdbId: providerValue === 'animeunity' ? undefined : info.imdbId,
+        type: providerValue === 'animeunity' ? undefined : info.type,
         malId: info.extra?.ids?.malId,
         anilistId: info.extra?.ids?.anilistId,
       });
       const artworkSources = info?.extra?.artworkSources;
       const needsAnimeArtworkFallback =
         providerValue === 'animeunity' &&
-        (artworkSources?.logo !== 'tmdb' ||
-          artworkSources?.poster !== 'tmdb' ||
-          artworkSources?.background !== 'tmdb');
+        shouldFetchAniListBanner({
+          anilistId: info.extra?.ids?.anilistId,
+          backgroundSource: artworkSources?.background,
+        });
 
       if (
         metaKey &&
         (providerValue !== 'animeunity' || needsAnimeArtworkFallback)
       ) {
         try {
-          const enhancedMeta = await fetchEnhancedMetadata({
-            imdbId: info.imdbId,
-            type: info.type,
-            malId: info.extra?.ids?.malId,
-            anilistId: info.extra?.ids?.anilistId,
-          });
+          const enhancedMeta =
+            providerValue === 'animeunity'
+              ? {
+                  banner: await fetchAniListBanner(
+                    Number(info.extra?.ids?.anilistId),
+                  ),
+                }
+              : await fetchEnhancedMetadata({
+                  imdbId: info.imdbId,
+                  type: info.type,
+                  malId: info.extra?.ids?.malId,
+                  anilistId: info.extra?.ids?.anilistId,
+                });
           if (enhancedMeta && Object.keys(enhancedMeta).length > 0) {
             const merged = mergeHeroMeta(info, enhancedMeta);
             if (cacheKey) {
@@ -690,7 +712,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       return info;
     },
     enabled: !!heroLink && !!providerValue,
-    staleTime: 10 * 60 * 1000, // 10 minutes - hero metadata changes less frequently
+    staleTime: HERO_METADATA_STALE_MS,
     gcTime: 60 * 60 * 1000, // 1 hour
     retry: 2,
     // Use cached data as initial data
