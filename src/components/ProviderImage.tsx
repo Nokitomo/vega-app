@@ -5,6 +5,7 @@ import {
   getCachedProviderPoster,
   resolveProviderPoster,
 } from '../lib/services/ProviderArtwork';
+import type {Post} from '../lib/providers/types';
 
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
@@ -14,12 +15,16 @@ type ProviderImageProps = Omit<ImageProps, 'source'> & {
   uri?: string;
   link?: string;
   providerValue?: string;
+  artworkHints?: Post['artworkHints'];
+  shouldResolveArtwork?: boolean;
 };
 
 const ProviderImage = ({
   uri,
   link,
   providerValue,
+  artworkHints,
+  shouldResolveArtwork = true,
   onError,
   ...rest
 }: ProviderImageProps): React.JSX.Element => {
@@ -36,27 +41,55 @@ const ProviderImage = ({
   }, []);
 
   useEffect(() => {
-    setSourceUri(uri || PLACEHOLDER_IMAGE);
+    const fallbackUri = uri || PLACEHOLDER_IMAGE;
     setHasTriedFallback(false);
     if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+      setSourceUri(fallbackUri);
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     const cached = getCachedProviderPoster(providerValue, link);
-    if (cached?.value) {
-      setSourceUri(cached.value);
+    if (cached?.value.poster) {
+      setSourceUri(cached.value.poster);
+    } else if (cached) {
+      setSourceUri(fallbackUri);
+    } else {
+      setSourceUri(PLACEHOLDER_IMAGE);
     }
-    resolveProviderPoster({providerValue, link})
+    if (!shouldResolveArtwork) {
+      return () => controller.abort();
+    }
+    resolveProviderPoster({
+      providerValue,
+      link,
+      hints: artworkHints,
+      signal: controller.signal,
+    })
       .then(poster => {
-        if (!cancelled && poster) {
-          setSourceUri(poster);
+        if (!cancelled) {
+          setSourceUri(poster || fallbackUri);
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!cancelled) {
+          setSourceUri(fallbackUri);
+        }
+      });
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [link, providerCacheScope, providerValue, uri]);
+  }, [
+    artworkHints?.anilistId,
+    artworkHints?.isMovie,
+    artworkHints?.malId,
+    link,
+    providerCacheScope,
+    providerValue,
+    shouldResolveArtwork,
+    uri,
+  ]);
 
   const resolveFallback = useCallback(async () => {
     if (hasTriedFallback) {
@@ -75,6 +108,7 @@ const ProviderImage = ({
       const image = await resolveProviderPoster({
         link,
         providerValue,
+        hints: artworkHints,
         forceRefresh: true,
       });
       if (image) {
@@ -90,7 +124,7 @@ const ProviderImage = ({
     if (isMounted.current) {
       setSourceUri(PLACEHOLDER_IMAGE);
     }
-  }, [hasTriedFallback, link, providerCacheScope, providerValue]);
+  }, [artworkHints, hasTriedFallback, link, providerCacheScope, providerValue]);
 
   const handleError: ImageProps['onError'] = useCallback(
     (event: Parameters<NonNullable<ImageProps['onError']>>[0]) => {

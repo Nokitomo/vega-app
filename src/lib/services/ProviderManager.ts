@@ -11,6 +11,8 @@ import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
 
 export class ProviderManager {
+  private readonly moduleExportsCache = new Map<string, any>();
+
   private getProviderErrorMessage(
     error: unknown,
     fallbackKey: string,
@@ -70,6 +72,10 @@ export class ProviderManager {
   }
 
   private executeModule(moduleCode: string, ...args: any[]): any {
+    const cached = this.moduleExportsCache.get(moduleCode);
+    if (cached) {
+      return cached;
+    }
     const context = this.createExecutionContext();
 
     const executeModule = new Function(
@@ -87,7 +93,9 @@ export class ProviderManager {
       return exports;
       `,
     );
-    return executeModule(context, ...args);
+    const moduleExports = executeModule(context, ...args);
+    this.moduleExportsCache.set(moduleCode, moduleExports);
+    return moduleExports;
   }
   getCatalog = ({providerValue}: {providerValue: string}): Catalog[] => {
     // Use extensionManager which now handles test mode automatically
@@ -259,9 +267,11 @@ export class ProviderManager {
   getMetaData = async ({
     link,
     provider,
+    purpose = 'full',
   }: {
     link: string;
     provider: string;
+    purpose?: 'full' | 'hero';
   }): Promise<Info> => {
     // Use extensionManager which now handles test mode automatically
     const getMetaDataModule =
@@ -278,6 +288,7 @@ export class ProviderManager {
         getMetaDataModule,
         link,
         provider,
+        purpose,
         providerContext,
       );
 
@@ -285,6 +296,7 @@ export class ProviderManager {
       return await moduleExports.getMeta({
         link,
         provider,
+        purpose,
         providerContext,
       });
     } catch (error) {
@@ -302,11 +314,20 @@ export class ProviderManager {
     link,
     provider,
     fields = ['poster'],
+    hints,
+    imageSize = 'original',
   }: {
     link: string;
     provider: string;
     fields?: Array<'logo' | 'poster' | 'background'>;
-  }): Promise<{logo?: string; poster?: string; background?: string}> => {
+    hints?: Post['artworkHints'];
+    imageSize?: 'original' | 'w300' | 'w780';
+  }): Promise<{
+    logo?: string;
+    poster?: string;
+    background?: string;
+    resolved?: boolean;
+  }> => {
     const metaModule =
       extensionManager.getProviderModules(provider)?.modules.meta;
     if (!metaModule) {
@@ -323,6 +344,8 @@ export class ProviderManager {
         return await moduleExports.getArtwork({
           link,
           fields,
+          hints,
+          imageSize,
           providerContext,
         });
       }

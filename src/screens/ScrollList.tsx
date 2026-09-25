@@ -432,6 +432,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                               providerValue={
                                 route.params.providerValue || provider.value
                               }
+                              artworkHints={item.artworkHints}
                               style={{
                                 width: gridItemWidth,
                                 height: gridItemHeight,
@@ -510,6 +511,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                     uri={item.image}
                     link={item.link}
                     providerValue={route.params.providerValue || provider.value}
+                    artworkHints={item.artworkHints}
                     style={
                       viewType === 1
                         ? {width: gridItemWidth, height: gridItemHeight}

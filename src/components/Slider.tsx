@@ -1,5 +1,5 @@
 import {Pressable, Text, TouchableOpacity, View} from 'react-native';
-import React, {memo, useCallback, useState} from 'react';
+import React, {memo, useCallback, useMemo, useState} from 'react';
 import type {Post} from '../lib/providers/types';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useNavigation} from '@react-navigation/native';
@@ -14,6 +14,15 @@ import PostBadges from './PostBadges';
 
 // import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import useThemeStore from '../lib/zustand/themeStore';
+
+const getPostKey = (item: Post, index: number) =>
+  `${item.link}-${item.episodeId ?? item.episodeLabel ?? index}`;
+
+const SafeFlashList = <T,>({style, ...rest}: FlashListProps<T>) => (
+  <View style={style}>
+    <FlashList {...rest} />
+  </View>
+);
 
 const Slider = ({
   isLoading,
@@ -42,13 +51,34 @@ const Slider = ({
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [isSelected, setSelected] = useState('');
+  const [visiblePostKeys, setVisiblePostKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
   // const {removeItem} = useWatchHistoryStore(state => state);
 
-  const SafeFlashList = <T,>({style, ...rest}: FlashListProps<T>) => (
-    <View style={style}>
-      <FlashList {...rest} />
-    </View>
+  const viewabilityConfig = useMemo(
+    () => ({itemVisiblePercentThreshold: 20, minimumViewTime: 80}),
+    [],
   );
+  const handleViewableItemsChanged = useCallback<
+    NonNullable<FlashListProps<Post>['onViewableItemsChanged']>
+  >(({viewableItems}) => {
+    const next = new Set<string>();
+    viewableItems.forEach(token => {
+      if (token.item && token.index != null) {
+        next.add(getPostKey(token.item, token.index));
+      }
+    });
+    setVisiblePostKeys(previous => {
+      if (
+        previous.size === next.size &&
+        Array.from(previous).every(key => next.has(key))
+      ) {
+        return previous;
+      }
+      return next;
+    });
+  }, []);
 
   const handleMorePress = useCallback(() => {
     navigation.navigate('ScrollList', {
@@ -75,7 +105,7 @@ const Slider = ({
   );
 
   const renderItem = useCallback(
-    ({item}: {item: Post}) => (
+    ({item, index}: {item: Post; index: number}) => (
       <View className="flex flex-col mx-2">
         <TouchableOpacity
           onLongPress={e => {
@@ -99,6 +129,8 @@ const Slider = ({
               uri={item?.image}
               link={item.link}
               providerValue={item.provider || providerValue || provider?.value}
+              artworkHints={item.artworkHints}
+              shouldResolveArtwork={visiblePostKeys.has(getPostKey(item, index))}
               style={{width: 100, height: 150}}
             />
             <PostBadges post={item} primary={primary} />
@@ -126,13 +158,24 @@ const Slider = ({
         </Text>
       </View>
     ),
-    [handleItemPress, primary, provider?.value, providerValue, t],
+    [
+      handleItemPress,
+      primary,
+      provider?.value,
+      providerValue,
+      t,
+      visiblePostKeys,
+    ],
   );
 
   const keyExtractor = useCallback(
     (item: Post, index: number) =>
-      `${item.link}-${item.episodeId ?? item.episodeLabel ?? index}`,
+      getPostKey(item, index),
     [],
+  );
+  const listExtraData = useMemo(
+    () => ({isSelected, visiblePostKeys}),
+    [isSelected, visiblePostKeys],
   );
 
   return (
@@ -163,11 +206,13 @@ const Slider = ({
         </View>
       ) : (
         <SafeFlashList
-          estimatedItemSize={30}
+          estimatedItemSize={116}
           showsHorizontalScrollIndicator={false}
           data={posts}
-          extraData={isSelected}
+          extraData={listExtraData}
           horizontal
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           onScrollBeginDrag={onHorizontalDragStart}
           onMomentumScrollBegin={onHorizontalDragStart}
           onScrollEndDrag={onHorizontalDragEnd}

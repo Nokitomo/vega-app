@@ -37,7 +37,7 @@ interface UseHomePageDataOptions {
 
 const STREAMINGUNITY_PROVIDER = 'streamingunity';
 const HOME_SECTION_PARALLEL_LIMIT = 4;
-const HOME_SECTION_STEP_DELAY_MS = 200;
+const HOME_INITIAL_SECTION_COUNT = 4;
 const HOME_STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const HIDDEN_STREAMINGUNITY_TYPES = new Set(['movie', 'tv']);
 const HOME_CATEGORY_MAX_ITEMS = 30;
@@ -64,32 +64,10 @@ const shouldHideHomeCategory = (providerValue: string, filter: string): boolean 
   return HIDDEN_STREAMINGUNITY_TYPES.has(type);
 };
 
-const isArchivePriorityFilter = (filter: string): boolean => {
-  const normalized = String(filter || '').trim().toLowerCase();
-  return (
-    normalized.startsWith('archive') ||
-    normalized.startsWith('/archive') ||
-    normalized.startsWith('catalog/all') ||
-    normalized.includes('archive?') ||
-    normalized.includes('catalog/all')
-  );
-};
-
 const sortCategoryIndexesByPriority = (
   indexes: number[],
-  categories: Array<{filter: string}>,
-): number[] => {
-  return [...indexes].sort((left, right) => {
-    const leftIsArchive = isArchivePriorityFilter(categories[left]?.filter || '');
-    const rightIsArchive = isArchivePriorityFilter(
-      categories[right]?.filter || '',
-    );
-    if (leftIsArchive !== rightIsArchive) {
-      return leftIsArchive ? -1 : 1;
-    }
-    return left - right;
-  });
-};
+  _categories: Array<{filter: string}>,
+): number[] => [...indexes].sort((left, right) => left - right);
 
 export const useHomePageData = ({
   provider,
@@ -99,6 +77,9 @@ export const useHomePageData = ({
   const providerValue = provider?.value || '';
   const providerCacheScope = getProviderCacheScope(providerValue);
   const [staleCheckTick, setStaleCheckTick] = useState(0);
+  const [activatedCategoryFilters, setActivatedCategoryFilters] = useState<
+    Set<string>
+  >(() => new Set());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const categories = useMemo(
     () =>
@@ -113,6 +94,18 @@ export const useHomePageData = ({
   const triggerStaleCheck = useCallback(() => {
     setStaleCheckTick(value => value + 1);
   }, []);
+
+  const activateCategories = useCallback((filters: string[]) => {
+    setActivatedCategoryFilters(previous => {
+      const next = new Set(previous);
+      filters.filter(Boolean).forEach(filter => next.add(filter));
+      return next.size === previous.size ? previous : next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setActivatedCategoryFilters(new Set());
+  }, [providerCacheScope]);
 
   type CategoryQueryData = {
     Posts: Post[];
@@ -279,19 +272,34 @@ export const useHomePageData = ({
     queryResultsRef.current = queryResults;
   }, [queryResults]);
 
-  const staleCategoryIndexes = useMemo(() => {
-    return categories
-      .map((category, index) => {
-        const cached = readCategoryCache(category.filter);
-        const staleTime = getCategoryStaleTime(
-          category.filter,
-          category.staleTimeMs,
-        );
-        const isStale = !cached || Date.now() - cached.updatedAt >= staleTime;
-        return isStale ? index : -1;
-      })
-      .filter(index => index >= 0);
-  }, [categories, staleCheckTick]);
+  const categoryDataFingerprint = queryResults
+    .map(result => (result.data as CategoryQueryData | undefined)?.updatedAt || 0)
+    .join(',');
+  const staleCategoryIndexes = useMemo(
+    () =>
+      categories
+        .map((category, index) => {
+          const cached = readCategoryCache(category.filter);
+          const staleTime = getCategoryStaleTime(
+            category.filter,
+            category.staleTimeMs,
+          );
+          const isStale = !cached || Date.now() - cached.updatedAt >= staleTime;
+          return isStale ? index : -1;
+        })
+        .filter(index => index >= 0),
+    [categories, categoryDataFingerprint, staleCheckTick],
+  );
+
+  const eligibleStaleCategoryIndexes = useMemo(
+    () =>
+      staleCategoryIndexes.filter(
+        index =>
+          index < HOME_INITIAL_SECTION_COUNT ||
+          activatedCategoryFilters.has(categories[index]?.filter || ''),
+      ),
+    [activatedCategoryFilters, categories, staleCategoryIndexes],
+  );
 
   useEffect(() => {
     appStateRef.current = AppState.currentState;
@@ -339,15 +347,7 @@ export const useHomePageData = ({
     };
   }, [enabled, providerValue, isScreenActive, triggerStaleCheck]);
 
-  const staleCategoryFingerprint = useMemo(
-    () => `${providerValue}:${staleCategoryIndexes.join(',')}`,
-    [providerValue, staleCategoryIndexes],
-  );
-
-  const requestedCategoryIndexesRef = useRef<Set<number>>(new Set());
   const fetchingCategoryIndexesRef = useRef<Set<number>>(new Set());
-  const refreshGenerationRef = useRef(0);
-  const isBatchRefreshRunningRef = useRef(false);
 
   const runBatchedRefetch = async (indexes: number[]) => {
     if (!Array.isArray(indexes) || indexes.length === 0) {
@@ -379,92 +379,51 @@ export const useHomePageData = ({
   };
 
   const prioritizedStaleCategoryIndexes = useMemo(
-    () => sortCategoryIndexesByPriority(staleCategoryIndexes, categories),
-    [categories, staleCategoryIndexes],
+    () => sortCategoryIndexesByPriority(eligibleStaleCategoryIndexes, categories),
+    [categories, eligibleStaleCategoryIndexes],
   );
 
   useEffect(() => {
-    requestedCategoryIndexesRef.current = new Set();
-    fetchingCategoryIndexesRef.current = new Set();
-    refreshGenerationRef.current += 1;
-    isBatchRefreshRunningRef.current = false;
-  }, [staleCategoryFingerprint]);
+    fetchingCategoryIndexesRef.current.clear();
+  }, [providerCacheScope]);
 
   useEffect(() => {
-    if (!enabled || !providerValue || prioritizedStaleCategoryIndexes.length === 0) {
+    if (
+      !enabled ||
+      !providerValue ||
+      !isScreenActive ||
+      prioritizedStaleCategoryIndexes.length === 0
+    ) {
       return;
     }
-    if (isBatchRefreshRunningRef.current) {
-      return;
-    }
-
-    const pendingIndexes = prioritizedStaleCategoryIndexes.filter(
-      index =>
-        !requestedCategoryIndexesRef.current.has(index) &&
-        !fetchingCategoryIndexesRef.current.has(index),
+    const availableSlots = Math.max(
+      0,
+      HOME_SECTION_PARALLEL_LIMIT - fetchingCategoryIndexesRef.current.size,
     );
-    if (pendingIndexes.length === 0) {
+    if (availableSlots === 0) {
       return;
     }
-
-    isBatchRefreshRunningRef.current = true;
-    const generation = refreshGenerationRef.current;
-    let cancelled = false;
-
-    const run = async () => {
-      while (!cancelled && generation === refreshGenerationRef.current) {
-        const currentPending = prioritizedStaleCategoryIndexes.filter(
-          index =>
-            !requestedCategoryIndexesRef.current.has(index) &&
-            !fetchingCategoryIndexesRef.current.has(index),
-        );
-        if (currentPending.length === 0) {
-          break;
+    const batch = prioritizedStaleCategoryIndexes
+      .filter(index => !fetchingCategoryIndexesRef.current.has(index))
+      .slice(0, availableSlots);
+    batch.forEach(index => fetchingCategoryIndexesRef.current.add(index));
+    void Promise.all(
+      batch.map(async index => {
+        try {
+          const queryResult = queryResultsRef.current[index];
+          if (queryResult) {
+            await queryResult.refetch();
+          }
+        } catch {
+          // React Query exposes the category error to the UI.
+        } finally {
+          fetchingCategoryIndexesRef.current.delete(index);
         }
-
-        const batch = currentPending.slice(0, HOME_SECTION_PARALLEL_LIMIT);
-        batch.forEach(index => fetchingCategoryIndexesRef.current.add(index));
-
-        await Promise.all(
-          batch.map(async index => {
-            try {
-              const queryResult = queryResultsRef.current[index];
-              if (!queryResult) {
-                return;
-              }
-              await queryResult.refetch();
-            } finally {
-              fetchingCategoryIndexesRef.current.delete(index);
-              requestedCategoryIndexesRef.current.add(index);
-            }
-          }),
-        );
-
-        if (
-          HOME_SECTION_STEP_DELAY_MS > 0 &&
-          generation === refreshGenerationRef.current
-        ) {
-          await new Promise(resolve =>
-            setTimeout(resolve, HOME_SECTION_STEP_DELAY_MS),
-          );
-        }
-      }
-    };
-
-    run().finally(() => {
-      if (generation === refreshGenerationRef.current) {
-        isBatchRefreshRunningRef.current = false;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      if (generation === refreshGenerationRef.current) {
-        isBatchRefreshRunningRef.current = false;
-      }
-    };
+      }),
+    );
   }, [
     enabled,
+    isScreenActive,
     providerValue,
     prioritizedStaleCategoryIndexes,
   ]);
@@ -482,6 +441,7 @@ export const useHomePageData = ({
           Posts: queryData?.Posts || [],
           filter: category.filter,
           isLoading:
+            !queryData &&
             !!result &&
             (result.isLoading || result.isPending || result.isFetching),
           error:
@@ -492,7 +452,11 @@ export const useHomePageData = ({
   );
 
   const isLoading = queryResults.some(
-    result => result.isLoading || result.isPending,
+    (result, index) =>
+      (index < HOME_INITIAL_SECTION_COUNT ||
+        activatedCategoryFilters.has(categories[index]?.filter || '')) &&
+      !result.data &&
+      (result.isLoading || result.isPending),
   );
   const isRefetching = queryResults.some(result => result.isRefetching);
   const firstError =
@@ -503,6 +467,7 @@ export const useHomePageData = ({
     isLoading,
     isRefetching,
     error: firstError as Error | null,
+    activateCategories,
     refetch: async () => {
       await runBatchedRefetch(
         categories.map((_, index) => index),
@@ -589,6 +554,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       const info = await importedProviderManager.getMetaData({
         link: heroLink,
         provider: providerValue,
+        purpose: 'hero',
       });
 
       const isMeaningfulValue = (value: unknown) => {

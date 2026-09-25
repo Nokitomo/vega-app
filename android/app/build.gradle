@@ -100,8 +100,8 @@ android {
         applicationId 'com.vega'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 168
-        versionName "3.3.9"
+        versionCode 169
+        versionName "3.3.10"
         manifestPlaceholders = [
             googleCastReceiverAppId: (System.getenv('VEGA_CAST_RECEIVER_APP_ID') ?: 'CC1AD845')
         ]

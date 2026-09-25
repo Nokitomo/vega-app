@@ -173,6 +173,7 @@ const Home = ({}: Props) => {
     error,
     refetch,
     isRefetching,
+    activateCategories,
     // isStale,
   } = useHomePageData({
     provider,
@@ -388,6 +389,20 @@ const Home = ({}: Props) => {
   }, [refetch]);
 
   const keyExtractor = useCallback((item: HomePageData) => item.filter, []);
+  const homeViewabilityConfig = useMemo(
+    () => ({itemVisiblePercentThreshold: 10, minimumViewTime: 100}),
+    [],
+  );
+  const handleVisibleSectionsChanged = useCallback(
+    ({viewableItems}: {viewableItems: Array<{item?: HomePageData}>}) => {
+      activateCategories(
+        viewableItems
+          .map(token => token.item?.filter || '')
+          .filter((filter): filter is string => Boolean(filter)),
+      );
+    },
+    [activateCategories],
+  );
 
   const renderSliderItem = useCallback(
     ({item, index}: {item: HomePageData; index: number}) => (
@@ -472,6 +487,8 @@ const Home = ({}: Props) => {
               data={homeData}
               keyExtractor={keyExtractor}
               renderItem={renderSliderItem}
+              onViewableItemsChanged={handleVisibleSectionsChanged}
+              viewabilityConfig={homeViewabilityConfig}
               onScroll={handleScroll}
               scrollEventThrottle={16} // Optimize scroll performance
               showsVerticalScrollIndicator={false}
