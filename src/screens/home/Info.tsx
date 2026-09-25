@@ -740,6 +740,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               <Image
                 source={{uri: resolvedBackgroundImage}}
                 className=" h-[256] w-full"
+                resizeMode="contain"
                 onError={handleBackgroundError}
               />
             </SkeletonLoader>
