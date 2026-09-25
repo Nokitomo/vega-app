@@ -335,7 +335,9 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
           request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW
 
         if (isNewWindow) {
-          if (!isHttpOrHttps(uri)) {
+          if (isHttpOrHttps(uri)) {
+            performSessionLoad(holder, uri)
+          } else {
             openExternally(holder, uri, "new_window_external_scheme")
           }
           return GeckoResult.deny()
@@ -353,7 +355,11 @@ class VegaGeckoViewManager : SimpleViewManager<GeckoView>() {
         session: GeckoSession,
         uri: String,
       ): GeckoResult<GeckoSession>? {
-        openExternally(holder, uri, "on_new_session")
+        if (isHttpOrHttps(uri)) {
+          performSessionLoad(holder, uri)
+        } else {
+          openExternally(holder, uri, "on_new_session")
+        }
         return null
       }
 

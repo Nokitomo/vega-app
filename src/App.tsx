@@ -96,7 +96,14 @@ export type InfoRouteParams = {
   variants?: PostVariant[];
   dubStatus?: 'subbed' | 'dubbed' | 'both';
   dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
-  infoStack?: Array<{link: string; provider?: string; poster?: string}>;
+  infoStack?: Array<{
+    link: string;
+    provider?: string;
+    poster?: string;
+    variants?: PostVariant[];
+    dubStatus?: 'subbed' | 'dubbed' | 'both';
+    dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
+  }>;
 };
 
 export type HomeStackParamList = {

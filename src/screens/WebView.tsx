@@ -350,7 +350,11 @@ const Webview = ({route, navigation}: Props) => {
       ) : (
         <LegacyWebView
           style={{flex: 1}}
-          javaScriptEnabled={false}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          sharedCookiesEnabled={true}
+          setSupportMultipleWindows={false}
           source={{uri: webViewLink}}
         />
       )}

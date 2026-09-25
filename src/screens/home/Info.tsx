@@ -72,7 +72,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
   const providerValue = route.params.provider || provider.value;
-  const variants = useMemo<PostVariant[]>(
+  const routeVariants = useMemo<PostVariant[]>(
     () =>
       (route.params.variants || []).filter(
         variant => !!variant?.link && !!variant?.status,
@@ -82,12 +82,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [selectedVariantLink, setSelectedVariantLink] = useState(
     route.params.link,
   );
-  const selectedVariant = useMemo(
-    () => variants.find(variant => variant.link === selectedVariantLink),
-    [selectedVariantLink, variants],
+  const activeLink = selectedVariantLink || route.params.link;
+  const routeSelectedVariant = useMemo(
+    () => routeVariants.find(variant => variant.link === activeLink),
+    [activeLink, routeVariants],
   );
-  const activeLink = selectedVariant?.link || route.params.link;
-  const activePoster = selectedVariant?.image || route.params.poster;
+  const activePoster = routeSelectedVariant?.image || route.params.poster;
   const activeRouteParams = useMemo(
     () => ({...route.params, link: activeLink, poster: activePoster}),
     [activeLink, activePoster, route.params],
@@ -475,13 +475,74 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     ],
   );
 
+  const relatedItems = useMemo<RelatedItem[]>(
+    () => (info?.related || []) as RelatedItem[],
+    [info?.related],
+  );
+  const relatedVariantSource = useMemo(
+    () =>
+      relatedItems.find(
+        item =>
+          item.link === route.params.link ||
+          item.link === activeLink ||
+          item.variants?.some(
+            variant =>
+              variant.link === route.params.link || variant.link === activeLink,
+          ),
+      ),
+    [activeLink, relatedItems, route.params.link],
+  );
+  const variants = useMemo<PostVariant[]>(() => {
+    const fallbackVariants = (relatedVariantSource?.variants || []).filter(
+      variant => !!variant?.link && !!variant?.status,
+    );
+    return routeVariants.length > 1 ? routeVariants : fallbackVariants;
+  }, [relatedVariantSource?.variants, routeVariants]);
+  const activeDubStatus = useMemo(() => {
+    if (route.params.dubStatus) {
+      return route.params.dubStatus;
+    }
+    if (
+      variants.some(variant => variant.status === 'subbed') &&
+      variants.some(variant => variant.status === 'dubbed')
+    ) {
+      return 'both' as const;
+    }
+    return variants[0]?.status;
+  }, [route.params.dubStatus, variants]);
+  const activeDubStatusKey = useMemo(() => {
+    if (route.params.dubStatusKey) {
+      return route.params.dubStatusKey;
+    }
+    if (activeDubStatus === 'both') {
+      return 'Subbed and dubbed' as const;
+    }
+    if (activeDubStatus === 'dubbed') {
+      return 'Dubbed' as const;
+    }
+    if (activeDubStatus === 'subbed') {
+      return 'Subbed' as const;
+    }
+    return undefined;
+  }, [activeDubStatus, route.params.dubStatusKey]);
+
   const currentInfoEntry = useMemo(
     () => ({
       link: activeLink,
       provider: providerValue,
       poster: posterImage,
+      variants,
+      dubStatus: activeDubStatus,
+      dubStatusKey: activeDubStatusKey,
     }),
-    [activeLink, providerValue, posterImage],
+    [
+      activeDubStatus,
+      activeDubStatusKey,
+      activeLink,
+      posterImage,
+      providerValue,
+      variants,
+    ],
   );
   const filteredLinkList = useMemo(() => {
     if (!info?.linkList) {
@@ -496,10 +557,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return filtered.length > 0 ? filtered : info.linkList;
   }, [info?.linkList, excludedQualities]);
 
-  const relatedItems = useMemo<RelatedItem[]>(
-    () => (info?.related || []) as RelatedItem[],
-    [info?.related],
-  );
   const statusTag = useMemo(() => {
     if (!hasAnimeExternalIds) {
       return null;

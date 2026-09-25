@@ -31,7 +31,13 @@ const ProviderImage = ({
   const providerCacheScope = getProviderCacheScope(providerValue || '');
   const [sourceUri, setSourceUri] = useState(uri || PLACEHOLDER_IMAGE);
   const [hasTriedFallback, setHasTriedFallback] = useState(false);
+  const [imageReloadKey, setImageReloadKey] = useState(0);
   const isMounted = useRef(true);
+
+  const updateSourceUri = useCallback((nextUri: string) => {
+    setSourceUri(nextUri);
+    setImageReloadKey(value => value + 1);
+  }, []);
 
   useEffect(() => {
     isMounted.current = true;
@@ -44,18 +50,18 @@ const ProviderImage = ({
     const fallbackUri = uri || PLACEHOLDER_IMAGE;
     setHasTriedFallback(false);
     if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
-      setSourceUri(fallbackUri);
+      updateSourceUri(fallbackUri);
       return;
     }
     let cancelled = false;
     const controller = new AbortController();
     const cached = getCachedProviderPoster(providerValue, link);
     if (cached?.value.poster) {
-      setSourceUri(cached.value.poster);
+      updateSourceUri(cached.value.poster);
     } else if (cached) {
-      setSourceUri(fallbackUri);
+      updateSourceUri(fallbackUri);
     } else {
-      setSourceUri(PLACEHOLDER_IMAGE);
+      updateSourceUri(PLACEHOLDER_IMAGE);
     }
     if (!shouldResolveArtwork) {
       return () => controller.abort();
@@ -68,12 +74,12 @@ const ProviderImage = ({
     })
       .then(poster => {
         if (!cancelled) {
-          setSourceUri(poster || fallbackUri);
+          updateSourceUri(poster || fallbackUri);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setSourceUri(fallbackUri);
+          updateSourceUri(fallbackUri);
         }
       });
     return () => {
@@ -88,6 +94,7 @@ const ProviderImage = ({
     providerCacheScope,
     providerValue,
     shouldResolveArtwork,
+    updateSourceUri,
     uri,
   ]);
 
@@ -99,7 +106,7 @@ const ProviderImage = ({
 
     if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
       if (isMounted.current) {
-        setSourceUri(PLACEHOLDER_IMAGE);
+        updateSourceUri(PLACEHOLDER_IMAGE);
       }
       return;
     }
@@ -113,7 +120,7 @@ const ProviderImage = ({
       });
       if (image) {
         if (isMounted.current) {
-          setSourceUri(image);
+          updateSourceUri(image);
         }
         return;
       }
@@ -122,9 +129,16 @@ const ProviderImage = ({
     }
 
     if (isMounted.current) {
-      setSourceUri(PLACEHOLDER_IMAGE);
+      updateSourceUri(PLACEHOLDER_IMAGE);
     }
-  }, [artworkHints, hasTriedFallback, link, providerCacheScope, providerValue]);
+  }, [
+    artworkHints,
+    hasTriedFallback,
+    link,
+    providerCacheScope,
+    providerValue,
+    updateSourceUri,
+  ]);
 
   const handleError: ImageProps['onError'] = useCallback(
     (event: Parameters<NonNullable<ImageProps['onError']>>[0]) => {
@@ -136,7 +150,14 @@ const ProviderImage = ({
     [onError, resolveFallback],
   );
 
-  return <Image {...rest} source={{uri: sourceUri}} onError={handleError} />;
+  return (
+    <Image
+      key={`${link || ''}:${sourceUri}:${imageReloadKey}`}
+      {...rest}
+      source={{uri: sourceUri}}
+      onError={handleError}
+    />
+  );
 };
 
 export default ProviderImage;

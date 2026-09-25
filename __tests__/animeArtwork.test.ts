@@ -15,7 +15,7 @@ describe('AnimeUnity artwork priority', () => {
     ).toBe('https://provider.test/season.jpg');
   });
 
-  it('inserts the AniList banner before non-provider fallbacks', () => {
+  it('keeps the provider-selected background ahead of AniList banners', () => {
     for (const backgroundSource of ['tmdb', 'cinemeta', 'anizip'] as const) {
       expect(
         selectAnimeUnityBackground({
@@ -23,7 +23,7 @@ describe('AnimeUnity artwork priority', () => {
           providerBackground: `https://${backgroundSource}.test/background.jpg`,
           aniListBanner: 'https://anilist.test/banner.jpg',
         }),
-      ).toBe('https://anilist.test/banner.jpg');
+      ).toBe(`https://${backgroundSource}.test/background.jpg`);
     }
   });
 
@@ -36,7 +36,7 @@ describe('AnimeUnity artwork priority', () => {
     ).toBe('https://tmdb.test/background.jpg');
   });
 
-  it('requests AniList only when it can outrank the current background', () => {
+  it('requests AniList only when no provider-selected background exists', () => {
     expect(
       shouldFetchAniListBanner({
         anilistId: 123,
@@ -47,6 +47,12 @@ describe('AnimeUnity artwork priority', () => {
       shouldFetchAniListBanner({
         anilistId: 123,
         backgroundSource: 'tmdb',
+      }),
+    ).toBe(false);
+    expect(
+      shouldFetchAniListBanner({
+        anilistId: 123,
+        backgroundSource: undefined,
       }),
     ).toBe(true);
     expect(shouldFetchAniListBanner({backgroundSource: 'tmdb'})).toBe(false);
