@@ -75,6 +75,10 @@ const CALENDAR_DAY_LABEL_KEYS: Record<
   undetermined: 'Undetermined',
 };
 
+const GRID_MAX_POSTER_WIDTH = 112;
+const GRID_TITLE_LINE_HEIGHT = 15;
+const GRID_TITLE_LINES = 3;
+
 const ScrollList = ({route}: Props): React.ReactElement => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
@@ -148,7 +152,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   }, [calendarDayOrder, isCalendarView, posts, t]);
   const gridColumns = 3;
   const gridFallbackHorizontalPadding = 32;
-  const gridMaxItemWidth = 100;
+  const gridMaxItemWidth = GRID_MAX_POSTER_WIDTH;
   const gridBaseWidth =
     gridContainerWidth > 0
       ? gridContainerWidth
@@ -160,7 +164,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
       : gridMaxItemWidth;
   const gridItemWidth = Math.min(gridMaxItemWidth, gridColumnWidth);
   const gridItemHeight = Math.round(gridItemWidth * 1.5);
-  const gridTitleWidth = Math.max(80, Math.min(gridItemWidth, gridColumnWidth) - 4);
+  const gridTitleWidth = Math.max(88, Math.min(gridItemWidth, gridColumnWidth) - 4);
   const gridItemWrapperStyle: ViewStyle = {
     width: gridColumnWidth > 0 ? gridColumnWidth : gridMaxItemWidth,
     alignItems: 'center',
@@ -442,8 +446,12 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                           </View>
                           <Text
                             className="text-white text-center text-xs"
-                            style={{width: gridTitleWidth}}
-                            numberOfLines={2}
+                            style={{
+                              width: gridTitleWidth,
+                              lineHeight: GRID_TITLE_LINE_HEIGHT,
+                              minHeight: GRID_TITLE_LINE_HEIGHT * GRID_TITLE_LINES,
+                            }}
+                            numberOfLines={GRID_TITLE_LINES}
                             ellipsizeMode="tail">
                             {item?.title}
                           </Text>
@@ -526,8 +534,16 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                       ? 'text-white text-center text-xs'
                       : 'text-white ml-3 w-72 font-semibold text-base'
                   }
-                  style={viewType === 1 ? {width: gridTitleWidth} : undefined}
-                  numberOfLines={2}
+                  style={
+                    viewType === 1
+                      ? {
+                          width: gridTitleWidth,
+                          lineHeight: GRID_TITLE_LINE_HEIGHT,
+                          minHeight: GRID_TITLE_LINE_HEIGHT * GRID_TITLE_LINES,
+                        }
+                      : undefined
+                  }
+                  numberOfLines={viewType === 1 ? GRID_TITLE_LINES : 2}
                   ellipsizeMode="tail">
                   {item?.title}
                 </Text>

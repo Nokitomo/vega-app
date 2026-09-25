@@ -18,6 +18,14 @@ import useThemeStore from '../lib/zustand/themeStore';
 const getPostKey = (item: Post, index: number) =>
   `${item.link}-${item.episodeId ?? item.episodeLabel ?? index}`;
 
+const CARD_IMAGE_WIDTH = 100;
+const CARD_IMAGE_HEIGHT = 150;
+const CARD_TITLE_WIDTH = 112;
+const CARD_TITLE_LINE_HEIGHT = 15;
+const CARD_TITLE_LINES = 3;
+const CARD_HORIZONTAL_MARGIN = 8;
+const CARD_ESTIMATED_ITEM_SIZE = CARD_TITLE_WIDTH + CARD_HORIZONTAL_MARGIN * 2;
+
 const SafeFlashList = <T,>({style, ...rest}: FlashListProps<T>) => (
   <View style={style}>
     <FlashList {...rest} />
@@ -106,7 +114,9 @@ const Slider = ({
 
   const renderItem = useCallback(
     ({item, index}: {item: Post; index: number}) => (
-      <View className="flex flex-col mx-2">
+      <View
+        className="flex flex-col mx-2"
+        style={{width: CARD_TITLE_WIDTH, alignItems: 'center'}}>
         <TouchableOpacity
           onLongPress={e => {
             e.stopPropagation();
@@ -131,7 +141,7 @@ const Slider = ({
               providerValue={item.provider || providerValue || provider?.value}
               artworkHints={item.artworkHints}
               shouldResolveArtwork={visiblePostKeys.has(getPostKey(item, index))}
-              style={{width: 100, height: 150}}
+              style={{width: CARD_IMAGE_WIDTH, height: CARD_IMAGE_HEIGHT}}
             />
             <PostBadges post={item} primary={primary} />
           </View>
@@ -151,8 +161,13 @@ const Slider = ({
           )} */}
         </TouchableOpacity>
         <Text
-          className="text-white text-center w-24 text-xs"
-          numberOfLines={2}
+          className="text-white text-center text-xs"
+          style={{
+            width: CARD_TITLE_WIDTH,
+            lineHeight: CARD_TITLE_LINE_HEIGHT,
+            minHeight: CARD_TITLE_LINE_HEIGHT * CARD_TITLE_LINES,
+          }}
+          numberOfLines={CARD_TITLE_LINES}
           ellipsizeMode="tail">
           {item.title}
         </Text>
@@ -198,15 +213,16 @@ const Slider = ({
           {Array.from({length: 20}).map((_, index) => (
             <View
               className="mx-3 gap-0 flex mb-3 justify-center items-center"
+              style={{width: CARD_TITLE_WIDTH}}
               key={index}>
-              <SkeletonLoader height={150} width={100} />
-              <SkeletonLoader height={12} width={97} />
+              <SkeletonLoader height={CARD_IMAGE_HEIGHT} width={CARD_IMAGE_WIDTH} />
+              <SkeletonLoader height={12} width={CARD_TITLE_WIDTH} />
             </View>
           ))}
         </View>
       ) : (
         <SafeFlashList
-          estimatedItemSize={116}
+          estimatedItemSize={CARD_ESTIMATED_ITEM_SIZE}
           showsHorizontalScrollIndicator={false}
           data={posts}
           extraData={listExtraData}
