@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
@@ -73,6 +74,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const {t} = useTranslation();
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
+  const {width: windowWidth} = useWindowDimensions();
   const providerValue = route.params.provider || provider.value;
   const routeVariants = useMemo<PostVariant[]>(
     () =>
@@ -94,6 +96,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     () => ({...route.params, link: activeLink, poster: activePoster}),
     [activeLink, activePoster, route.params],
   );
+  const infoHeaderHeight = useMemo(() => {
+    const width =
+      Number.isFinite(windowWidth) && windowWidth > 0 ? windowWidth : 390;
+    return Math.round(Math.min(Math.max(width * (9 / 16), 256), 480));
+  }, [windowWidth]);
 
   useEffect(() => {
     setSelectedVariantLink(route.params.link);
@@ -794,12 +801,15 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               <Ionicons name="close" size={22} color="white" />
             </TouchableOpacity>
           </View>
-          <View className="absolute w-full h-[256px]">
-            <SkeletonLoader show={infoLoading} height={256} width={'100%'}>
+          <View className="absolute w-full" style={{height: infoHeaderHeight}}>
+            <SkeletonLoader
+              show={infoLoading}
+              height={infoHeaderHeight}
+              width={'100%'}>
               <Image
                 source={{uri: resolvedBackgroundImage}}
-                className=" h-[256] w-full"
-                resizeMode="contain"
+                style={{height: infoHeaderHeight, width: '100%'}}
+                resizeMode="cover"
                 onError={handleBackgroundError}
               />
             </SkeletonLoader>
@@ -830,7 +840,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             renderItem={() => <View />}
             ListHeaderComponent={
               <>
-                <View className="relative w-full h-[256px]">
+                <View
+                  className="relative w-full"
+                  style={{height: infoHeaderHeight}}>
                   <LinearGradient
                     colors={['transparent', 'black']}
                     className="absolute h-full w-full"
