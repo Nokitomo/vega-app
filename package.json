@@ -1,6 +1,6 @@
 {
   "name": "vega",
-  "version": "3.3.14",
+  "version": "3.3.15",
   "private": true,
   "scripts": {
     "android": "expo run:android",
