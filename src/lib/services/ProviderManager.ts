@@ -1,4 +1,4 @@
-import {ToastAndroid} from 'react-native';
+import {Alert, Platform, ToastAndroid} from 'react-native';
 import {providerContext} from '../providers/providerContext';
 import {
   ArchiveFilters,
@@ -439,7 +439,11 @@ export class ProviderManager {
         'Failed to get episodes from provider: {{provider}}',
         {provider: providerValue},
       );
-      ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+      } else {
+        Alert.alert(i18n.t('Error'), errorMessage);
+      }
       throw new Error(errorMessage);
     }
   };

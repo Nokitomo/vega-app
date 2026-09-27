@@ -21,6 +21,8 @@ import {Feather} from '@expo/vector-icons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
 import {useTranslation} from 'react-i18next';
+import RemoteLogo from './RemoteLogo';
+import type {ArtworkCandidates} from '../lib/services/artworkSelection';
 
 interface HeroProps {
   isDrawerOpen: boolean;
@@ -33,10 +35,8 @@ const PLACEHOLDER_IMAGE =
 
 const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   const [searchActive, setSearchActive] = useState(false);
-  const [imageFallback, setImageFallback] = useState<string | null>(null);
-  const [logoFallbackMode, setLogoFallbackMode] = useState<
-    'provider' | 'cinemeta' | 'text'
-  >('text');
+  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
+  const [logoCandidateIndex, setLogoCandidateIndex] = useState(0);
   const {t} = useTranslation();
   const {provider} = useContentStore(state => state);
   const {hero} = useHeroStore(state => state);
@@ -110,72 +110,62 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     heroData,
   ]);
 
-  const heroFallbackImage = hero?.image || '';
   const lastErrorLinkRef = useRef<string | null>(null);
 
+  const backgroundCandidates = React.useMemo(() => {
+    const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
+      ?.artworkCandidates?.background;
+    const values = candidates?.length
+      ? candidates
+      : [heroData?.background, heroData?.image, heroData?.poster];
+    return Array.from(
+      new Set(values.filter((value): value is string => !!value?.trim())),
+    );
+  }, [heroData]);
+
+  const logoCandidates = React.useMemo(() => {
+    const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
+      ?.artworkCandidates?.logo;
+    const values = candidates?.length ? candidates : [heroData?.logo];
+    return Array.from(
+      new Set(values.filter((value): value is string => !!value?.trim())),
+    );
+  }, [heroData]);
+
   useEffect(() => {
-    setImageFallback(null);
+    setImageCandidateIndex(0);
     lastErrorLinkRef.current = null;
-  }, [hero?.link]);
-
-  const providerLogo = React.useMemo(() => {
-    const value = (heroData as {providerLogo?: string; logo?: string}) || {};
-    return (value.providerLogo || value.logo || '').trim();
-  }, [heroData]);
-
-  const cinemetaLogo = React.useMemo(() => {
-    const value = (heroData as {cinemetaLogo?: string}) || {};
-    return (value.cinemetaLogo || '').trim();
-  }, [heroData]);
+  }, [hero?.link, backgroundCandidates]);
 
   useEffect(() => {
-    if (providerLogo) {
-      setLogoFallbackMode('provider');
-      return;
-    }
-    if (cinemetaLogo) {
-      setLogoFallbackMode('cinemeta');
-      return;
-    }
-    setLogoFallbackMode('text');
-  }, [hero?.link, providerLogo, cinemetaLogo]);
+    setLogoCandidateIndex(0);
+  }, [hero?.link, logoCandidates]);
 
   // Memoized image source
   const currentImageUri = React.useMemo(() => {
     if (!heroData) {
       return PLACEHOLDER_IMAGE;
     }
-    return (
-      imageFallback ||
-      heroData.background ||
-      heroData.image ||
-      heroData.poster ||
-      PLACEHOLDER_IMAGE
-    );
-  }, [heroData, imageFallback]);
+    return backgroundCandidates[imageCandidateIndex] || PLACEHOLDER_IMAGE;
+  }, [heroData, backgroundCandidates, imageCandidateIndex]);
   const imageSource = React.useMemo(
     () => ({uri: currentImageUri}),
     [currentImageUri],
   );
 
   const handleImageError = useCallback(() => {
-    // Handle image error silently - React Query will manage retries
     console.warn('Hero image failed to load');
-    if (
-      !imageFallback &&
-      heroFallbackImage &&
-      heroFallbackImage !== currentImageUri
-    ) {
-      setImageFallback(heroFallbackImage);
+    if (imageCandidateIndex + 1 < backgroundCandidates.length) {
+      setImageCandidateIndex(index => index + 1);
+      return;
     }
     if (onImageError && hero?.link && lastErrorLinkRef.current !== hero.link) {
       lastErrorLinkRef.current = hero.link;
       onImageError(hero.link);
     }
   }, [
-    imageFallback,
-    heroFallbackImage,
-    currentImageUri,
+    imageCandidateIndex,
+    backgroundCandidates.length,
     onImageError,
     hero?.link,
   ]);
@@ -215,26 +205,14 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   }, [heroData, t]);
 
   const logoUri = React.useMemo(() => {
-    if (logoFallbackMode === 'provider') {
-      return providerLogo;
-    }
-    if (logoFallbackMode === 'cinemeta') {
-      return cinemetaLogo;
-    }
-    return '';
-  }, [logoFallbackMode, providerLogo, cinemetaLogo]);
+    return logoCandidates[logoCandidateIndex] || '';
+  }, [logoCandidates, logoCandidateIndex]);
 
   const handleLogoError = useCallback(() => {
-    if (
-      logoFallbackMode === 'provider' &&
-      cinemetaLogo &&
-      cinemetaLogo !== providerLogo
-    ) {
-      setLogoFallbackMode('cinemeta');
-      return;
+    if (logoCandidateIndex < logoCandidates.length) {
+      setLogoCandidateIndex(index => index + 1);
     }
-    setLogoFallbackMode('text');
-  }, [logoFallbackMode, cinemetaLogo, providerLogo]);
+  }, [logoCandidateIndex, logoCandidates.length]);
 
   if (error) {
     console.error('Hero metadata error:', error);
@@ -303,13 +281,10 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
           <View className="gap-4 items-center">
             {/* Title/Logo */}
             {logoUri ? (
-              <Image
-                source={{uri: logoUri}}
-                style={{
-                  width: 200,
-                  height: 100,
-                  resizeMode: 'contain',
-                }}
+              <RemoteLogo
+                uri={logoUri}
+                width={200}
+                height={100}
                 onError={handleLogoError}
               />
             ) : (

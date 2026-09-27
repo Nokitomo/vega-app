@@ -161,11 +161,8 @@ export const useContentDetails = (link: string, providerValue: string) => {
   return {
     info,
     meta,
-    isLoading:
-      infoLoading ||
-      (providerValue === 'animeunity'
-        ? animeArtworkNeedsFallback && metaLoading
-        : metaLoading),
+    isLoading: infoLoading || (animeArtworkNeedsFallback && metaLoading),
+    isMetaLoading: metaLoading,
     error: infoError || (!info ? metaError : undefined),
     refetch: async () => {
       await Promise.all([refetchInfo(), refetchMeta()]);

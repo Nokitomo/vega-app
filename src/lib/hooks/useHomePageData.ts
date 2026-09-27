@@ -16,10 +16,10 @@ import {
 } from '../utils/providerCacheScope';
 import {readPersistedCache, writePersistedCache} from '../utils/persistedCache';
 import {
-  selectAnimeUnityBackground,
   shouldFetchAniListBanner,
 } from '../services/animeArtwork';
 import {fetchAniListBanner} from '../services/animeMeta';
+import {selectArtworkCandidates} from '../services/artworkSelection';
 
 export interface HomePageData {
   title: string;
@@ -49,7 +49,7 @@ const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
   if (!heroLink) {
     return '';
   }
-  return buildProviderCacheKey('heroMetadata', providerValue, heroLink);
+  return buildProviderCacheKey('heroMetadata:v2', providerValue, heroLink);
 };
 
 const shouldHideHomeCategory = (
@@ -574,64 +574,37 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       };
 
       const mergeHeroMeta = (providerInfo: any, enhancedMeta: any) => {
-        if (!enhancedMeta || Object.keys(enhancedMeta).length === 0) {
-          return providerInfo;
-        }
-
-        const merged = {...providerInfo, ...enhancedMeta};
+        const hasEnhancedMeta =
+          enhancedMeta && Object.keys(enhancedMeta).length > 0;
+        const merged = hasEnhancedMeta
+          ? {...providerInfo, ...enhancedMeta}
+          : {...providerInfo};
+        merged.extra = {
+          ...(enhancedMeta?.extra || {}),
+          ...(providerInfo?.extra || {}),
+        };
         const pickValue = (primary: unknown, fallback: unknown) =>
           isMeaningfulValue(primary) ? primary : fallback;
 
-        const artworkSources = providerInfo?.extra?.artworkSources || {};
-        const pickArtwork = (
-          field: 'logo' | 'poster' | 'background',
-          providerArtworkValue: unknown,
-          enhancedValue: unknown,
-        ) => {
-          const source = artworkSources[field];
-          if (source === 'tmdb' || source === 'provider') {
-            return pickValue(providerArtworkValue, enhancedValue);
-          }
-          return pickValue(enhancedValue, providerArtworkValue);
-        };
-        const isAnimeUnity = providerValue === 'animeunity';
-        merged.poster = isAnimeUnity
-          ? pickValue(
-              providerInfo.poster || providerInfo.image,
-              enhancedMeta.poster,
-            )
-          : pickArtwork(
-              'poster',
-              providerInfo.poster || providerInfo.image,
-              enhancedMeta.poster,
-            );
-        merged.background = isAnimeUnity
-          ? selectAnimeUnityBackground({
-              backgroundSource: artworkSources.background,
-              providerBackground: providerInfo.background,
-              aniListBanner: enhancedMeta.banner,
-              fallback: providerInfo.image,
-            })
-          : pickArtwork(
-              'background',
-              providerInfo.background || providerInfo.image,
-              enhancedMeta.background,
-            );
+        const artworkCandidates = selectArtworkCandidates({
+          providerValue,
+          info: providerInfo,
+          enhanced: enhancedMeta,
+          activePoster: providerInfo.poster || providerInfo.image,
+        });
+        merged.artworkCandidates = artworkCandidates;
+        merged.poster = artworkCandidates.poster[0];
+        merged.background = artworkCandidates.background[0];
         merged.image = merged.background || merged.poster || providerInfo.image;
-        merged.year = pickValue(enhancedMeta.year, providerInfo.year);
-        merged.runtime = pickValue(enhancedMeta.runtime, providerInfo.runtime);
+        merged.year = pickValue(enhancedMeta?.year, providerInfo.year);
+        merged.runtime = pickValue(enhancedMeta?.runtime, providerInfo.runtime);
         merged.imdbRating = pickValue(
-          enhancedMeta.imdbRating,
+          enhancedMeta?.imdbRating,
           providerInfo.rating,
         );
-        merged.genres = pickValue(enhancedMeta.genres, providerInfo.genres);
-        merged.cast = pickValue(enhancedMeta.cast, providerInfo.cast);
-        merged.logo = isAnimeUnity
-          ? providerInfo.logo
-          : pickArtwork('logo', providerInfo.logo, enhancedMeta.logo);
-        merged.providerLogo = merged.logo;
-        merged.cinemetaLogo =
-          merged.logo !== enhancedMeta.logo ? enhancedMeta.logo : undefined;
+        merged.genres = pickValue(enhancedMeta?.genres, providerInfo.genres);
+        merged.cast = pickValue(enhancedMeta?.cast, providerInfo.cast);
+        merged.logo = artworkCandidates.logo[0];
 
         const providerTags = Array.isArray(providerInfo?.tags)
           ? providerInfo.tags
@@ -653,7 +626,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         }
 
         if (!merged.tagKeys) {
-          merged.tagKeys = enhancedMeta.tagKeys || providerInfo.tagKeys;
+          merged.tagKeys = enhancedMeta?.tagKeys || providerInfo.tagKeys;
         }
 
         return merged;
@@ -699,17 +672,19 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
             return merged;
           }
         } catch {
+          const merged = mergeHeroMeta(info, undefined);
           if (cacheKey) {
-            writePersistedCache(cacheStorage, cacheKey, info);
+            writePersistedCache(cacheStorage, cacheKey, merged);
           }
-          return info;
+          return merged;
         }
       }
 
+      const merged = mergeHeroMeta(info, undefined);
       if (cacheKey) {
-        writePersistedCache(cacheStorage, cacheKey, info);
+        writePersistedCache(cacheStorage, cacheKey, merged);
       }
-      return info;
+      return merged;
     },
     enabled: !!heroLink && !!providerValue,
     staleTime: HERO_METADATA_STALE_MS,

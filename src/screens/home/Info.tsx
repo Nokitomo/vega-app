@@ -40,9 +40,10 @@ import type {
   Info as ProviderInfo,
   PostVariant,
 } from '../../lib/providers/types';
-import {selectAnimeUnityBackground} from '../../lib/services/animeArtwork';
+import {selectArtworkCandidates} from '../../lib/services/artworkSelection';
 import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
 import {resolveWebViewLink} from '../../lib/utils/providerLinks';
+import RemoteLogo from '../../components/RemoteLogo';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -120,11 +121,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [readMore, setReadMore] = useState(false);
   const [menuPosition, setMenuPosition] = useState({top: -1000, right: 0});
   const [backgroundColor, setBackgroundColor] = useState('transparent');
-  const [backgroundFallback, setBackgroundFallback] = useState<string | null>(
-    null,
-  );
-  const [backgroundErrorCount, setBackgroundErrorCount] = useState(0);
-  const [logoError, setLogoError] = useState(false);
+  const [backgroundCandidateIndex, setBackgroundCandidateIndex] = useState(0);
+  const [logoCandidateIndex, setLogoCandidateIndex] = useState(0);
   const [infoView, setInfoView] = useState<'episodes' | 'related'>('episodes');
   const [refreshing, setRefreshing] = useState(false);
   const [episodeRefreshVersion, setEpisodeRefreshVersion] = useState(0);
@@ -189,32 +187,19 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     () => (forceProviderTitle ? providerTitle : meta?.name || providerTitle),
     [forceProviderTitle, meta?.name, providerTitle],
   );
-  const artworkSources = info?.extra?.artworkSources;
+  const artworkCandidates = useMemo(
+    () =>
+      selectArtworkCandidates({
+        providerValue,
+        info,
+        enhanced: meta,
+        activePoster,
+      }),
+    [providerValue, info, meta, activePoster],
+  );
   const posterImage = useMemo(() => {
-    if (providerValue === 'animeunity') {
-      return (
-        info?.poster ||
-        meta?.poster ||
-        activePoster ||
-        info?.image ||
-        PLACEHOLDER_IMAGE
-      );
-    }
-    return (
-      meta?.poster ||
-      info?.poster ||
-      activePoster ||
-      info?.image ||
-      PLACEHOLDER_IMAGE
-    );
-  }, [
-    providerValue,
-    artworkSources?.poster,
-    info?.poster,
-    info?.image,
-    meta?.poster,
-    activePoster,
-  ]);
+    return artworkCandidates.poster[0] || PLACEHOLDER_IMAGE;
+  }, [artworkCandidates.poster]);
   // Optimized library management
   const addLibrary = useCallback(() => {
     ReactNativeHapticFeedback.trigger('effectClick', {
@@ -394,54 +379,20 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return false;
   }, [providerValue, info?.extra?.flags?.dub]);
 
-  const logoImage =
-    providerValue === 'animeunity' ? info?.logo : info?.logo || meta?.logo;
-
-  const backgroundImage = useMemo(() => {
-    if (providerValue === 'animeunity') {
-      return (
-        selectAnimeUnityBackground({
-          backgroundSource: artworkSources?.background,
-          providerBackground: info?.background,
-          aniListBanner: meta?.banner,
-          fallback: info?.image,
-        }) || PLACEHOLDER_IMAGE
-      );
-    }
-    if (meta?.background) {
-      return meta.background;
-    }
-    if (
-      (providerValue === 'altadefinizionez' ||
-        providerValue === 'streamingunity') &&
-      !hasImdbMeta
-    ) {
-      return info?.background || info?.image || PLACEHOLDER_IMAGE;
-    }
-    return info?.background || info?.image || PLACEHOLDER_IMAGE;
-  }, [
-    meta?.banner,
-    meta?.background,
-    providerValue,
-    hasImdbMeta,
-    artworkSources?.background,
-    info?.background,
-    info?.image,
-  ]);
-  const providerBackgroundFallback = useMemo(
-    () => info?.background || info?.image || PLACEHOLDER_IMAGE,
-    [info?.background, info?.image],
-  );
-  const resolvedBackgroundImage = backgroundFallback || backgroundImage;
+  const logoImage = artworkCandidates.logo[logoCandidateIndex] || '';
+  const backgroundImage =
+    artworkCandidates.background[0] || PLACEHOLDER_IMAGE;
+  const resolvedBackgroundImage =
+    artworkCandidates.background[backgroundCandidateIndex] ||
+    PLACEHOLDER_IMAGE;
 
   useEffect(() => {
-    setBackgroundFallback(null);
-    setBackgroundErrorCount(0);
-  }, [backgroundImage, providerBackgroundFallback, activeLink]);
+    setBackgroundCandidateIndex(0);
+  }, [activeLink, artworkCandidates.background]);
 
   useEffect(() => {
-    setLogoError(false);
-  }, [activeLink, logoImage]);
+    setLogoCandidateIndex(0);
+  }, [activeLink, artworkCandidates.logo]);
 
   const trailerUrl = useMemo(() => {
     const providerTrailer = info?.trailers?.find(
@@ -459,30 +410,18 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const handleBackgroundError = useCallback(
     (event: any) => {
       console.warn('Background image failed to load:', event);
-      if (
-        backgroundErrorCount === 0 &&
-        providerBackgroundFallback &&
-        providerBackgroundFallback !== backgroundImage
-      ) {
-        setBackgroundFallback(providerBackgroundFallback);
-        setBackgroundErrorCount(1);
-        return;
-      }
-      if (
-        backgroundErrorCount === 1 &&
-        resolvedBackgroundImage !== PLACEHOLDER_IMAGE
-      ) {
-        setBackgroundFallback(PLACEHOLDER_IMAGE);
-        setBackgroundErrorCount(2);
+      if (backgroundCandidateIndex < artworkCandidates.background.length) {
+        setBackgroundCandidateIndex(index => index + 1);
       }
     },
-    [
-      backgroundErrorCount,
-      providerBackgroundFallback,
-      backgroundImage,
-      resolvedBackgroundImage,
-    ],
+    [backgroundCandidateIndex, artworkCandidates.background.length],
   );
+
+  const handleLogoError = useCallback(() => {
+    if (logoCandidateIndex < artworkCandidates.logo.length) {
+      setLogoCandidateIndex(index => index + 1);
+    }
+  }, [logoCandidateIndex, artworkCandidates.logo.length]);
 
   const relatedItems = useMemo<RelatedItem[]>(
     () => (info?.related || []) as RelatedItem[],
@@ -848,12 +787,15 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     className="absolute h-full w-full"
                   />
                   <View className="absolute bottom-0 right-0 w-screen flex-row justify-between items-baseline px-2">
-                    {(logoImage && !logoError) || infoLoading ? (
-                      <Image
-                        onError={() => setLogoError(true)}
-                        source={{uri: logoImage}}
-                        style={{width: 200, height: 100, resizeMode: 'contain'}}
+                    {logoImage ? (
+                      <RemoteLogo
+                        uri={logoImage}
+                        width={200}
+                        height={100}
+                        onError={handleLogoError}
                       />
+                    ) : infoLoading ? (
+                      <View style={{width: 200, height: 100}} />
                     ) : (
                       <View className="w-3/4">
                         <Text className="text-white text-2xl mt-3 capitalize font-semibold truncate">

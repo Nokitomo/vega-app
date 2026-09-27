@@ -3,6 +3,7 @@ export type AnimeArtworkSource =
   | 'cinemeta'
   | 'provider'
   | 'anizip'
+  | 'tvdb'
   | undefined;
 
 const hasText = (value: unknown): value is string =>

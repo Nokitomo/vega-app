@@ -16,7 +16,7 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - La vista "more" del calendario usa una griglia con sezioni per giorno.
 - La vista "more" del calendario include anche la sezione "Undetermined".
 - L'hero usa una cache giornaliera (24 ore) per provider; il refresh manuale della home non invalida la selezione, che cambia solo a scadenza o se l'immagine hero risulta non valida.
-- Per il titolo Hero, quando e disponibile un logo viene usata priorita: logo provider -> logo Cinemeta (fallback) -> titolo testuale.
+- Per StreamingUnity, Hero e Info usano la stessa priorita artwork: poster/background provider -> TMDB -> TVDB -> Cinemeta; per il logo: TMDB -> TVDB -> Cinemeta -> provider -> titolo testuale. Gli altri provider mantengono la propria selezione dichiarata in `artworkSources`, con Cinemeta come fallback applicativo. I logo SVG remoti vengono renderizzati tramite `react-native-svg`.
 - La home usa cache e refresh per categoria (chiave provider+filter): all'avvio vengono richieste solo le categorie stale, e una categoria con dati invariati non forza l'aggiornamento delle altre.
 - Il refresh automatico della home e progressivo per sezione (non globale): all'avvio (e al cambio provider) le categorie stale vengono richieste a batch fino a 4 in parallelo, con priorita alle sezioni archivio/catalogo completo; inoltre lo stale-check viene triggerato su focus Home, resume app e con polling leggero ogni 1 ora solo quando Home e attiva.
 - La lista verticale della Home e virtualizzata (FlatList): vengono montate principalmente le sezioni visibili e quelle vicine, riducendo memoria e lavoro sul thread JS rispetto a una ScrollView unica.

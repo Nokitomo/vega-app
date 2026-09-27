@@ -48,6 +48,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Quando un post contiene piu `variants`, Info mostra il selettore di versione e ricarica metadata, episodi, player e azioni libreria usando il link SUB/ITA realmente selezionato. Il `Post.link` originario resta la selezione predefinita.
 - I metadata possono includere `logo`, `background`, `poster` e `trailers` (URL completi). Tutti i campi sono opzionali e non cambiano il contratto dei provider esistenti.
 - Per AnimeUnity poster e logo arrivano gia ordinati dal provider metadata. Il background usa la priorita: background AnimeUnity, banner stagionale AniList, background TMDB, Cinemeta, AniZip Fanart e AniZip Banner; immagine card e placeholder restano gli ultimi fallback. AniList viene interrogato per l'artwork soltanto quando esiste un `anilistId` e il provider non ha gia un proprio background. I trailer provider possono essere URL completi, mentre gli ID delle fonti esterne vengono normalizzati come URL YouTube.
+- Per i provider film/serie, `artworkSources` dichiara la fonte scelta e `artworkCandidates` puo esporre i fallback ordinati. StreamingUnity fornisce poster/background in ordine provider -> TMDB -> TVDB; l'app aggiunge Cinemeta in coda. Il logo segue TMDB -> TVDB -> Cinemeta -> provider -> titolo testuale. Info e Hero condividono lo stesso selettore e passano al candidato successivo quando il caricamento fallisce; gli SVG remoti vengono renderizzati con `SvgUri`.
 
 ## Disponibilita contenuti futuri (upcoming)
 - I provider possono valorizzare in `Info.linkList[]` i campi opzionali:
@@ -81,14 +82,13 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - In Info, per AnimeUnity doppiati, viene mostrata la dicitura "Doppiato in italiano" sotto il titolo usando info.extra.flags.dub.
 - Per AltadefinizioneZ la sinossi viene sempre dal provider (anche se esistono metadati esterni).
 - Per StreamingUnity la sinossi usa sempre quella del provider; se manca fa fallback ai metadati esterni.
-- Per StreamingUnity il titolo mostrato in app usa prima il logo del provider (se presente); altrimenti la traduzione italiana se diversa dall'originale o con caratteri latini, ma se coincide con l'originale e contiene CJK viene ignorata; poi inglese con la stessa regola, quindi lo slug normalizzato e infine il titolo originale.
+- Per StreamingUnity il logo usa TMDB, poi TVDB, Cinemeta e infine il logo del provider; se nessun logo e caricabile viene mostrato il titolo testuale. Il titolo testuale usa la traduzione italiana se diversa dall'originale o con caratteri latini, ma se coincide con l'originale e contiene CJK viene ignorata; poi inglese con la stessa regola, quindi lo slug normalizzato e infine il titolo originale.
 - Per AltadefinizioneZ gli altri metadati del provider sono usati solo se i metadati esterni sono assenti.
 - Per StreamingUnity, quando sono presenti metadati esterni (imdbId), la UI usa fallback per campo: anno, durata, rating, generi e cast usano prima i metadati esterni e, se mancanti, i corrispondenti campi del provider; il badge "Episodi" usa sempre il conteggio del provider.
 - In assenza di metadati esterni, la UI usa i campi del provider (anno, durata, rating, generi, cast) per popolare le stesse sezioni mostrate con Stremio.
-- Per AltadefinizioneZ e StreamingUnity, quando mancano metadati esterni, lo sfondo in Info usa il background del provider se disponibile.
+- Per StreamingUnity lo sfondo segue sempre provider -> TMDB -> TVDB -> Cinemeta. AltadefinizioneZ dichiara il proprio artwork come `provider`, che resta prioritario rispetto al fallback Cinemeta.
 - In Home, per StreamingUnity l'hero viene estratto dall'archivio con filtro casuale (`archive?random=true`) per evitare una selezione limitata alle sole sezioni in pagina.
-- Se un'immagine esterna non e caricabile (es. 404), la UI fa fallback alle immagini del provider quando disponibili.
-- Se l'immagine dell'hero fallisce, il titolo viene scartato e si seleziona un altro hero casuale.
+- Se un artwork non e caricabile (es. 404), la UI prova in ordine i candidati disponibili; l'hero viene scartato soltanto quando tutti i background candidati falliscono.
 - Se i metadati esterni falliscono ma il provider risponde correttamente, la scheda Info resta disponibile usando i dati del provider.
 
 ## ProviderManager
