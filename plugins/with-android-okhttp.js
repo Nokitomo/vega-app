@@ -19,6 +19,7 @@ module.exports = function withAndroidOkHttp(config) {
       const okHttpContent = `// Auto-applied by with-android-okhttp config plugin
 dependencies {
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0"
     implementation "com.squareup.okhttp3:logging-interceptor:4.12.0"
     implementation "com.squareup.okhttp3:okhttp-urlconnection:4.12.0"
 }
@@ -27,6 +28,7 @@ dependencies {
 configurations.all {
     resolutionStrategy {
         force "com.squareup.okhttp3:okhttp:4.12.0"
+        force "com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0"
         force "com.squareup.okhttp3:logging-interceptor:4.12.0"
         force "com.squareup.okhttp3:okhttp-urlconnection:4.12.0"
     }

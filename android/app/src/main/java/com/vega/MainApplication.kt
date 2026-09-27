@@ -31,6 +31,7 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(SafCopyPackage())
               add(DeviceAbiPackage())
+              add(VegaDnsPackage())
               if (BuildConfig.VEGA_USER_WEBVIEW_ENABLED) {
                 try {
                   val packageClass = Class.forName("com.vega.VegaGeckoViewPackage")
@@ -54,6 +55,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    VegaDnsController.install(this)
     DefaultNewArchitectureEntryPoint.releaseLevel = try {
       ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
     } catch (e: IllegalArgumentException) {

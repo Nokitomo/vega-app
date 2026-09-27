@@ -21,6 +21,7 @@ import useUiSettingsStore from '../../lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {setAppLanguage, SupportedLanguage} from '../../i18n';
 import DownloadLocationPreference from './components/DownloadLocationPreference';
+import DnsSettings from './components/DnsSettings';
 // Lazy-load Firebase to allow running without google-services.json
 const getAnalytics = (): any | null => {
   try {
@@ -185,6 +186,8 @@ const Preferences = () => {
             </View>
           </View>
         </View>
+
+        <DnsSettings primary={primary} />
 
         {/* Theme Section */}
         <View className="mb-6">

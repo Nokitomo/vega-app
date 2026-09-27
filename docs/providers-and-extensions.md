@@ -130,8 +130,11 @@ File: src/lib/providers/providerContext.ts
 - I provider eseguono chiamate HTTP direttamente dal device utente verso i domini target.
 - Se il resolver DNS del device/rete restituisce `NXDOMAIN` o blocca un dominio provider, la chiamata fallisce prima della risposta HTTP.
 - In questo scenario e possibile vedere provider installato ma risultati vuoti, anche con moduli corretti.
-- Mitigazioni lato utente: DNS privato affidabile, app DNS (es. `1.1.1.1`) o VPN.
+- Su Android l'utente puo selezionare un resolver in `Impostazioni > Preferenze > Rete > DNS su HTTPS`.
+- Il DoH integrato copre le richieste React Native/Axios e il player interno Android; WebView, cast, app esterne e iOS usano stack DNS separati.
+- Mitigazioni alternative: DNS privato del dispositivo, app DNS dedicata o VPN.
 - Questo comportamento puo colpire solo alcuni provider e non altri, nella stessa installazione.
+- Dettagli tecnici e limiti: `docs/dns-over-https.md`.
 
 ## Come aggiungere provider personalizzati
 - Devi pubblicare un tuo set di provider (manifest + moduli JS) in un repository GitHub accessibile pubblicamente.
