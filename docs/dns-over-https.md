@@ -8,13 +8,32 @@ riavviare l'app.
 
 Provider disponibili:
 
-- DNS di sistema (comportamento predefinito, DoH disattivato)
-- Cloudflare (`https://cloudflare-dns.com/dns-query`)
+- Cloudflare (`https://cloudflare-dns.com/dns-query`), predefinito sulle nuove installazioni
 - Google (`https://dns.google/dns-query`)
 - Quad9 senza filtri (`https://dns10.quad9.net/dns-query`)
+- AdGuard Default (`https://dns.adguard-dns.com/dns-query`), con blocco di pubblicita e tracker
+- endpoint DoH personalizzato
+- DNS di sistema (DoH disattivato)
 
-Gli endpoint DoH usano TLS con verifica standard del certificato e indirizzi bootstrap
-ufficiali IPv4/IPv6. Non viene disabilitata la verifica TLS.
+Le scelte gia salvate dagli utenti esistenti vengono mantenute. Cloudflare viene usato
+come fallback anche se la preferenza persistita non e piu valida.
+
+Gli endpoint DoH preconfigurati usano TLS con verifica standard del certificato e
+indirizzi bootstrap ufficiali IPv4/IPv6. Non viene disabilitata la verifica TLS.
+
+### Endpoint personalizzato
+
+L'URL personalizzato viene validato sia in TypeScript sia nel modulo Android prima di
+essere salvato. Deve essere un URL HTTPS assoluto, lungo al massimo 2048 caratteri,
+senza credenziali incorporate, query string o frammento. Sono ammessi percorsi e porte
+personalizzati, per esempio `https://resolver.example/dns-query`.
+
+La configurazione viene conservata nelle preferenze native. L'hostname dell'endpoint
+personalizzato viene inizialmente risolto tramite il DNS di sistema per avviare la
+connessione HTTPS; le query DNS successive passano attraverso il resolver DoH scelto.
+Vega non verifica che il server implementi correttamente DoH fino a `Verifica DNS` o
+alla prima richiesta reale. Il gestore dell'endpoint personalizzato puo osservare i
+nomi di dominio richiesti, quindi va usato solo un resolver fidato.
 
 ## Copertura
 
@@ -54,8 +73,9 @@ latenza e numero di indirizzi restituiti.
   `okhttp3.dnsoverhttps.DnsOverHttps`.
 - `MainApplication` registra un `OkHttpClientFactory` prima dell'avvio di React Native.
 - `VegaDnsModule` espone stato, cambio provider e diagnostica al livello TypeScript.
-- La scelta e persistita in `SharedPreferences` nativo, per essere disponibile prima
-  della creazione del bridge React Native al successivo avvio.
+- La scelta e l'eventuale URL personalizzato sono persistiti in `SharedPreferences`
+  nativo, per essere disponibili prima della creazione del bridge React Native al
+  successivo avvio.
 
 Quando cambia provider, le connessioni HTTP inattive vengono eliminate dal pool. Le
 richieste gia in corso non vengono interrotte; le nuove connessioni usano subito il

@@ -21,6 +21,7 @@ class VegaDnsModule(reactContext: ReactApplicationContext) :
   fun getState(promise: Promise) {
     val result = Arguments.createMap().apply {
       putString("selectedProviderId", VegaDnsController.getSelectedProviderId())
+      putString("customUrl", VegaDnsController.getCustomUrl())
       putArray(
         "providers",
         Arguments.createArray().apply {
@@ -28,13 +29,24 @@ class VegaDnsModule(reactContext: ReactApplicationContext) :
             pushMap(Arguments.createMap().apply {
               putString("id", provider.id)
               putString("name", provider.name)
-              putBoolean("encrypted", provider.url != null)
+              putBoolean("encrypted", provider.id != "system")
             })
           }
         },
       )
     }
     promise.resolve(result)
+  }
+
+  @ReactMethod
+  fun setCustomProvider(url: String, promise: Promise) {
+    try {
+      promise.resolve(VegaDnsController.setCustomProvider(url))
+    } catch (error: IllegalArgumentException) {
+      promise.reject("DNS_CUSTOM_URL_INVALID", error.message, error)
+    } catch (error: Throwable) {
+      promise.reject("DNS_PROVIDER_UPDATE_FAILED", error.message, error)
+    }
   }
 
   @ReactMethod

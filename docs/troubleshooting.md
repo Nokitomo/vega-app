@@ -141,10 +141,11 @@ Diagnosi:
 - Se con DNS alternativi o VPN il provider torna a funzionare, la causa e confermata.
 
 Mitigazioni consigliate:
-1) Su Android apri `Impostazioni > Preferenze > Rete`, seleziona Cloudflare, Google o Quad9 e usa `Verifica DNS`.
+1) Su Android apri `Impostazioni > Preferenze > Rete`, seleziona Cloudflare, Google, Quad9 o AdGuard e usa `Verifica DNS`.
 2) Se il test integrato fallisce, prova un altro provider oppure torna a `DNS di sistema`.
-3) In alternativa imposta un DNS privato sul device oppure usa un'app DNS dedicata o una VPN.
-4) Verifica da browser del device che il dominio provider sia raggiungibile. La WebView e il browser non usano il DoH app-scoped di Vega.
+3) Per un resolver personalizzato, inserisci l'URL HTTPS DoH completo e premi `Applica` prima di `Verifica DNS`. URL con credenziali, query string o frammenti non sono accettati.
+4) In alternativa imposta un DNS privato sul device oppure usa un'app DNS dedicata o una VPN.
+5) Verifica da browser del device che il dominio provider sia raggiungibile. La WebView e il browser non usano il DoH app-scoped di Vega.
 
 Nota:
 - Provider diversi possono avere esiti diversi sulla stessa rete: uno puo funzionare e un altro no, in base a come viene risolto il dominio.
