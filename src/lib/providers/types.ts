@@ -58,6 +58,12 @@ export type TextTracks = {
   uri: string;
 }[];
 
+export interface SkipInterval {
+  title?: string;
+  from: number;
+  to: number;
+}
+
 // getStream
 export interface Stream {
   server: string;

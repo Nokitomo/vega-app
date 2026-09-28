@@ -1,5 +1,15 @@
-import React, {useCallback, useState, useEffect, useRef, useMemo} from 'react';
-import {View} from 'react-native';
+import React, {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+} from 'react';
+import {NativeModules, Platform, View} from 'react-native';
+import * as Brightness from 'expo-brightness';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import Video, {
   OnLoadData,
   OnLoadStartData,
@@ -17,11 +27,17 @@ import {
   PlayPause,
   Overlay,
 } from './components';
+import {SeekControls} from './components/PlayPause/SeekButton';
 import {PlatformSupport} from './OSSupport';
 import {_onBack} from './utils';
 import {_styles} from './styles';
 import type {VideoPlayerProps, WithRequiredProperty} from './types';
 import Gestures from './components/Gestures';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 const volumeWidth = 150;
 const iconOffset = 0;
@@ -80,13 +96,13 @@ const AnimatedVideoPlayer = (
     disableGesture = false,
     enable2xGesture = true,
     hideAllControlls = false,
+    onSeekSnap,
+    skips,
   } = props;
 
   const mounted = useRef(false);
+  const originalBrightness = useRef<number | null>(null);
   const _videoRef = useRef<VideoRef>(null);
-  const controlTimeout = useRef<ReturnType<typeof setTimeout>>(
-    setTimeout(() => {}),
-  ).current;
   const tapActionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [_resizeMode, setResizeMode] = useState<ResizeMode>(ResizeMode.CONTAIN);
   const [_paused, setPaused] = useState<boolean>(paused);
@@ -105,9 +121,12 @@ const AnimatedVideoPlayer = (
   const [volumePosition, setVolumePositionState] = useState(0);
   const [seekerPosition, setSeekerPositionState] = useState(0);
   const [volumeOffset, setVolumeOffset] = useState(0);
-  const [seekerOffset, setSeekerOffset] = useState(0);
   const [seekerWidth, setSeekerWidth] = useState(0);
   const [seeking, setSeeking] = useState(false);
+  const seekingRef = useRef(false);
+  const seekWasActive = useRef(false);
+  const wasPausedBeforeSeek = useRef(false);
+  const [seekSnapPosition, setSeekSnapPosition] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [error, setError] = useState(false);
@@ -115,13 +134,78 @@ const AnimatedVideoPlayer = (
   const [buffering, setBuffering] = useState(false);
   const [cachedDuration, setCachedDuration] = useState(0);
   const [cachedPosition, setCachedPosition] = useState(0);
-  const endedRef = useRef(false);
+  const [seekThumbnailUri, setSeekThumbnailUri] = useState<string | null>(null);
+  const [seekThumbnailLoading, setSeekThumbnailLoading] = useState(false);
+  const seekThumbnailRequestId = useRef(0);
+  const seekThumbnailMemoryCache = useRef(new Map<string, string>());
+  const [skipFeedbackLeft, setSkipFeedbackLeft] = useState(0);
+  const [skipFeedbackRight, setSkipFeedbackRight] = useState(0);
+  const skipFeedbackResetRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const zoomScale = useSharedValue(1);
+  const zoomStartScale = useSharedValue(1);
+
+  const zoomAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{scale: zoomScale.value}],
+  }));
 
   const videoRef = props.videoRef || _videoRef;
 
+  const setSeekingState = useCallback<Dispatch<SetStateAction<boolean>>>(
+    value => {
+      const nextValue =
+        typeof value === 'function' ? value(seekingRef.current) : value;
+      // Update synchronously so a progress event arriving between pointer-down
+      // and React's next render cannot move the seek thumb back to playback.
+      seekingRef.current = nextValue;
+      setSeeking(nextValue);
+    },
+    [],
+  );
+
+  // The resize control is also the explicit way to return to the normal view.
+  useEffect(() => {
+    zoomStartScale.value = 1;
+    zoomScale.value = withTiming(1, {duration: 180});
+  }, [resizeMode, zoomScale, zoomStartScale]);
+
+  useEffect(() => {
+    let active = true;
+
+    Brightness.getBrightnessAsync()
+      .then(brightness => {
+        if (active) {
+          originalBrightness.current = brightness;
+        }
+      })
+      .catch(brightnessError => {
+        console.error('Error reading initial brightness:', brightnessError);
+      });
+
+    return () => {
+      active = false;
+
+      const restoreBrightness = async () => {
+        try {
+          if (Platform.OS === 'android') {
+            await Brightness.restoreSystemBrightnessAsync();
+          } else if (originalBrightness.current !== null) {
+            await Brightness.setBrightnessAsync(originalBrightness.current);
+          }
+        } catch (brightnessError) {
+          console.error('Error resetting brightness:', brightnessError);
+        }
+      };
+
+      restoreBrightness().catch(error => {
+        console.warn('Failed to restore screen brightness:', error);
+      });
+    };
+  }, []);
+
   const {clearControlTimeout, resetControlTimeout, setControlTimeout} =
     useControlTimeout({
-      controlTimeout,
       controlTimeoutDelay,
       mounted: mounted.current,
       showControls,
@@ -130,19 +214,19 @@ const AnimatedVideoPlayer = (
     });
 
   const toggleFullscreen = useCallback(
-    () => setIsFullscreen((prevState) => !prevState),
+    () => setIsFullscreen(prevState => !prevState),
     [],
   );
   const toggleControls = useCallback(
-    () => setShowControls((prevState) => alwaysShowControls || !prevState),
+    () => setShowControls(prevState => alwaysShowControls || !prevState),
     [alwaysShowControls],
   );
   const toggleTimer = useCallback(
-    () => setShowTimeRemaining((prevState) => !prevState),
+    () => setShowTimeRemaining(prevState => !prevState),
     [],
   );
   const togglePlayPause = useCallback(() => {
-    setPaused((prevState) => !prevState);
+    setPaused(prevState => !prevState);
   }, []);
 
   const styles = useMemo(
@@ -153,21 +237,23 @@ const AnimatedVideoPlayer = (
     [videoStyle, containerStyle],
   );
 
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+
   const _onSeek = useCallback(
     (obj: OnSeekData) => {
       try {
-        if (!seeking) {
+        if (!seekingRef.current) {
           setControlTimeout();
         }
 
-        // Ensure currentTime is valid
         const validCurrentTime = Math.max(
           0,
-          Math.min(obj.currentTime || 0, duration),
+          Math.min(obj.currentTime || 0, durationRef.current),
         );
         setCurrentTime(validCurrentTime);
-
-        console.log('Seek completed:', obj);
 
         if (typeof onSeek === 'function') {
           onSeek(obj);
@@ -176,13 +262,12 @@ const AnimatedVideoPlayer = (
         console.error('Error in _onSeek:', error);
       }
     },
-    [seeking, setControlTimeout, onSeek, duration],
+    [setControlTimeout, onSeek],
   );
 
   const _onEnd = useCallback(() => {
-    endedRef.current = true;
-    if (currentTime < duration) {
-      setCurrentTime(duration);
+    if (currentTimeRef.current < durationRef.current) {
+      setCurrentTime(durationRef.current);
       setPaused(!props.repeat);
 
       if (showOnEnd) {
@@ -193,17 +278,7 @@ const AnimatedVideoPlayer = (
     if (typeof onEnd === 'function') {
       onEnd();
     }
-  }, [currentTime, duration, props.repeat, showOnEnd, onEnd]);
-
-  const isNearEnd = useCallback(
-    (time: number, totalDuration: number) => {
-      if (!(totalDuration > 0)) {
-        return false;
-      }
-      return time >= totalDuration - 0.25;
-    },
-    [],
-  );
+  }, [props.repeat, showOnEnd, onEnd]);
 
   const _onError = useCallback(() => {
     setError(true);
@@ -221,13 +296,15 @@ const AnimatedVideoPlayer = (
     [onLoadStart],
   );
 
+  const showControlsRef = useRef(showControls);
+  showControlsRef.current = showControls;
+
   const _onLoad = useCallback(
     (data: OnLoadData) => {
-      endedRef.current = false;
       setDuration(data.duration);
       setLoading(false);
 
-      if (showControls) {
+      if (showControlsRef.current) {
         setControlTimeout();
       }
 
@@ -235,13 +312,13 @@ const AnimatedVideoPlayer = (
         onLoad(data);
       }
     },
-    [showControls, setControlTimeout, onLoad],
+    [setControlTimeout, onLoad],
   );
 
   const _onProgress = useCallback(
     (data: OnProgressData) => {
       setLoading(false);
-      if (!seeking && !buffering) {
+      if (!seekingRef.current && !buffering) {
         const newCurrentTime = data.currentTime;
         const newCachedDuration = data.playableDuration;
 
@@ -268,22 +345,20 @@ const AnimatedVideoPlayer = (
         }
       }
     },
-    [seeking, buffering, onProgress, duration, seekerWidth],
+    [buffering, onProgress, duration, seekerWidth],
   );
 
   const _onScreenTouch = useCallback(() => {
     if (tapActionTimeout.current) {
-      // This is a double tap - clear timeout and toggle fullscreen
       clearTimeout(tapActionTimeout.current);
       tapActionTimeout.current = null;
       toggleFullscreen();
-      if (showControls) {
+      if (showControlsRef.current) {
         resetControlTimeout();
       }
     } else {
-      // This is a single tap - set timeout to handle single tap action
       tapActionTimeout.current = setTimeout(() => {
-        if (tapAnywhereToPause && showControls) {
+        if (tapAnywhereToPause && showControlsRef.current) {
           togglePlayPause();
           resetControlTimeout();
         } else {
@@ -294,7 +369,6 @@ const AnimatedVideoPlayer = (
     }
   }, [
     toggleFullscreen,
-    showControls,
     resetControlTimeout,
     tapAnywhereToPause,
     togglePlayPause,
@@ -305,15 +379,12 @@ const AnimatedVideoPlayer = (
   const _onPlaybackRateChange = useCallback(
     (playBack: {playbackRate: number}) => {
       if (playBack.playbackRate === 0 && !buffering) {
-        setTimeout(() => {
-          !buffering && setPaused(true);
-        });
-      } else if (!endedRef.current && !isNearEnd(currentTime, duration)) {
-        setPaused(false);
+        setPaused(prev => (prev ? prev : true));
+      } else if (playBack.playbackRate > 0) {
+        setPaused(prev => (!prev ? prev : false));
       }
-      console.log(playBack);
     },
-    [buffering, currentTime, duration, isNearEnd],
+    [buffering],
   );
 
   const events = useMemo(
@@ -382,7 +453,6 @@ const AnimatedVideoPlayer = (
 
       // Batch state updates to prevent excessive re-renders
       setSeekerPositionState(positionValue);
-      setSeekerOffset(positionValue);
       setSeekerFillWidth(positionValue);
     },
     [constrainToSeekerMinMax],
@@ -434,28 +504,22 @@ const AnimatedVideoPlayer = (
 
   const {volumePanResponder, seekPanResponder} = usePanResponders({
     duration,
-    seekerOffset,
     volumeOffset,
     loading,
     seekerWidth,
-    seeking,
     seekerPosition,
     seek: seekVideo,
     clearControlTimeout,
     setVolumePosition,
     setSeekerPosition,
-    setSeeking,
+    setSeeking: setSeekingState,
+    setSeekSnapPosition,
     setControlTimeout,
     onEnd: events.onEnd,
+    onSeekSnap,
     horizontal: horizontalPan,
     inverted: invertedPan,
   });
-
-  useEffect(() => {
-    if (!isNearEnd(currentTime, duration) && endedRef.current) {
-      endedRef.current = false;
-    }
-  }, [currentTime, duration, isNearEnd]);
 
   useEffect(() => {
     if (toggleResizeModeOnFullscreen) {
@@ -481,6 +545,30 @@ const AnimatedVideoPlayer = (
   useEffect(() => {
     setPaused(paused);
   }, [paused]);
+
+  useEffect(() => {
+    if (seeking) {
+      if (!seekWasActive.current) {
+        seekWasActive.current = true;
+        wasPausedBeforeSeek.current = _paused;
+      }
+
+      // Hold the current frame while the user chooses a position. Keep
+      // enforcing this in case an external paused prop or buffering callback
+      // attempts to resume playback during the gesture.
+      if (!_paused) {
+        setPaused(true);
+      }
+      return;
+    }
+
+    if (seekWasActive.current) {
+      seekWasActive.current = false;
+      if (!wasPausedBeforeSeek.current) {
+        setPaused(false);
+      }
+    }
+  }, [_paused, seeking]);
 
   useEffect(() => {
     if (_paused) {
@@ -549,7 +637,7 @@ const AnimatedVideoPlayer = (
       typeof events.onHideControls === 'function' && events.onHideControls();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showControls, loading]);
+  }, [showControls]);
 
   useEffect(() => {
     setMuted(muted);
@@ -559,6 +647,7 @@ const AnimatedVideoPlayer = (
   const updateVolumeRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (disableVolume) return;
     if (updateVolumeRef.current) {
       cancelAnimationFrame(updateVolumeRef.current);
     }
@@ -566,22 +655,15 @@ const AnimatedVideoPlayer = (
     updateVolumeRef.current = requestAnimationFrame(() => {
       const newVolume = volumePosition / volumeWidth;
 
-      if (newVolume <= 0) {
-        setMuted(true);
-      } else {
-        setMuted(false);
-      }
+      setMuted(newVolume <= 0);
 
-      setVolume(newVolume);
+      setVolume(prev => (Math.abs(prev - newVolume) > 0.02 ? newVolume : prev));
       setVolumeOffset(volumePosition);
 
       const newVolumeTrackWidth = volumeWidth - volumeFillWidth;
-
-      if (newVolumeTrackWidth > 150) {
-        setVolumeTrackWidth(150);
-      } else {
-        setVolumeTrackWidth(newVolumeTrackWidth);
-      }
+      setVolumeTrackWidth(
+        newVolumeTrackWidth > 150 ? 150 : newVolumeTrackWidth,
+      );
 
       updateVolumeRef.current = null;
     });
@@ -591,7 +673,7 @@ const AnimatedVideoPlayer = (
         cancelAnimationFrame(updateVolumeRef.current);
       }
     };
-  }, [volumeFillWidth, volumePosition]);
+  }, [disableVolume, volumeFillWidth, volumePosition]);
 
   useEffect(() => {
     const position = volumeWidth * _volume;
@@ -615,6 +697,30 @@ const AnimatedVideoPlayer = (
   useEffect(() => {
     setPlaybackRate(rate);
   }, [rate]);
+
+  const handleSkipFeedback = useCallback(
+    (side: 'left' | 'right', totalTime: number) => {
+      if (side === 'left') {
+        setSkipFeedbackLeft(totalTime);
+        setSkipFeedbackRight(0);
+      } else {
+        setSkipFeedbackRight(totalTime);
+        setSkipFeedbackLeft(0);
+      }
+      if (skipFeedbackResetRef.current) {
+        clearTimeout(skipFeedbackResetRef.current);
+      }
+      if (totalTime > 0) {
+        // Safety net only. The gesture clears the feedback itself once the
+        // accumulated seek is applied, so this must not outlive that.
+        skipFeedbackResetRef.current = setTimeout(() => {
+          setSkipFeedbackLeft(0);
+          setSkipFeedbackRight(0);
+        }, 600);
+      }
+    },
+    [],
+  );
 
   const rewind = useCallback(
     (time?: number) => {
@@ -643,10 +749,10 @@ const AnimatedVideoPlayer = (
   // Memoize onBuffer callback
   const onBuffer = useCallback((e: {isBuffering: boolean}) => {
     setBuffering(e.isBuffering);
-    if (!e.isBuffering && !endedRef.current && !isNearEnd(currentTime, duration)) {
+    if (!e.isBuffering && !seekingRef.current) {
       setPaused(false);
     }
-  }, [currentTime, duration, isNearEnd]);
+  }, []);
 
   // Memoize source URI for dependency comparison - use deep comparison for stability
   const sourceUri = useMemo(() => {
@@ -661,6 +767,158 @@ const AnimatedVideoPlayer = (
     return String(source);
   }, [source]);
 
+  const thumbnailSource = useMemo(() => {
+    if (!source) return null;
+    if (typeof source === 'string') return source;
+    if (typeof source === 'object' && 'uri' in source) {
+      return typeof source.uri === 'string' ? source.uri : null;
+    }
+    return null;
+  }, [source]);
+
+  const thumbnailHeaders = useMemo(() => {
+    if (
+      source &&
+      typeof source === 'object' &&
+      'headers' in source &&
+      source.headers
+    ) {
+      return source.headers;
+    }
+    return {};
+  }, [source]);
+
+  const thumbnailHeadersKey = useMemo(
+    () =>
+      Object.entries(thumbnailHeaders)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([name, value]) => `${name}:${value}`)
+        .join('|'),
+    [thumbnailHeaders],
+  );
+
+  const seekPreviewTime = useMemo(() => {
+    if (!seeking || seekerWidth <= 0 || duration <= 0) return currentTime;
+    return duration * Math.max(0, Math.min(1, seekerPosition / seekerWidth));
+  }, [currentTime, duration, seekerPosition, seekerWidth, seeking]);
+
+  // Reuse one representative frame for a timeline region instead of asking
+  // the native decoder for another frame after every tiny thumb movement.
+  // Short videos retain finer previews while feature-length content uses
+  // wider regions to keep scrubbing responsive.
+  const seekThumbnailTimestampMs = useMemo(() => {
+    if (duration <= 0) return 0;
+    const bucketSeconds = duration >= 3600 ? 15 : duration >= 1200 ? 10 : 5;
+    const bucketStart =
+      Math.floor(Math.max(0, seekPreviewTime) / bucketSeconds) * bucketSeconds;
+    const representativeTime = Math.min(
+      duration,
+      bucketStart + bucketSeconds / 2,
+    );
+    return Math.round(representativeTime * 1000);
+  }, [duration, seekPreviewTime]);
+
+  // The responder clears the active timer on touch-down. Keep enforcing that
+  // invariant while scrubbing in case another control schedules a timeout.
+  useEffect(() => {
+    if (seeking) {
+      clearControlTimeout();
+    }
+  }, [clearControlTimeout, seeking]);
+
+  useEffect(() => {
+    const requestId = ++seekThumbnailRequestId.current;
+    const thumbnailModule = NativeModules.VideoThumbnailModule as
+      | {
+          getThumbnail: (
+            uri: string,
+            timestampMs: number,
+            headers: Record<string, string>,
+            options: Record<string, number | boolean>,
+          ) => Promise<{uri: string}>;
+        }
+      | undefined;
+
+    if (!seeking) {
+      setSeekThumbnailUri(null);
+      setSeekThumbnailLoading(false);
+      return;
+    }
+
+    if (!thumbnailSource) {
+      setSeekThumbnailUri(null);
+      setSeekThumbnailLoading(false);
+      return;
+    }
+
+    const memoryCacheKey = `${thumbnailSource}|${thumbnailHeadersKey}|${seekThumbnailTimestampMs}`;
+    const memoryCachedUri =
+      seekThumbnailMemoryCache.current.get(memoryCacheKey);
+    if (memoryCachedUri) {
+      // Refresh insertion order so the bounded map behaves as an LRU cache.
+      seekThumbnailMemoryCache.current.delete(memoryCacheKey);
+      seekThumbnailMemoryCache.current.set(memoryCacheKey, memoryCachedUri);
+      setSeekThumbnailUri(memoryCachedUri);
+      setSeekThumbnailLoading(false);
+      return;
+    }
+
+    // Never leave the previous timestamp's frame visible while the debounced
+    // request for the new position is pending.
+    setSeekThumbnailUri(null);
+    setSeekThumbnailLoading(true);
+    const debounce = setTimeout(() => {
+      const thumbnailRequest = thumbnailModule
+        ? thumbnailModule.getThumbnail(
+            thumbnailSource,
+            seekThumbnailTimestampMs,
+            thumbnailHeaders,
+            {
+              maxWidth: 320,
+              maxHeight: 180,
+              quality: 78,
+              cache: true,
+            },
+          )
+        : VideoThumbnails.getThumbnailAsync(thumbnailSource, {
+            time: seekThumbnailTimestampMs,
+            quality: 0.78,
+            headers: thumbnailHeaders,
+          });
+
+      thumbnailRequest
+        .then(result => {
+          seekThumbnailMemoryCache.current.set(memoryCacheKey, result.uri);
+          if (seekThumbnailMemoryCache.current.size > 48) {
+            const oldestKey = seekThumbnailMemoryCache.current
+              .keys()
+              .next().value;
+            if (oldestKey) {
+              seekThumbnailMemoryCache.current.delete(oldestKey);
+            }
+          }
+          if (seekThumbnailRequestId.current === requestId) {
+            setSeekThumbnailUri(result.uri);
+            setSeekThumbnailLoading(false);
+          }
+        })
+        .catch(() => {
+          if (seekThumbnailRequestId.current === requestId) {
+            setSeekThumbnailUri(null);
+            setSeekThumbnailLoading(false);
+          }
+        });
+    }, 180);
+
+    return () => clearTimeout(debounce);
+  }, [
+    seeking,
+    seekThumbnailTimestampMs,
+    thumbnailHeaders,
+    thumbnailHeadersKey,
+    thumbnailSource,
+  ]);
+
   // Keep track of previous source to prevent unnecessary resets
   const prevSourceUri = useRef(sourceUri);
   const hasInitialized = useRef(false);
@@ -672,7 +930,6 @@ const AnimatedVideoPlayer = (
       sourceUri !== prevSourceUri.current &&
       sourceUri !== null
     ) {
-      endedRef.current = false;
       prevSourceUri.current = sourceUri;
       setLoading(true);
       setSeekerFillWidth(0);
@@ -692,20 +949,30 @@ const AnimatedVideoPlayer = (
       onScreenTouch={events.onScreenTouch}
       testID={testID}>
       <View style={[_styles.player.container, styles.containerStyle]}>
-        <Video
-          controls={false}
-          {...props}
-          {...events}
-          ref={videoRef || _videoRef}
-          resizeMode={resizeMode}
-          volume={_volume}
-          paused={_paused}
-          muted={_muted}
-          rate={_playbackRate}
-          style={[_styles.player.video, styles.videoStyle]}
-          source={source}
-          onBuffer={onBuffer}
-        />
+        <Animated.View
+          pointerEvents="none"
+          style={[_styles.player.video, zoomAnimatedStyle]}>
+          <Video
+            controls={false}
+            {...props}
+            {...events}
+            ref={videoRef || _videoRef}
+            resizeMode={resizeMode}
+            volume={_volume}
+            paused={_paused}
+            muted={_muted}
+            rate={_playbackRate}
+            style={[_styles.player.video, styles.videoStyle]}
+            source={source}
+            onBuffer={onBuffer}
+            // SurfaceView is rendered in a separate Android surface and does
+            // not follow React Native transforms. Pinch zoom therefore needs
+            // TextureView, which remains part of the normal view hierarchy.
+            useTextureView={
+              Platform.OS === 'android' ? true : props.useTextureView
+            }
+          />
+        </Animated.View>
         {
           <>
             <Error error={error} />
@@ -731,14 +998,10 @@ const AnimatedVideoPlayer = (
                   <PlayPause
                     animations={animations}
                     disablePlayPause={disablePlayPause}
-                    disableSeekButtons={disableSeekButtons}
                     paused={_paused}
-                    // pauseLabel={pauseLabel}
                     togglePlayPause={togglePlayPause}
                     resetControlTimeout={resetControlTimeout}
                     showControls={showControls}
-                    onPressRewind={rewind}
-                    onPressForward={forward}
                     buffering={buffering}
                     primaryColor={seekColor}
                   />
@@ -754,10 +1017,20 @@ const AnimatedVideoPlayer = (
                   tapActionTimeout={tapActionTimeout}
                   tapAnywhereToPause={tapAnywhereToPause}
                   showControls={showControls}
+                  seekButtonsEnabled={
+                    !hideAllControlls &&
+                    !disablePlayPause &&
+                    !disableSeekButtons
+                  }
                   disableGesture={disableGesture}
                   enable2xGesture={enable2xGesture}
+                  baseRate={rate}
                   setPlayback={setPlaybackRate}
-                  playbackRate={_playbackRate}
+                  clearControlTimeout={clearControlTimeout}
+                  setControlTimeout={setControlTimeout}
+                  zoomScale={zoomScale}
+                  zoomStartScale={zoomStartScale}
+                  onSkipFeedback={handleSkipFeedback}
                 />
                 <BottomControls
                   animations={animations}
@@ -777,15 +1050,32 @@ const AnimatedVideoPlayer = (
                   seekerPosition={seekerPosition}
                   setSeekerWidth={setSeekerWidth}
                   cachedPosition={cachedPosition}
+                  seeking={seeking}
+                  seekPreviewTime={seekPreviewTime}
+                  seekThumbnailUri={seekThumbnailUri}
+                  seekThumbnailLoading={seekThumbnailLoading}
+                  seekSnapPosition={seekSnapPosition}
                   isFullscreen={isFullscreen}
                   disableFullscreen={disableFullscreen}
                   toggleFullscreen={toggleFullscreen}
                   showControls={showControls}
+                  skips={skips}
                 />
               </>
             )}
           </>
         }
+        {!hideAllControlls && !disablePlayPause && !disableSeekButtons ? (
+          <SeekControls
+            seekSeconds={rewindTime}
+            onPressRewind={rewind}
+            onPressForward={forward}
+            resetControlTimeout={resetControlTimeout}
+            showControls={showControls && !loading}
+            skipFeedbackLeft={skipFeedbackLeft}
+            skipFeedbackRight={skipFeedbackRight}
+          />
+        ) : null}
       </View>
     </PlatformSupport>
   );

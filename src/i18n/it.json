@@ -242,6 +242,8 @@
   "Confirm": "Conferma",
   "Episodes": "Episodi",
   "Lists": "Liste",
+  "Open episode list": "Apri elenco episodi",
+  "Close episode list": "Chiudi elenco episodi",
   "EP {{number}}": "EP {{number}}",
   "Episode {{number}}": "Episodio {{number}}",
   "Disable Providers": "Disattiva provider",

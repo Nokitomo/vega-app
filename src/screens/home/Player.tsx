@@ -37,6 +37,7 @@ import {
   useNavigation,
 } from '@react-navigation/native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {BlurView} from 'expo-blur';
 import {
   VideoRef,
@@ -58,6 +59,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import useThemeStore from '../../lib/zustand/themeStore';
 import {FlashList} from '@shopify/flash-list';
 import SearchSubtitles from '../../components/SearchSubtitles';
+import PlayerEpisodeSidebar from '../../components/PlayerEpisodeSidebar';
+import PlayerMenuRow from '../../components/PlayerMenuRow';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import {useStream, useVideoSettings} from '../../lib/hooks/useStream';
 import {useContentInfo} from '../../lib/hooks/useContentInfo';
@@ -95,6 +98,7 @@ import {
 import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../../lib/utils/streamHeaders';
 import {torrentManager} from '../../lib/torrentManager';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -122,6 +126,11 @@ const ANISKIP_BASE_URL = 'https://api.aniskip.com/v2/skip-times';
 const ANISKIP_TYPES = ['op', 'mixed-op'];
 const SKIP_INTRO_TIMEOUT_MS = 8000;
 const SKIP_INTRO_LEAD_SECONDS = 1.5;
+const PLAYER_CONTROL_COLOR = 'rgba(255,255,255,0.68)';
+const PLAYER_CONTROL_LABEL_STYLE = {
+  color: PLAYER_CONTROL_COLOR,
+  fontWeight: '300' as const,
+};
 
 type SkipIntroInterval = {
   startTime: number;
@@ -219,7 +228,8 @@ const Player = ({route}: Props): React.JSX.Element => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const {provider} = useContentStore();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const [isAppActive, setIsAppActive] = useState(
     AppState.currentState === 'active',
@@ -286,6 +296,10 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   const controlsStyle = useAnimatedStyle(() => ({
     transform: [{translateY: controlsTranslateY.value}],
+    opacity: controlsOpacity.value,
+  }));
+
+  const controlsOpacityStyle = useAnimatedStyle(() => ({
     opacity: controlsOpacity.value,
   }));
 
@@ -471,13 +485,16 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
     };
 
-    void resolveStream();
+    resolveStream().catch(error => {
+      console.error('Unexpected stream resolution failure:', error);
+    });
     return () => {
       active = false;
-      void stopCurrentTorrent();
+      stopCurrentTorrent().catch(error => {
+        console.error('Failed to stop current torrent:', error);
+      });
     };
     // switchToNextStream changes identity on each render in useStream.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findTorrentVideoFile, selectedStream, t]);
 
   // Custom hooks for video settings
@@ -615,12 +632,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       return false;
     }
     return streamData.some(
-      stream =>
-        Array.isArray(stream?.subtitles) && stream.subtitles.length > 0,
+      stream => Array.isArray(stream?.subtitles) && stream.subtitles.length > 0,
     );
   }, [streamData]);
-  const isSubtitleGatePending =
-    hasExpectedExternalSubs && !subtitleGatePassed;
+  const isSubtitleGatePending = hasExpectedExternalSubs && !subtitleGatePassed;
   const isPreparingPlayer =
     streamLoading || isSubtitleGatePending || isResolvingStream;
   const mergedTextTracks = useMemo(() => {
@@ -644,8 +659,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     if (!track) {
       return {type: SelectedTrackType.DISABLED};
     }
-    const language =
-      typeof track.language === 'string' ? track.language : '';
+    const language = typeof track.language === 'string' ? track.language : '';
     const title = typeof track.title === 'string' ? track.title : '';
     const uri = typeof track.uri === 'string' ? track.uri : '';
 
@@ -781,13 +795,11 @@ const Player = ({route}: Props): React.JSX.Element => {
   }, []);
   const resolveLocalizedItemTitle = useCallback(
     (
-      item?:
-        | {
-            title?: string;
-            titleKey?: string;
-            titleParams?: Record<string, any>;
-          }
-        | null,
+      item?: {
+        title?: string;
+        titleKey?: string;
+        titleParams?: Record<string, any>;
+      } | null,
     ) => {
       if (!item) {
         return '';
@@ -834,10 +846,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       if (!season) {
         return [];
       }
-      if (
-        Array.isArray(season?.directLinks) &&
-        season.directLinks.length > 0
-      ) {
+      if (Array.isArray(season?.directLinks) && season.directLinks.length > 0) {
         return normalizeEpisodeList(season.directLinks);
       }
       if (!season?.episodesLink) {
@@ -878,12 +887,16 @@ const Player = ({route}: Props): React.JSX.Element => {
   );
 
   const currentRouteEpisodeList = useMemo(
-    () => normalizeEpisodeList(route.params?.episodeList || []) as EpisodeLink[],
+    () =>
+      normalizeEpisodeList(route.params?.episodeList || []) as EpisodeLink[],
     [normalizeEpisodeList, route.params?.episodeList],
   );
 
   const episodeGroups = useMemo<Link[]>(() => {
-    if (Array.isArray(route.params?.seasons) && route.params.seasons.length > 0) {
+    if (
+      Array.isArray(route.params?.seasons) &&
+      route.params.seasons.length > 0
+    ) {
       return route.params.seasons;
     }
 
@@ -963,13 +976,23 @@ const Player = ({route}: Props): React.JSX.Element => {
   >(currentRouteEpisodeList);
   const [episodesTabLoading, setEpisodesTabLoading] = useState(false);
   const [episodesTabError, setEpisodesTabError] = useState<string | null>(null);
+  const [showEpisodeSidebar, setShowEpisodeSidebar] = useState(false);
+  const episodeSidebarLoadRequestRef = useRef(0);
 
   useEffect(() => {
+    episodeSidebarLoadRequestRef.current += 1;
     setEpisodesTabGroupIndex(currentGroupIndex >= 0 ? currentGroupIndex : 0);
     setEpisodesTabEpisodeList(currentRouteEpisodeList);
     setEpisodesTabLoading(false);
     setEpisodesTabError(null);
-  }, [currentGroupIndex, currentRouteEpisodeList, route.params?.seasonEpisodesLink]);
+    return () => {
+      episodeSidebarLoadRequestRef.current += 1;
+    };
+  }, [
+    currentGroupIndex,
+    currentRouteEpisodeList,
+    route.params?.seasonEpisodesLink,
+  ]);
 
   const replacePlayerEpisode = useCallback(
     ({
@@ -983,7 +1006,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       nextGroup?: Link;
       nextGroupIndex?: number;
     }) => {
-      const normalizedEpisodes = normalizeEpisodeList(nextEpisodes) as EpisodeLink[];
+      const normalizedEpisodes = normalizeEpisodeList(
+        nextEpisodes,
+      ) as EpisodeLink[];
       const targetEpisode = normalizedEpisodes[nextIndex];
       if (!targetEpisode) {
         return false;
@@ -1077,10 +1102,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     const currentIndex = episodeList.findIndex(
       item => item?.link === activeEpisode?.link,
     );
-    if (
-      currentIndex >= 0 &&
-      currentIndex < episodeList.length - 1
-    ) {
+    if (currentIndex >= 0 && currentIndex < episodeList.length - 1) {
       const currentGroup =
         currentGroupIndex >= 0 ? episodeGroups[currentGroupIndex] : undefined;
       replacePlayerEpisode({
@@ -1124,14 +1146,15 @@ const Player = ({route}: Props): React.JSX.Element => {
     t,
   ]);
 
-  const handleOpenEpisodesTab = useCallback(() => {
+  const handleOpenEpisodeSidebar = useCallback(() => {
+    const requestId = ++episodeSidebarLoadRequestRef.current;
     const targetIndex = currentGroupIndex >= 0 ? currentGroupIndex : 0;
     setEpisodesTabGroupIndex(targetIndex);
     setEpisodesTabEpisodeList(currentRouteEpisodeList);
     setEpisodesTabLoading(false);
     setEpisodesTabError(null);
-    setActiveTab('episodes');
-    setShowSettings(!showSettings);
+    setShowSettings(false);
+    setShowEpisodeSidebar(true);
 
     if (currentRouteEpisodeList.length === 0 && episodeGroups[targetIndex]) {
       (async () => {
@@ -1139,9 +1162,14 @@ const Player = ({route}: Props): React.JSX.Element => {
         const loaded = (await loadSeasonEpisodes(
           episodeGroups[targetIndex],
         )) as EpisodeLink[];
+        if (episodeSidebarLoadRequestRef.current !== requestId) {
+          return;
+        }
         setEpisodesTabEpisodeList(loaded);
         setEpisodesTabLoading(false);
-        setEpisodesTabError(loaded.length === 0 ? t('No episodes available') : null);
+        setEpisodesTabError(
+          loaded.length === 0 ? t('No episodes available') : null,
+        );
       })();
     }
   }, [
@@ -1149,14 +1177,13 @@ const Player = ({route}: Props): React.JSX.Element => {
     currentRouteEpisodeList,
     episodeGroups,
     loadSeasonEpisodes,
-    setActiveTab,
     setShowSettings,
-    showSettings,
     t,
   ]);
 
   const handleSelectEpisodeGroup = useCallback(
     async (groupIndex: number) => {
+      const requestId = ++episodeSidebarLoadRequestRef.current;
       const group = episodeGroups[groupIndex];
       if (!group) {
         return;
@@ -1165,7 +1192,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       setEpisodesTabGroupIndex(groupIndex);
       setEpisodesTabError(null);
 
-      if (groupIndex === currentGroupIndex && currentRouteEpisodeList.length > 0) {
+      if (
+        groupIndex === currentGroupIndex &&
+        currentRouteEpisodeList.length > 0
+      ) {
         setEpisodesTabEpisodeList(currentRouteEpisodeList);
         setEpisodesTabLoading(false);
         return;
@@ -1173,6 +1203,9 @@ const Player = ({route}: Props): React.JSX.Element => {
 
       setEpisodesTabLoading(true);
       const loadedEpisodes = (await loadSeasonEpisodes(group)) as EpisodeLink[];
+      if (episodeSidebarLoadRequestRef.current !== requestId) {
+        return;
+      }
       setEpisodesTabEpisodeList(loadedEpisodes);
       setEpisodesTabLoading(false);
       setEpisodesTabError(
@@ -1191,7 +1224,9 @@ const Player = ({route}: Props): React.JSX.Element => {
   const handleSelectEpisodeFromTab = useCallback(
     (episode: EpisodeLink, index: number) => {
       const selectedGroup =
-        episodesTabGroupIndex >= 0 ? episodeGroups[episodesTabGroupIndex] : undefined;
+        episodesTabGroupIndex >= 0
+          ? episodeGroups[episodesTabGroupIndex]
+          : undefined;
       const selectedGroupIndex =
         episodesTabGroupIndex >= 0 ? episodesTabGroupIndex : undefined;
 
@@ -1199,7 +1234,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         selectedGroupIndex === currentGroupIndex &&
         episode?.link === activeEpisode?.link
       ) {
-        setShowSettings(false);
+        setShowEpisodeSidebar(false);
         return;
       }
 
@@ -1211,7 +1246,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       });
 
       if (changed) {
-        setShowSettings(false);
+        setShowEpisodeSidebar(false);
       }
     },
     [
@@ -1221,9 +1256,14 @@ const Player = ({route}: Props): React.JSX.Element => {
       episodesTabEpisodeList,
       episodesTabGroupIndex,
       replacePlayerEpisode,
-      setShowSettings,
     ],
   );
+
+  useEffect(() => {
+    if (isPlayerLocked || showSettings) {
+      setShowEpisodeSidebar(false);
+    }
+  }, [isPlayerLocked, showSettings]);
 
   const handleSkipIntro = useCallback(() => {
     if (!skipIntroInterval) {
@@ -1233,6 +1273,14 @@ const Player = ({route}: Props): React.JSX.Element => {
     setShowControls(true);
   }, [skipIntroInterval, setShowControls]);
 
+  const handleSeekSnap = useCallback(() => {
+    if (settingsStorage.isHapticFeedbackEnabled()) {
+      ReactNativeHapticFeedback.trigger('effectTick', {
+        enableVibrateFallback: true,
+        ignoreAndroidSystemSettings: false,
+      });
+    }
+  }, []);
 
   const nextButtonOpacity = useSharedValue(showControls ? 1 : 0.5);
   useEffect(() => {
@@ -1308,7 +1356,10 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     const controller = new AbortController();
     skipIntroAbortRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), SKIP_INTRO_TIMEOUT_MS);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      SKIP_INTRO_TIMEOUT_MS,
+    );
 
     const fetchSkip = async () => {
       try {
@@ -1479,10 +1530,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         const retryCount = sameKey ? retryState.count : 0;
         const lastAttempt = sameKey ? retryState.lastAttempt : 0;
 
-        if (
-          retryCount < 1 &&
-          now - lastAttempt > STREAM_RETRY_COOLDOWN_MS
-        ) {
+        if (retryCount < 1 && now - lastAttempt > STREAM_RETRY_COOLDOWN_MS) {
           streamRetryRef.current = {
             retryKey,
             count: retryCount + 1,
@@ -1655,7 +1703,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       );
     } catch (error) {
       console.error('Error opening Web Video Caster:', error);
-      ToastAndroid.show(t('Failed to open Web Video Caster'), ToastAndroid.SHORT);
+      ToastAndroid.show(
+        t('Failed to open Web Video Caster'),
+        ToastAndroid.SHORT,
+      );
     }
   }, [
     activeEpisode?.title,
@@ -1676,7 +1727,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     }
 
     try {
-      const selectedSubtitleUri = resolveCastSubtitleUri(getCastSubtitleTracks(), 0);
+      const selectedSubtitleUri = resolveCastSubtitleUri(
+        getCastSubtitleTracks(),
+        0,
+      );
       const startTime = Math.max(
         0,
         videoPositionRef.current?.position || watchedDuration || 0,
@@ -1684,24 +1738,26 @@ const Player = ({route}: Props): React.JSX.Element => {
 
       const {receiverUrl, sessionCode, launchMode, expiresAt, tracking} =
         await prepareVegaCastLaunchData({
-        currentEpisodeLink: activeEpisode?.link || selectedStream.link,
-        episodeList: route.params?.episodeList || [],
-        selectedStream,
-        providerValue: route.params?.providerValue || providerValue,
-        contentType: route.params?.type || 'series',
-        context: {
-          primaryTitle: resolvedPrimaryTitle,
-          secondaryTitle: route.params?.secondaryTitle || '',
-          posterUrl:
-            route.params?.poster?.poster || route.params?.poster?.background || '',
-          infoUrl: route.params?.infoUrl || '',
-          seasonNumber: route.params?.seasonNumber,
-          aniSkipMalId: skipMalId,
-          playbackRate,
-          startTime,
-          preferredSubtitleUri: selectedSubtitleUri,
-        },
-      });
+          currentEpisodeLink: activeEpisode?.link || selectedStream.link,
+          episodeList: route.params?.episodeList || [],
+          selectedStream,
+          providerValue: route.params?.providerValue || providerValue,
+          contentType: route.params?.type || 'series',
+          context: {
+            primaryTitle: resolvedPrimaryTitle,
+            secondaryTitle: route.params?.secondaryTitle || '',
+            posterUrl:
+              route.params?.poster?.poster ||
+              route.params?.poster?.background ||
+              '',
+            infoUrl: route.params?.infoUrl || '',
+            seasonNumber: route.params?.seasonNumber,
+            aniSkipMalId: skipMalId,
+            playbackRate,
+            startTime,
+            preferredSubtitleUri: selectedSubtitleUri,
+          },
+        });
       if (launchMode === 'pairing' && tracking) {
         lastVegaProgressSyncRef.current = 0;
         lastCastProgressWriteRef.current = 0;
@@ -1757,7 +1813,10 @@ const Player = ({route}: Props): React.JSX.Element => {
                 );
                 return;
               }
-              ToastAndroid.show(t('Vega Cast receiver opened'), ToastAndroid.SHORT);
+              ToastAndroid.show(
+                t('Vega Cast receiver opened'),
+                ToastAndroid.SHORT,
+              );
             },
           },
         ],
@@ -1765,7 +1824,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     } catch (error) {
       console.error('Vega Cast session preparation failed:', error);
       const message =
-        error instanceof Error && error.message === 'VEGA_CAST_SESSION_TOO_LARGE'
+        error instanceof Error &&
+        error.message === 'VEGA_CAST_SESSION_TOO_LARGE'
           ? t('Vega Cast session too large')
           : t('Failed to prepare Vega Cast');
       ToastAndroid.show(message, ToastAndroid.SHORT);
@@ -1793,7 +1853,8 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   const storeRemoteCastProgress = useCallback(
     (currentTime: number, duration: number) => {
-      const episodeLink = currentCastEpisodeRef.current.link || activeEpisode?.link;
+      const episodeLink =
+        currentCastEpisodeRef.current.link || activeEpisode?.link;
       if (!episodeLink) {
         return;
       }
@@ -1830,7 +1891,8 @@ const Player = ({route}: Props): React.JSX.Element => {
           id: historyKey,
           link: historyKey,
           title: resolvedPrimaryTitle,
-          poster: route.params?.poster?.poster || route.params?.poster?.background,
+          poster:
+            route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
           lastPlayed: Date.now(),
           currentTime,
@@ -1914,7 +1976,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
 
       let latestEntry:
-        | (VegaCastEpisodeProgressSnapshot & {currentTime: number; duration: number})
+        | (VegaCastEpisodeProgressSnapshot & {
+            currentTime: number;
+            duration: number;
+          })
         | null = null;
       let latestUpdatedAt = 0;
 
@@ -1950,7 +2015,9 @@ const Player = ({route}: Props): React.JSX.Element => {
           title: resolvedPrimaryTitle,
           episodeTitle: String(entry.episodeTitle || ''),
           episodeNumber:
-            typeof entry.episodeNumber === 'number' ? entry.episodeNumber : undefined,
+            typeof entry.episodeNumber === 'number'
+              ? entry.episodeNumber
+              : undefined,
           episodeLink,
           seasonTitle: route.params?.secondaryTitle || '',
           seasonNumber:
@@ -1995,7 +2062,8 @@ const Player = ({route}: Props): React.JSX.Element => {
           id: historyKey,
           link: historyKey,
           title: resolvedPrimaryTitle,
-          poster: route.params?.poster?.poster || route.params?.poster?.background,
+          poster:
+            route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
           lastPlayed: Date.now(),
           currentTime: latestEntry.currentTime,
@@ -2070,7 +2138,10 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     setIsStartingNativeCast(true);
     try {
-      const selectedSubtitleUri = resolveCastSubtitleUri(getCastSubtitleTracks(), 0);
+      const selectedSubtitleUri = resolveCastSubtitleUri(
+        getCastSubtitleTracks(),
+        0,
+      );
       const startTime = Math.max(
         0,
         videoPositionRef.current?.position || watchedDuration || 0,
@@ -2086,7 +2157,9 @@ const Player = ({route}: Props): React.JSX.Element => {
           primaryTitle: resolvedPrimaryTitle,
           secondaryTitle: route.params?.secondaryTitle || '',
           posterUrl:
-            route.params?.poster?.poster || route.params?.poster?.background || '',
+            route.params?.poster?.poster ||
+            route.params?.poster?.background ||
+            '',
           infoUrl: route.params?.infoUrl || '',
           seasonNumber: route.params?.seasonNumber,
           playbackRate,
@@ -2157,7 +2230,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       Alert.alert(
         t('Protected stream'),
         t(
-          'Native Cast cannot forward this server\'s request headers. Open Web Video Caster instead?',
+          "Native Cast cannot forward this server's request headers. Open Web Video Caster instead?",
         ),
         [
           {text: t('Cancel'), style: 'cancel'},
@@ -2218,7 +2291,12 @@ const Player = ({route}: Props): React.JSX.Element => {
       return;
     }
     await handleNativeCast();
-  }, [castProvider, handleNativeCast, handleVegaCast, handleWebVideoCasterCast]);
+  }, [
+    castProvider,
+    handleNativeCast,
+    handleVegaCast,
+    handleWebVideoCasterCast,
+  ]);
 
   useEffect(() => {
     if (!pendingNativeCast || !remoteMediaClient || castProvider !== 'native') {
@@ -2256,44 +2334,46 @@ const Player = ({route}: Props): React.JSX.Element => {
       return;
     }
 
-    const statusSubscription = remoteMediaClient.onMediaStatusUpdated(status => {
-      const customData = (status?.mediaInfo?.customData || {}) as {
-        episodeLink?: string;
-        episodeTitle?: string;
-        episodeNumber?: number;
-        seasonNumber?: number;
-      };
-      const castEpisodeLink =
-        typeof customData.episodeLink === 'string'
-          ? customData.episodeLink
-          : undefined;
-      if (castEpisodeLink) {
-        currentCastEpisodeRef.current = {
-          link: castEpisodeLink,
-          title:
-            typeof customData.episodeTitle === 'string'
-              ? customData.episodeTitle
-              : activeEpisode?.title,
-          episodeNumber:
-            typeof customData.episodeNumber === 'number'
-              ? customData.episodeNumber
-              : activeEpisode?.episodeNumber,
-          seasonNumber:
-            typeof customData.seasonNumber === 'number'
-              ? customData.seasonNumber
-              : route.params?.seasonNumber,
+    const statusSubscription = remoteMediaClient.onMediaStatusUpdated(
+      status => {
+        const customData = (status?.mediaInfo?.customData || {}) as {
+          episodeLink?: string;
+          episodeTitle?: string;
+          episodeNumber?: number;
+          seasonNumber?: number;
         };
+        const castEpisodeLink =
+          typeof customData.episodeLink === 'string'
+            ? customData.episodeLink
+            : undefined;
+        if (castEpisodeLink) {
+          currentCastEpisodeRef.current = {
+            link: castEpisodeLink,
+            title:
+              typeof customData.episodeTitle === 'string'
+                ? customData.episodeTitle
+                : activeEpisode?.title,
+            episodeNumber:
+              typeof customData.episodeNumber === 'number'
+                ? customData.episodeNumber
+                : activeEpisode?.episodeNumber,
+            seasonNumber:
+              typeof customData.seasonNumber === 'number'
+                ? customData.seasonNumber
+                : route.params?.seasonNumber,
+          };
 
-        if (castEpisodeLink !== activeEpisode?.link) {
-          const matchingEpisode = route.params?.episodeList?.find(
-            item => item?.link === castEpisodeLink,
-          );
-          if (matchingEpisode) {
-            setActiveEpisode(matchingEpisode);
+          if (castEpisodeLink !== activeEpisode?.link) {
+            const matchingEpisode = route.params?.episodeList?.find(
+              item => item?.link === castEpisodeLink,
+            );
+            if (matchingEpisode) {
+              setActiveEpisode(matchingEpisode);
+            }
           }
         }
-      }
-    });
+      },
+    );
 
     const progressSubscription = remoteMediaClient.onMediaProgressUpdated(
       (progress, duration) => {
@@ -2350,7 +2430,11 @@ const Player = ({route}: Props): React.JSX.Element => {
           return;
         }
         const progressInfoUrl = String(progress.infoUrl || '').trim();
-        if (expectedInfoUrl && progressInfoUrl && progressInfoUrl !== expectedInfoUrl) {
+        if (
+          expectedInfoUrl &&
+          progressInfoUrl &&
+          progressInfoUrl !== expectedInfoUrl
+        ) {
           return;
         }
 
@@ -2848,8 +2932,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       },
       onLoad: (data: any) => {
         handleVideoLoad(data?.naturalSize);
-        const duration =
-          typeof data?.duration === 'number' ? data.duration : 0;
+        const duration = typeof data?.duration === 'number' ? data.duration : 0;
         if (Number.isFinite(duration) && duration > 0) {
           loadedDurationRef.current = duration;
           setEpisodeDuration(prev => (prev === duration ? prev : duration));
@@ -2883,41 +2966,51 @@ const Player = ({route}: Props): React.JSX.Element => {
       },
       navigator: navigation,
       seekColor: primary,
-        showDuration: true,
-        toggleResizeModeOnFullscreen: false,
-        fullscreenOrientation: 'landscape' as const,
-        fullscreenAutorotate: true,
-        onShowControls: () => setShowControls(true),
-        onHideControls: () => setShowControls(false),
-        rewindTime: 10,
-        isFullscreen: true,
-        disableFullscreen: true,
-        disableVolume: true,
-        showHours: true,
-        progressUpdateInterval: 1000,
-        showNotificationControls: showMediaControls,
-        onError: handleVideoError,
-        resizeMode,
-        selectedAudioTrack,
-        onAudioTracks: (e: any) => processAudioTracks(e.audioTracks),
-        textTracks: externalSubs,
-        selectedTextTrack,
-        onTextTracks: (e: any) => {
-          const tracks = e?.textTracks || [];
-          console.log('[subs][player] onTextTracks', {
-            count: tracks.length,
-            tracks: tracks.map((track: any, idx: number) => ({
-              index: track?.index ?? idx,
-              language: track?.language,
-              title: track?.title,
-              type: track?.type,
-              uri: track?.uri,
-            })),
-          });
-          setTextTracks(tracks);
-        },
+      showDuration: true,
+      toggleResizeModeOnFullscreen: false,
+      fullscreenOrientation: 'landscape' as const,
+      fullscreenAutorotate: true,
+      onShowControls: () => setShowControls(true),
+      onHideControls: () => setShowControls(false),
+      rewindTime: 10,
+      isFullscreen: true,
+      disableFullscreen: true,
+      disableVolume: true,
+      showHours: true,
+      progressUpdateInterval: 1000,
+      showNotificationControls: showMediaControls,
+      onError: handleVideoError,
+      resizeMode,
+      selectedAudioTrack,
+      onAudioTracks: (e: any) => processAudioTracks(e.audioTracks),
+      textTracks: externalSubs,
+      selectedTextTrack,
+      onTextTracks: (e: any) => {
+        const tracks = e?.textTracks || [];
+        console.log('[subs][player] onTextTracks', {
+          count: tracks.length,
+          tracks: tracks.map((track: any, idx: number) => ({
+            index: track?.index ?? idx,
+            language: track?.language,
+            title: track?.title,
+            type: track?.type,
+            uri: track?.uri,
+          })),
+        });
+        setTextTracks(tracks);
+      },
       onVideoTracks: (e: any) => processVideoTracks(e.videoTracks),
       selectedVideoTrack,
+      skips: skipIntroInterval
+        ? [
+            {
+              title: t('Skip Intro'),
+              from: skipIntroInterval.startTime,
+              to: skipIntroInterval.endTime,
+            },
+          ]
+        : undefined,
+      onSeekSnap: handleSeekSnap,
       style: {flex: 1, zIndex: 100},
       controlAnimationTiming: 357,
       controlTimeoutDelay: 10000,
@@ -2951,6 +3044,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       selectedVideoTrack,
       processAudioTracks,
       processVideoTracks,
+      skipIntroInterval,
+      handleSeekSnap,
+      t,
     ],
   );
 
@@ -2989,15 +3085,11 @@ const Player = ({route}: Props): React.JSX.Element => {
     castProvider === 'native' && castState === CastState.CONNECTED
       ? primary
       : 'hsl(0, 0%, 70%)';
-  const isEpisodesSettingsTab = activeTab === 'episodes';
   const settingsPanelWidth = Math.max(
     320,
-    Math.min(
-      Dimensions.get('window').width - 24,
-      isEpisodesSettingsTab ? 900 : 600,
-    ),
+    Math.min(Dimensions.get('window').width - 24, 620),
   );
-  const settingsPanelHeight = isEpisodesSettingsTab ? 420 : 288;
+  const settingsPanelHeight = 320;
 
   // Show loading state
   if (isPreparingPlayer) {
@@ -3105,10 +3197,10 @@ const Player = ({route}: Props): React.JSX.Element => {
           className="absolute top-5 right-5 flex-row items-center gap-2 z-50">
           <TouchableOpacity
             onPress={togglePlayerLock}
-            className="opacity-70 p-2 rounded-full">
-            <MaterialIcons
-              name={isPlayerLocked ? 'lock' : 'lock-open'}
-              color={'hsl(0, 0%, 70%)'}
+            className="p-2 rounded-full">
+            <MaterialCommunityIcons
+              name={isPlayerLocked ? 'lock-outline' : 'lock-open-outline'}
+              color={PLAYER_CONTROL_COLOR}
               size={24}
             />
           </TouchableOpacity>
@@ -3117,17 +3209,46 @@ const Player = ({route}: Props): React.JSX.Element => {
             className="opacity-70 p-2 rounded-full">
             <MaterialIcons
               name={isFullScreen ? 'fullscreen-exit' : 'fullscreen'}
-              color={'hsl(0, 0%, 70%)'}
+              color={PLAYER_CONTROL_COLOR}
               size={24}
             />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleCastPress}
             className="opacity-70 p-2 rounded-full">
+            <MaterialIcons name={'cast'} color={castIconColor} size={24} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Episode drawer toggle */}
+      {!isPreparingPlayer && !isPlayerLocked && canShowEpisodeControls && (
+        <Animated.View
+          pointerEvents={
+            showControls && !showSettings && !showEpisodeSidebar
+              ? 'auto'
+              : 'none'
+          }
+          style={[
+            controlsOpacityStyle,
+            {
+              position: 'absolute',
+              right: 2,
+              top: '50%',
+              transform: [{translateY: -20}],
+              zIndex: 60,
+            },
+          ]}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('Open episode list')}
+            hitSlop={{top: 16, bottom: 16, left: 16, right: 16}}
+            onPress={handleOpenEpisodeSidebar}
+            className="p-2 rounded-full justify-center items-center">
             <MaterialIcons
-              name={'cast'}
-              color={castIconColor}
-              size={24}
+              name="chevron-left"
+              size={28}
+              color={PLAYER_CONTROL_COLOR}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -3136,73 +3257,122 @@ const Player = ({route}: Props): React.JSX.Element => {
       {/* Bottom controls */}
       {!isPlayerLocked && (
         <Animated.View
-          style={[controlsStyle]}
-          className="absolute bottom-3 right-6 flex flex-row justify-center w-full gap-x-16">
+          style={[controlsStyle, {left: '7%', right: '7%', bottom: 15}]}
+          className="absolute flex-row items-center">
           {/* Audio controls */}
           <TouchableOpacity
             onPress={() => {
               setActiveTab('audio');
               setShowSettings(!showSettings);
             }}
-            className="flex flex-row gap-x-1 items-center">
-            <MaterialIcons
-              style={{opacity: 0.7}}
-              name={'multitrack-audio'}
-              size={26}
-              color="white"
+            className="min-w-0 flex-1 flex-row items-center justify-center gap-x-1">
+            <MaterialCommunityIcons
+              name="waveform"
+              size={24}
+              color={PLAYER_CONTROL_COLOR}
             />
-            <Text className="capitalize text-xs text-white opacity-70">
+            <Text
+              className="capitalize text-xs text-white"
+              style={PLAYER_CONTROL_LABEL_STYLE}
+              numberOfLines={1}>
               {audioTracks[selectedAudioTrackIndex]?.language === 'auto'
                 ? t('Auto')
                 : audioTracks[selectedAudioTrackIndex]?.language || t('Auto')}
             </Text>
           </TouchableOpacity>
 
-          {/* Grouped playback options */}
+          {/* Subtitle controls */}
           <TouchableOpacity
             onPress={() => {
-              setActiveTab('options');
+              setActiveTab('subtitle');
               setShowSettings(!showSettings);
             }}
-            className="flex flex-row gap-x-1 items-center opacity-60">
-            <MaterialIcons name={'tune'} size={24} color="white" />
-            <Text className="text-xs capitalize text-white">
-              {t('Options')}
+            className="min-w-0 flex-1 flex-row items-center justify-center gap-x-1">
+            <MaterialCommunityIcons
+              name="subtitles-outline"
+              size={24}
+              color={PLAYER_CONTROL_COLOR}
+            />
+            <Text
+              className="text-xs capitalize text-white"
+              style={PLAYER_CONTROL_LABEL_STYLE}
+              numberOfLines={1}>
+              {selectedSubtitleLabel}
             </Text>
           </TouchableOpacity>
 
-          {/* Episode list controls */}
-          {canShowEpisodeControls && (
-            <TouchableOpacity
-              className="flex-row gap-1 items-center opacity-60"
-              onPress={handleOpenEpisodesTab}>
-              <MaterialIcons name="list" size={24} color="white" />
-              <Text className="text-white text-xs">{t('Episodes')}</Text>
-            </TouchableOpacity>
-          )}
+          {/* Speed controls */}
+          <TouchableOpacity
+            className="min-w-0 flex-1 flex-row items-center justify-center gap-1"
+            onPress={() => {
+              setActiveTab('speed');
+              setShowSettings(!showSettings);
+            }}>
+            <MaterialCommunityIcons
+              name="speedometer"
+              size={24}
+              color={PLAYER_CONTROL_COLOR}
+            />
+            <Text
+              className="text-white text-sm"
+              style={PLAYER_CONTROL_LABEL_STYLE}>
+              {playbackRate === 1 ? '1.0' : playbackRate}x
+            </Text>
+          </TouchableOpacity>
 
           {/* PIP */}
           {!Platform.isTV && (
             <TouchableOpacity
-              className="flex-row gap-1 items-center opacity-60"
+              className="min-w-0 flex-1 flex-row items-center justify-center gap-1"
               onPress={() => {
                 playerRef?.current?.enterPictureInPicture();
               }}>
-              <MaterialIcons
-                name="picture-in-picture"
+              <MaterialCommunityIcons
+                name="picture-in-picture-bottom-right-outline"
                 size={24}
-                color="white"
+                color={PLAYER_CONTROL_COLOR}
               />
-              <Text className="text-white text-xs">{t('PIP')}</Text>
+              <Text
+                className="text-white text-xs"
+                style={PLAYER_CONTROL_LABEL_STYLE}>
+                {t('PIP')}
+              </Text>
             </TouchableOpacity>
           )}
 
+          {/* Server and quality */}
+          <TouchableOpacity
+            className="min-w-0 flex-1 flex-row items-center justify-center gap-1"
+            onPress={() => {
+              setActiveTab('server');
+              setShowSettings(!showSettings);
+            }}>
+            <MaterialIcons
+              name="video-settings"
+              size={24}
+              color={PLAYER_CONTROL_COLOR}
+            />
+            <Text
+              className="text-xs text-white capitalize"
+              style={PLAYER_CONTROL_LABEL_STYLE}
+              numberOfLines={1}>
+              {groupedOptionsQualityLabel}
+            </Text>
+          </TouchableOpacity>
+
           {/* Resize button */}
           <TouchableOpacity
-            className="flex-row gap-1 items-center opacity-60"
+            className="min-w-0 flex-1 flex-row items-center justify-center gap-1"
             onPress={handleResizeMode}>
-            <MaterialIcons name="fit-screen" size={28} color="white" />
-            <Text className="text-white text-sm min-w-[38px]">
+            <MaterialCommunityIcons
+              name="fit-to-screen-outline"
+              size={25}
+              color={PLAYER_CONTROL_COLOR}
+            />
+            <Text
+              className="text-white text-sm min-w-[38px]"
+              style={PLAYER_CONTROL_LABEL_STYLE}
+              numberOfLines={1}>
               {resizeMode === ResizeMode.NONE
                 ? t('Fit')
                 : resizeMode === ResizeMode.COVER
@@ -3216,15 +3386,23 @@ const Player = ({route}: Props): React.JSX.Element => {
           {/* Next episode controls */}
           {canShowEpisodeControls && (
             <TouchableOpacity
-              className="flex-row gap-1 items-center"
+              className="min-w-0 flex-1 flex-row items-center justify-center"
               disabled={!hasNextEpisode}
               onPress={handleNextEpisode}
-              style={{opacity: hasNextEpisode ? 0.6 : 0.25}}>
-              <MaterialIcons name="skip-next" size={24} color="white" />
-              <Text className="text-white text-xs">{t('Next')}</Text>
+              style={{opacity: hasNextEpisode ? 1 : 0.35}}>
+              <Text
+                className="text-white text-sm"
+                style={PLAYER_CONTROL_LABEL_STYLE}
+                numberOfLines={1}>
+                {t('Next')}
+              </Text>
+              <MaterialCommunityIcons
+                name="skip-next-outline"
+                size={26}
+                color={PLAYER_CONTROL_COLOR}
+              />
             </TouchableOpacity>
           )}
-
         </Animated.View>
       )}
 
@@ -3237,7 +3415,9 @@ const Player = ({route}: Props): React.JSX.Element => {
             activeOpacity={0.85}
             className="rounded-full"
             onPress={handleSkipIntro}>
-            <View style={overlayButtonContainerStyle} className="rounded-full overflow-hidden">
+            <View
+              style={overlayButtonContainerStyle}
+              className="rounded-full overflow-hidden">
               <BlurView
                 intensity={overlayBlurIntensity}
                 tint="dark"
@@ -3276,12 +3456,22 @@ const Player = ({route}: Props): React.JSX.Element => {
       {/* Settings Modal */}
       {!isPreparingPlayer && !isPlayerLocked && showSettings && (
         <Animated.View
-          style={[settingsStyle]}
-          className="absolute opacity-0 top-0 left-0 w-full h-full bg-black/20 justify-end items-center"
+          style={[settingsStyle, {backgroundColor: 'rgba(0,0,0,0.48)'}]}
+          className="absolute opacity-0 top-0 left-0 w-full h-full justify-end items-center"
           onTouchEnd={() => setShowSettings(false)}>
           <View
-            className="bg-black p-3 rounded-t-lg flex-row justify-start items-center"
-            style={{width: settingsPanelWidth, height: settingsPanelHeight}}
+            className="p-3 rounded-t-3xl flex-row justify-start items-center"
+            style={{
+              width: settingsPanelWidth,
+              height: settingsPanelHeight,
+              backgroundColor: 'rgba(13,13,13,0.94)',
+              borderColor: 'rgba(255,255,255,0.12)',
+              borderWidth: 1,
+              shadowColor: '#000',
+              shadowOpacity: 0.45,
+              shadowRadius: 24,
+              elevation: 18,
+            }}
             onTouchEnd={e => e.stopPropagation()}>
             {/* Audio Tab */}
             {activeTab === 'audio' && (
@@ -3297,9 +3487,15 @@ const Player = ({route}: Props): React.JSX.Element => {
                   </View>
                 )}
                 {audioTracks.map((track, i) => (
-                  <TouchableOpacity
-                    className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
+                  <PlayerMenuRow
                     key={i}
+                    title={track.language || `${t('Audio')} ${i + 1}`}
+                    detail={[track.type, track.title]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    selected={selectedAudioTrackIndex === i}
+                    accentColor={primary}
+                    icon="multitrack-audio"
                     onPress={() => {
                       setSelectedAudioTrack({
                         type: SelectedTrackType.LANGUAGE,
@@ -3311,118 +3507,10 @@ const Player = ({route}: Props): React.JSX.Element => {
                       );
                       setSelectedAudioTrackIndex(i);
                       setShowSettings(false);
-                    }}>
-                    <Text
-                      className={'text-lg font-semibold'}
-                      style={{
-                        color:
-                          selectedAudioTrackIndex === i ? primary : 'white',
-                      }}>
-                      {track.language}
-                    </Text>
-                    <Text
-                      className={'text-base italic'}
-                      style={{
-                        color:
-                          selectedAudioTrackIndex === i ? primary : 'white',
-                      }}>
-                      {track.type}
-                    </Text>
-                    <Text
-                      className={'text-sm italic'}
-                      style={{
-                        color:
-                          selectedAudioTrackIndex === i ? primary : 'white',
-                      }}>
-                      {track.title}
-                    </Text>
-                    {selectedAudioTrackIndex === i && (
-                      <MaterialIcons name="check" size={20} color="white" />
-                    )}
-                  </TouchableOpacity>
+                    }}
+                  />
                 ))}
               </ScrollView>
-            )}
-
-            {/* Options Menu Tab */}
-            {activeTab === 'options' && (
-              <View className="w-full h-full p-1 px-4">
-                <Text className="text-lg font-bold text-center text-white mb-2">
-                  {t('Options')}
-                </Text>
-
-                <TouchableOpacity
-                  className="flex-row items-center rounded-md px-2 py-2 my-1"
-                  onPress={() => setActiveTab('subtitle')}>
-                  <MaterialIcons
-                    style={{opacity: 0.8}}
-                    name="subtitles"
-                    size={22}
-                    color="white"
-                  />
-                  <View className="flex-1 ml-3">
-                    <Text className="text-white text-base font-semibold">
-                      {t('Subtitle')}
-                    </Text>
-                    <Text className="text-white/60 text-xs" numberOfLines={1}>
-                      {selectedSubtitleLabel}
-                    </Text>
-                  </View>
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={22}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  className="flex-row items-center rounded-md px-2 py-2 my-1"
-                  onPress={() => setActiveTab('speed')}>
-                  <MaterialIcons
-                    style={{opacity: 0.8}}
-                    name="speed"
-                    size={22}
-                    color="white"
-                  />
-                  <View className="flex-1 ml-3">
-                    <Text className="text-white text-base font-semibold">
-                      {t('Playback Speed')}
-                    </Text>
-                    <Text className="text-white/60 text-xs" numberOfLines={1}>
-                      {playbackRate === 1 ? '1.0x' : `${playbackRate}x`}
-                    </Text>
-                  </View>
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={22}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  className="flex-row items-center rounded-md px-2 py-2 my-1"
-                  onPress={() => setActiveTab('server')}>
-                  <MaterialIcons
-                    style={{opacity: 0.8}}
-                    name="video-settings"
-                    size={22}
-                    color="white"
-                  />
-                  <View className="flex-1 ml-3">
-                    <Text className="text-white text-base font-semibold">
-                      {t('Server')}
-                    </Text>
-                    <Text className="text-white/60 text-xs" numberOfLines={1}>
-                      {groupedOptionsQualityLabel}
-                    </Text>
-                  </View>
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={22}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                </TouchableOpacity>
-              </View>
             )}
 
             {/* Subtitle Tab */}
@@ -3435,8 +3523,11 @@ const Player = ({route}: Props): React.JSX.Element => {
                     <Text className="text-lg font-bold text-center text-white">
                       {t('Subtitle')}
                     </Text>
-                    <TouchableOpacity
-                      className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-3"
+                    <PlayerMenuRow
+                      title={t('Disabled')}
+                      selected={selectedTextTrackIndex === 1000}
+                      accentColor={primary}
+                      icon="subtitles-off"
                       onPress={() => {
                         console.log('[subs][player] subtitle disabled');
                         setSelectedTextTrack({
@@ -3445,22 +3536,16 @@ const Player = ({route}: Props): React.JSX.Element => {
                         setSelectedTextTrackIndex(1000);
                         cacheStorage.setString('lastTextTrack', '');
                         setShowSettings(false);
-                      }}>
-                      <Text
-                        className="text-base font-semibold"
-                        style={{
-                          color:
-                            selectedTextTrackIndex === 1000 ? primary : 'white',
-                        }}>
-                        {t('Disabled')}
-                      </Text>
-                    </TouchableOpacity>
+                      }}
+                    />
                   </View>
                 }
                 ListFooterComponent={
                   <>
-                    <TouchableOpacity
-                      className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
+                    <PlayerMenuRow
+                      title={t('Add external file')}
+                      accentColor={primary}
+                      icon="add"
                       onPress={async () => {
                         try {
                           const res = await DocumentPicker.getDocumentAsync({
@@ -3489,12 +3574,8 @@ const Player = ({route}: Props): React.JSX.Element => {
                         } catch (err) {
                           console.log(err);
                         }
-                      }}>
-                      <MaterialIcons name="add" size={20} color="white" />
-                      <Text className="text-base font-semibold text-white">
-                        {t('Add external file')}
-                      </Text>
-                    </TouchableOpacity>
+                      }}
+                    />
                     <SearchSubtitles
                       searchQuery={searchQuery}
                       setSearchQuery={setSearchQuery}
@@ -3502,10 +3583,15 @@ const Player = ({route}: Props): React.JSX.Element => {
                     />
                   </>
                 }
-                  renderItem={({item: track}) => (
-                    <TouchableOpacity
-                      className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
-                      onPress={() => {
+                renderItem={({item: track}) => (
+                  <PlayerMenuRow
+                    title={track.language || track.title || t('Subtitle')}
+                    detail={track.title}
+                    tags={[track.type, track.source].filter(Boolean)}
+                    selected={selectedTextTrackIndex === track.index}
+                    accentColor={primary}
+                    icon="subtitles"
+                    onPress={() => {
                       const selected = buildSelectedTextTrack(track);
                       console.log('[subs][player] subtitle selected', {
                         track: {
@@ -3526,150 +3612,10 @@ const Player = ({route}: Props): React.JSX.Element => {
                         track.language || '',
                       );
                       setShowSettings(false);
-                    }}>
-                    <Text
-                      className={'text-base font-semibold'}
-                      style={{
-                        color:
-                          selectedTextTrackIndex === track.index
-                            ? primary
-                            : 'white',
-                      }}>
-                      {track.language}
-                    </Text>
-                    <Text
-                      className={'text-sm italic'}
-                      style={{
-                        color:
-                          selectedTextTrackIndex === track.index
-                            ? primary
-                            : 'white',
-                      }}>
-                      {track.type}
-                    </Text>
-                    <Text
-                      className={'text-sm italic text-white'}
-                      style={{
-                        color:
-                          selectedTextTrackIndex === track.index
-                            ? primary
-                            : 'white',
-                      }}>
-                      {track.title}
-                    </Text>
-                    {selectedTextTrackIndex === track.index && (
-                      <MaterialIcons name="check" size={20} color="white" />
-                    )}
-                  </TouchableOpacity>
+                    }}
+                  />
                 )}
               />
-            )}
-
-            {/* Episodes Tab */}
-            {activeTab === 'episodes' && (
-              <View className="w-full h-full flex-row p-1">
-                <View className="w-44 pr-3 border-r border-white/15">
-                  <Text className="text-lg font-bold text-center text-white mb-2">
-                    {t('Lists')}
-                  </Text>
-                  <ScrollView
-                    className="w-full"
-                    contentContainerStyle={{paddingBottom: 8}}>
-                    {episodeGroups.map((group, index) => {
-                      const isSelectedGroup = episodesTabGroupIndex === index;
-                      const groupTitle = resolveLocalizedItemTitle(group);
-                      return (
-                        <TouchableOpacity
-                          key={`episode-group-${group.episodesLink || group.title || index}`}
-                          className="rounded-md px-2 py-2 my-1"
-                          style={{
-                            backgroundColor: isSelectedGroup
-                              ? 'rgba(255,255,255,0.12)'
-                              : 'transparent',
-                          }}
-                          onPress={() => {
-                            handleSelectEpisodeGroup(index);
-                          }}>
-                          <Text
-                            className="text-sm"
-                            style={{
-                              color: isSelectedGroup ? primary : 'white',
-                              fontWeight: isSelectedGroup ? '700' : '500',
-                            }}
-                            numberOfLines={2}>
-                            {groupTitle || `#${index + 1}`}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-
-                <View className="flex-1 pl-3">
-                  <Text className="text-lg font-bold text-center text-white mb-2">
-                    {t('Episodes')}
-                  </Text>
-
-                  {episodesTabLoading ? (
-                    <View className="flex-1 items-center justify-center">
-                      <Text className="text-white text-sm">
-                        {t('Loading episodes...')}
-                      </Text>
-                    </View>
-                  ) : episodesTabError ? (
-                    <View className="flex-1 items-center justify-center px-4">
-                      <Text className="text-white text-sm text-center">
-                        {episodesTabError}
-                      </Text>
-                    </View>
-                  ) : episodesTabEpisodeList.length === 0 ? (
-                    <View className="flex-1 items-center justify-center">
-                      <Text className="text-white text-sm">
-                        {t('No episodes available')}
-                      </Text>
-                    </View>
-                  ) : (
-                    <FlashList
-                      data={episodesTabEpisodeList}
-                      estimatedItemSize={58}
-                      keyExtractor={(item, index) =>
-                        `player-episode-${item.link}-${index}`
-                      }
-                      renderItem={({item, index}) => {
-                        const isCurrentEpisode = item.link === activeEpisode?.link;
-                        const episodeTitle = resolveLocalizedItemTitle(item) || item.title;
-                        return (
-                          <TouchableOpacity
-                            className="rounded-md px-2 py-2 my-1 flex-row items-center justify-between"
-                            style={{
-                              backgroundColor: isCurrentEpisode
-                                ? 'rgba(255,255,255,0.12)'
-                                : 'transparent',
-                            }}
-                            onPress={() => handleSelectEpisodeFromTab(item, index)}>
-                            <Text
-                              className="text-sm flex-1 pr-2"
-                              style={{
-                                color: isCurrentEpisode ? primary : 'white',
-                                fontWeight: isCurrentEpisode ? '700' : '500',
-                              }}
-                              numberOfLines={2}>
-                              {episodeTitle}
-                            </Text>
-                            {isCurrentEpisode && (
-                              <MaterialIcons
-                                name="play-circle-filled"
-                                size={18}
-                                color={primary}
-                              />
-                            )}
-                          </TouchableOpacity>
-                        );
-                      }}
-                    />
-                  )}
-                </View>
-              </View>
             )}
 
             {/* Server Tab */}
@@ -3681,28 +3627,20 @@ const Player = ({route}: Props): React.JSX.Element => {
                   </Text>
                   {streamData?.length > 0 &&
                     streamData?.map((track, i) => (
-                      <TouchableOpacity
-                        className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
+                      <PlayerMenuRow
                         key={i}
+                        title={track.server || `${t('Server')} ${i + 1}`}
+                        quality={track.quality}
+                        tags={track.type ? [track.type] : undefined}
+                        selected={track.link === selectedStream.link}
+                        accentColor={primary}
+                        icon="dns"
                         onPress={() => {
                           setSelectedStream(track);
                           setShowSettings(false);
                           playerRef?.current?.resume();
-                        }}>
-                        <Text
-                          className={'text-base capitalize font-semibold'}
-                          style={{
-                            color:
-                              track.link === selectedStream.link
-                                ? primary
-                                : 'white',
-                          }}>
-                          {track.server}
-                        </Text>
-                        {track.link === selectedStream.link && (
-                          <MaterialIcons name="check" size={20} color="white" />
-                        )}
-                      </TouchableOpacity>
+                        }}
+                      />
                     ))}
                 </ScrollView>
 
@@ -3712,43 +3650,28 @@ const Player = ({route}: Props): React.JSX.Element => {
                   </Text>
                   {videoTracks &&
                     videoTracks.map((track: any, i: any) => (
-                      <TouchableOpacity
-                        className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
+                      <PlayerMenuRow
                         key={i}
+                        title={formatVideoTrackQuality(track)}
+                        detail={
+                          track.bitrate || track?.codecs
+                            ? t('Bitrate {{bitrate}} | Codec {{codec}}', {
+                                bitrate: track.bitrate || 0,
+                                codec: track?.codecs || t('Unknown'),
+                              })
+                            : undefined
+                        }
+                        selected={selectedQualityIndex === i}
+                        accentColor={primary}
+                        icon="high-quality"
                         onPress={() => {
                           setSelectedVideoTrack({
                             type: SelectedVideoTrackType.INDEX,
                             value: track.index,
                           });
                           setSelectedQualityIndex(i);
-                        }}>
-                        <Text
-                          className={'text-base font-semibold'}
-                          style={{
-                          color:
-                            selectedQualityIndex === i ? primary : 'white',
-                          }}>
-                          {formatVideoTrackQuality(track)}
-                        </Text>
-                        {(!!track.bitrate || !!track?.codecs) && (
-                          <Text
-                            className={'text-sm italic'}
-                            style={{
-                              color:
-                                selectedQualityIndex === i
-                                  ? primary
-                                  : 'white',
-                            }}>
-                            {t('Bitrate {{bitrate}} | Codec {{codec}}', {
-                              bitrate: track.bitrate || 0,
-                              codec: track?.codecs || t('Unknown'),
-                            })}
-                          </Text>
-                        )}
-                        {selectedQualityIndex === i && (
-                          <MaterialIcons name="check" size={20} color="white" />
-                        )}
-                      </TouchableOpacity>
+                        }}
+                      />
                     ))}
                 </ScrollView>
               </View>
@@ -3761,29 +3684,48 @@ const Player = ({route}: Props): React.JSX.Element => {
                   {t('Playback Speed')}
                 </Text>
                 {playbacks.map((rate, i) => (
-                  <TouchableOpacity
-                    className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
+                  <PlayerMenuRow
                     key={i}
+                    title={`${rate}x`}
+                    selected={playbackRate === rate}
+                    accentColor={primary}
+                    icon="speed"
                     onPress={() => {
                       setPlaybackRate(rate);
                       setShowSettings(false);
-                    }}>
-                    <Text
-                      className={'text-lg font-semibold'}
-                      style={{
-                        color: playbackRate === rate ? primary : 'white',
-                      }}>
-                      {rate}x
-                    </Text>
-                    {playbackRate === rate && (
-                      <MaterialIcons name="check" size={20} color="white" />
-                    )}
-                  </TouchableOpacity>
+                    }}
+                  />
                 ))}
               </ScrollView>
             )}
           </View>
         </Animated.View>
+      )}
+
+      {!isPreparingPlayer && !isPlayerLocked && canShowEpisodeControls && (
+        <PlayerEpisodeSidebar
+          visible={showEpisodeSidebar}
+          groups={episodeGroups}
+          selectedGroupIndex={episodesTabGroupIndex}
+          episodes={episodesTabEpisodeList}
+          activeEpisodeLink={activeEpisode?.link}
+          loading={episodesTabLoading}
+          error={episodesTabError}
+          primaryColor={primary}
+          labels={{
+            episodes: t('Episodes'),
+            lists: t('Lists'),
+            loading: t('Loading episodes...'),
+            empty: t('No episodes available'),
+            close: t('Close episode list'),
+            episode: number => t('Episode {{number}}', {number}),
+            shortEpisode: number => t('EP {{number}}', {number}),
+          }}
+          resolveTitle={resolveLocalizedItemTitle}
+          onClose={() => setShowEpisodeSidebar(false)}
+          onSelectGroup={handleSelectEpisodeGroup}
+          onSelectEpisode={handleSelectEpisodeFromTab}
+        />
       )}
     </SafeAreaView>
   );

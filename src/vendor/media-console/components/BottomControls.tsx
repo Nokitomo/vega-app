@@ -11,6 +11,7 @@ import {Fullscreen} from './Fullscreen';
 import {Seekbar} from './Seekbar';
 import {calculateTime} from '../utils';
 import type {VideoAnimations} from '../types';
+import type {SkipInterval} from '../../../lib/providers/types';
 import {styles} from './styles';
 
 interface BottomControlsProps {
@@ -35,6 +36,12 @@ interface BottomControlsProps {
   disableFullscreen: boolean;
   toggleFullscreen: () => void;
   cachedPosition: number;
+  seeking: boolean;
+  seekPreviewTime: number;
+  seekThumbnailUri: string | null;
+  seekThumbnailLoading: boolean;
+  seekSnapPosition: number | null;
+  skips?: SkipInterval[];
 }
 
 export const BottomControls = ({
@@ -58,6 +65,12 @@ export const BottomControls = ({
   disableFullscreen,
   toggleFullscreen,
   cachedPosition,
+  seeking,
+  seekPreviewTime,
+  seekThumbnailUri,
+  seekThumbnailLoading,
+  seekSnapPosition,
+  skips,
 }: BottomControlsProps) => {
   //@ts-ignore
   const timerControl = disableTimer ? (
@@ -92,6 +105,14 @@ export const BottomControls = ({
       showTimeRemaining={showTimeRemaining}
       duration={duration}
       time={currentTime}
+      toggleTimer={toggleTimer}
+      resetControlTimeout={resetControlTimeout}
+      seeking={seeking}
+      previewTime={seekPreviewTime}
+      thumbnailUri={seekThumbnailUri}
+      thumbnailLoading={seekThumbnailLoading}
+      snapPosition={seekSnapPosition}
+      skips={skips}
     />
   );
 
@@ -114,17 +135,9 @@ export const BottomControls = ({
         animations.controlsOpacity,
         animations.bottomControl,
       ]}>
-      {/* <ImageBackground
-        source={require('../assets/img/bottom-vignette.png')}
-        style={[styles.column]}
-        imageStyle={[styles.vignette]}> */}
       <SafeAreaView style={styles.seekBarContainer}>
         {seekbarControl}
       </SafeAreaView>
-      {/* <SafeAreaView style={[styles.row, _styles.bottomControlGroup]}>
-          {timerControl}
-        </SafeAreaView> */}
-      {/* </ImageBackground> */}
     </AnimatedView>
   );
 };

@@ -31,6 +31,13 @@ npm test
 - Da player nativo app (non Webview), attivare fullscreen e verificare che status/navigation bar Android siano nascoste.
 - In fullscreen player nativo, mettere app in background e tornare in foreground: verificare che status/navigation bar restino nascoste senza dover togglare il pulsante fullscreen.
 - Uscire dal fullscreen player nativo: verificare ripristino corretto delle system bars.
+- Su una serie, aprire il drawer episodi dal chevron laterale: verificare animazione, chiusura tramite backdrop/X, thumbnail con fallback, episodio attivo e scorrimento automatico.
+- Con una serie multi-stagione, cambiare lista nel drawer e verificare caricamento on-demand e riproduzione dell'episodio selezionato senza perdere provider, header o sottotitoli.
+- Con controlli nascosti e gesto 2x attivo, tenere premuto sul video: verificare feedback aptico/visivo, velocita 2x e ripristino della velocita precedente al rilascio.
+- Ripetere il gesto muovendo il dito oltre la soglia e con l'opzione 2x disattivata: in entrambi i casi la velocita non deve cambiare.
+- Trascinare la seekbar su stream diretti, HLS e stream con header: verificare timestamp, thumbnail quando supportata, prosecuzione del seek anche quando la thumbnail non e disponibile e assenza di blocchi durante richieste rapide.
+- Durante il trascinamento, tornare vicino al punto di partenza: verificare snap visivo/aptico; su un episodio con AniSkip verificare il segmento marcato nella seekbar.
+- Eseguire pinch-to-zoom sul video e verificare che non interferisca con tap, doppio tap, luminosita/volume o pressione prolungata 2x.
 
 ## Smoke test WebView/GeckoView
 - Android:

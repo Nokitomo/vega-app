@@ -1,7 +1,6 @@
-import {Dispatch, SetStateAction, useEffect, useState} from 'react';
+import {Dispatch, SetStateAction, useCallback, useEffect, useRef} from 'react';
 
 interface ControlTimeoutProps {
-  controlTimeout: ReturnType<typeof setTimeout>;
   controlTimeoutDelay: number;
   mounted: boolean;
   showControls: boolean;
@@ -10,58 +9,57 @@ interface ControlTimeoutProps {
 }
 
 export const useControlTimeout = ({
-  controlTimeout,
   controlTimeoutDelay,
   mounted,
   showControls,
   setShowControls,
   alwaysShowControls,
 }: ControlTimeoutProps) => {
-  const [_controlTimeout, _setControlTimeout] = useState<boolean>();
-  const [_clearTimeout, setClearTimeout] = useState<boolean>();
+  const controlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showControlsRef = useRef(showControls);
+  showControlsRef.current = showControls;
 
-  const setControlTimeout = () => {
-    _setControlTimeout((prevState) => !prevState);
-  };
+  const mountedRef = useRef(mounted);
+  mountedRef.current = mounted;
 
-  const clearControlTimeout = () => {
-    setClearTimeout(true);
-  };
+  const clearControlTimeout = useCallback(() => {
+    if (controlTimeoutRef.current) {
+      clearTimeout(controlTimeoutRef.current);
+      controlTimeoutRef.current = null;
+    }
+  }, []);
 
-  const resetControlTimeout = () => {
-    clearControlTimeout();
-  };
-
-  const hideControls = () => {
-    if (mounted && showControls && !alwaysShowControls) {
+  const hideControls = useCallback(() => {
+    if (mountedRef.current && showControlsRef.current && !alwaysShowControls) {
       setShowControls(false);
     }
-  };
+  }, [alwaysShowControls, setShowControls]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    controlTimeout = setTimeout(() => {
-      hideControls();
-    }, controlTimeoutDelay);
-
-    return () => {
-      clearTimeout(controlTimeout);
-    };
-  }, [_controlTimeout]);
-
-  useEffect(() => {
-    if (_clearTimeout) {
-      clearTimeout(controlTimeout);
-      setClearTimeout(false);
+  const setControlTimeout = useCallback(() => {
+    clearControlTimeout();
+    if (showControlsRef.current && !alwaysShowControls) {
+      controlTimeoutRef.current = setTimeout(hideControls, controlTimeoutDelay);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_clearTimeout]);
+  }, [
+    alwaysShowControls,
+    clearControlTimeout,
+    controlTimeoutDelay,
+    hideControls,
+  ]);
+
+  const resetControlTimeout = setControlTimeout;
+
+  useEffect(() => {
+    if (showControls) {
+      setControlTimeout();
+    }
+    return clearControlTimeout;
+  }, [showControls, clearControlTimeout, setControlTimeout]);
 
   return {
     clearControlTimeout,
     resetControlTimeout,
     hideControls,
-    setClearTimeout,
     setControlTimeout,
   };
 };

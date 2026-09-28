@@ -51,6 +51,10 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 
 4) Player
 - Riproduzione video con supporto a qualita, sottotitoli, controlli.
+- L'elenco episodi si apre dal pulsante laterale del player come drawer animato, mostra thumbnail/sinossi quando fornite dal provider e conserva il caricamento on-demand delle stagioni.
+- La pressione prolungata sull'area video abilita temporaneamente la velocita 2x solo se la relativa preferenza e attiva; uno spostamento del dito annulla il gesto e al rilascio viene ripristinata la velocita precedente.
+- La seekbar mostra l'anteprima temporale e, quando la sorgente lo consente, una thumbnail generata localmente con gli stessi header dello stream; le richieste sono raggruppate e memorizzate in una cache limitata durante lo scrubbing.
+- La seekbar evidenzia gli intervalli AniSkip, supporta lo snap alla posizione iniziale del trascinamento con feedback aptico e il player supporta pinch-to-zoom.
 - Il pulsante "Next" appare quando mancano circa 90 secondi alla fine e passa al prossimo episodio; se esiste una stagione successiva apre il primo episodio.
 - Per AnimeUnity, il pulsante "Skip Intro" appare quando AniSkip fornisce un intervallo OP/mixed-op e permette di saltare l'intro.
 - Su Android e disponibile l'apertura in player esterno (es. VLC).

@@ -3,6 +3,7 @@ import type {ViewStyle, StyleProp, Animated} from 'react-native';
 import type Reanimated from 'react-native-reanimated';
 import type {StyleProps} from 'react-native-reanimated';
 import type {VideoRef, ReactVideoProps} from 'react-native-video';
+import type {SkipInterval} from '../../lib/providers/types';
 
 export type WithRequiredProperty<Type, Key extends keyof Type> = Type & {
   [Property in Key]-?: Type[Property];
@@ -277,7 +278,7 @@ export interface VideoPlayerProps extends ReactVideoProps {
   disableGesture?: boolean;
 
   /**
-   * Enable long-press gesture on the right side to temporarily switch playback to 2x.
+   * Enable the temporary 2x playback gesture on long press.
    *
    * @default true
    */
@@ -289,4 +290,10 @@ export interface VideoPlayerProps extends ReactVideoProps {
    * @default false
    */
   hideAllControlls?: boolean;
+
+  /** Fired once when a seek drag magnetically returns to its starting point. */
+  onSeekSnap?: () => void;
+
+  /** Skip intervals (intro/outro/recap) to display as gaps in the seekbar */
+  skips?: SkipInterval[];
 }
