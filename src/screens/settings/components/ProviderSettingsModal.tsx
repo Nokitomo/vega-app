@@ -81,7 +81,9 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
 
   useEffect(() => {
     if (visible && provider) {
-      void load();
+      load().catch(loadError => {
+        console.error('Unexpected provider settings load failure:', loadError);
+      });
     } else {
       setFields([]);
       setValues({});

@@ -300,7 +300,7 @@ export class ExtensionStorage {
 
     // Also remove cached modules.
     this.removeProviderModules(providerValue, sourceAuthor);
-    void clearProviderKvStore(providerValue, sourceAuthor).catch(error => {
+    clearProviderKvStore(providerValue, sourceAuthor).catch(error => {
       console.warn('Failed to clear provider settings:', error);
     });
   }
