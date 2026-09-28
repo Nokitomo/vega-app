@@ -17,6 +17,7 @@ export interface IStorageService {
   delete(key: string): void;
   contains(key: string): boolean;
   clearAll(): void;
+  getKeys(): Promise<string[]>;
 }
 
 /**
@@ -26,8 +27,11 @@ export class StorageService implements IStorageService {
   // Define storage variable with proper typing
   private storage;
 
-  constructor(instanceId?: string) {
+  constructor(instanceId?: string, encrypted = false) {
     const loader = new MMKVLoader();
+    if (encrypted) {
+      loader.withEncryption();
+    }
     this.storage = instanceId
       ? loader.withInstanceID(instanceId).initialize()
       : loader.initialize();
@@ -108,8 +112,24 @@ export class StorageService implements IStorageService {
   clearAll(): void {
     this.storage.clearStore();
   }
+
+  async getKeys(): Promise<string[]> {
+    if (!this.storage?.indexer?.getKeys) {
+      return [];
+    }
+    try {
+      const keys = await this.storage.indexer.getKeys();
+      return Array.isArray(keys) ? keys : [];
+    } catch {
+      return [];
+    }
+  }
 }
 
 // Create and export default instances
 export const mainStorage: IStorageService = new StorageService();
 export const cacheStorage: IStorageService = new StorageService('cache');
+export const providerKvStorage: IStorageService = new StorageService(
+  'provider_kv',
+  true,
+);

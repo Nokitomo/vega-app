@@ -582,5 +582,20 @@
   "Verify you are human": "Verifica di essere umano",
   "Complete the challenge below, then tap Done.": "Completa la verifica qui sotto, poi tocca Fatto.",
   "Reload": "Ricarica",
-  "Done": "Fatto"
+  "Done": "Fatto",
+  "Provider settings": "Impostazioni provider",
+  "{{provider}} settings": "Impostazioni di {{provider}}",
+  "Configure this provider": "Configura questo provider",
+  "Loading settings...": "Caricamento impostazioni...",
+  "Unable to load provider settings.": "Impossibile caricare le impostazioni del provider.",
+  "Unable to save provider settings.": "Impossibile salvare le impostazioni del provider.",
+  "This provider has no configurable settings.": "Questo provider non ha impostazioni configurabili.",
+  "Reset provider settings": "Ripristina impostazioni provider",
+  "Reset all settings for {{provider}} to their defaults?": "Ripristinare tutte le impostazioni di {{provider}} ai valori predefiniti?",
+  "Show sensitive value": "Mostra valore sensibile",
+  "Hide sensitive value": "Nascondi valore sensibile",
+  "Retry": "Riprova",
+  "Save": "Salva",
+  "Fetching torrent metadata...": "Recupero metadati torrent...",
+  "Failed to load torrent stream.": "Impossibile caricare lo stream torrent."
 }

@@ -16,6 +16,9 @@ const getStore = instanceId => {
     setInt: (key, value) => store.set(key, value),
     removeItem: key => store.delete(key),
     clearStore: () => store.clear(),
+    indexer: {
+      getKeys: async () => Array.from(store.keys()),
+    },
   };
 };
 
@@ -26,6 +29,10 @@ class MMKVLoader {
 
   withInstanceID(instanceId) {
     this.instanceId = instanceId;
+    return this;
+  }
+
+  withEncryption() {
     return this;
   }
 

@@ -1,4 +1,5 @@
-import {mainStorage} from './StorageService';
+import {mainStorage, providerKvStorage} from './StorageService';
+import {clearProviderKvStore} from '../providers/providerKvStore';
 
 /**
  * Provider source metadata.
@@ -21,6 +22,7 @@ export interface ProviderExtension {
   disabled: boolean;
   type: 'global' | 'english' | 'india' | 'italy' | 'anime' | 'drama';
   installed: boolean;
+  hasSettings?: boolean;
   installedAt?: number;
   lastUpdated?: number;
 }
@@ -38,6 +40,7 @@ export interface ProviderModule {
     stream?: string;
     catalog?: string;
     episodes?: string;
+    settings?: string;
   };
   cachedAt: number;
 }
@@ -297,6 +300,9 @@ export class ExtensionStorage {
 
     // Also remove cached modules.
     this.removeProviderModules(providerValue, sourceAuthor);
+    void clearProviderKvStore(providerValue, sourceAuthor).catch(error => {
+      console.warn('Failed to clear provider settings:', error);
+    });
   }
 
   /**
@@ -503,6 +509,7 @@ export class ExtensionStorage {
     });
 
     mainStorage.delete(ExtensionKeys.PROVIDER_SOURCES);
+    providerKvStorage.clearAll();
   }
 }
 

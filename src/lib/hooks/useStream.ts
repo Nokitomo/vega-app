@@ -1,6 +1,6 @@
 import {useQuery} from '@tanstack/react-query';
 import {useState, useEffect, useCallback, useMemo} from 'react';
-import {ToastAndroid} from 'react-native';
+import {Platform, ToastAndroid} from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import {providerManager} from '../services/ProviderManager';
 import {settingsStorage} from '../storage';
@@ -262,14 +262,23 @@ export const useStream = ({
         providerValue,
       });
 
+      const playableData =
+        Platform.OS === 'android'
+          ? data
+          : data?.filter(
+              stream =>
+                stream.type !== 'torrent' &&
+                !String(stream.link || '').startsWith('magnet:'),
+            );
+
       // Filter out excluded qualities
       const excludedQualities = settingsStorage.getExcludedQualities() || [];
-      const filteredQualities = data?.filter(
+      const filteredQualities = playableData?.filter(
         streamItem => !excludedQualities.includes(streamItem?.quality + 'p'),
       );
 
       const filteredData =
-        filteredQualities?.length > 0 ? filteredQualities : data;
+        filteredQualities?.length > 0 ? filteredQualities : playableData;
 
       if (!filteredData || filteredData.length === 0) {
         throw new Error(i18n.t('No Streams Available'));

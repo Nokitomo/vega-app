@@ -10,6 +10,7 @@ import {ProviderContext} from './types';
 import * as Crypto from 'expo-crypto';
 import {openWebView} from '../services/wafResolver';
 import {cacheStorage} from '../storage';
+import {createProviderKvStore} from './providerKvStore';
 
 /**
  * Context for provider functions.
@@ -23,18 +24,30 @@ const extractors = {
   gdFlixExtracter,
 };
 
-export const providerContext: ProviderContext = {
-  axios,
-  getBaseUrl,
-  commonHeaders: headers,
-  Crypto,
-  cheerio,
-  cache: {
-    getString: key => cacheStorage.getString(`provider:${key}`),
-    setString: (key, value) =>
-      cacheStorage.setString(`provider:${key}`, value),
-    delete: key => cacheStorage.delete(`provider:${key}`),
-  },
-  extractors,
-  openWebView,
+export const createProviderContext = (
+  providerValue: string,
+  sourceAuthor?: string,
+): ProviderContext => {
+  const cachePrefix = `provider:${encodeURIComponent(
+    sourceAuthor || 'legacy',
+  )}:${encodeURIComponent(providerValue)}:`;
+
+  return {
+    axios,
+    getBaseUrl,
+    commonHeaders: headers,
+    Crypto,
+    cheerio,
+    cache: {
+      getString: key => cacheStorage.getString(`${cachePrefix}${key}`),
+      setString: (key, value) =>
+        cacheStorage.setString(`${cachePrefix}${key}`, value),
+      delete: key => cacheStorage.delete(`${cachePrefix}${key}`),
+    },
+    kvStore: createProviderKvStore(providerValue, sourceAuthor),
+    extractors,
+    openWebView,
+  };
 };
+
+export const providerContext: ProviderContext = createProviderContext('legacy');

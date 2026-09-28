@@ -94,6 +94,7 @@ import {
 } from '../../lib/utils/providerCardTitleResolver';
 import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../../lib/utils/streamHeaders';
+import {torrentManager} from '../../lib/torrentManager';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -334,6 +335,150 @@ const Player = ({route}: Props): React.JSX.Element => {
     routeParams: route.params,
     provider: provider.value,
   });
+  const [processedStreamUrl, setProcessedStreamUrl] = useState('');
+  const [isResolvingStream, setIsResolvingStream] = useState(false);
+  const [torrentState, setTorrentState] = useState('');
+  const [torrentDownloaded, setTorrentDownloaded] = useState(0);
+  const [torrentDownloadSpeed, setTorrentDownloadSpeed] = useState(0);
+  const activeTorrentRef = useRef<string | null>(null);
+  const torrentProgressRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+
+  const findTorrentVideoFile = useCallback(
+    async (infoHash: string, magnetLink: string): Promise<number> => {
+      const files = await torrentManager.getFiles(infoHash);
+      if (!files.length) {
+        throw new Error('No files found in torrent');
+      }
+
+      const requestedIndex = Number(
+        magnetLink.match(/[?&]so=(\d+)/i)?.[1] ?? Number.NaN,
+      );
+      if (
+        Number.isInteger(requestedIndex) &&
+        files.some(file => file.index === requestedIndex)
+      ) {
+        return requestedIndex;
+      }
+
+      const videoExtensions = [
+        '.mp4',
+        '.mkv',
+        '.avi',
+        '.webm',
+        '.mov',
+        '.ts',
+        '.flv',
+        '.wmv',
+        '.m4v',
+      ];
+      const candidates = files.filter(file =>
+        videoExtensions.some(extension =>
+          file.name.toLowerCase().endsWith(extension),
+        ),
+      );
+      return (candidates.length ? candidates : files).reduce((largest, file) =>
+        file.size > largest.size ? file : largest,
+      ).index;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const stopCurrentTorrent = async () => {
+      if (torrentProgressRef.current) {
+        clearInterval(torrentProgressRef.current);
+        torrentProgressRef.current = null;
+      }
+      const previous = activeTorrentRef.current;
+      activeTorrentRef.current = null;
+      if (previous) {
+        await torrentManager.deleteTorrent(previous, true).catch(() => {});
+      }
+    };
+
+    const resolveStream = async () => {
+      await stopCurrentTorrent();
+      if (!active || !selectedStream?.link) {
+        setProcessedStreamUrl('');
+        setIsResolvingStream(false);
+        return;
+      }
+
+      const isTorrent =
+        selectedStream.type === 'torrent' ||
+        selectedStream.link.startsWith('magnet:');
+      if (!isTorrent) {
+        setProcessedStreamUrl(selectedStream.link);
+        setIsResolvingStream(false);
+        return;
+      }
+
+      setProcessedStreamUrl('');
+      setIsResolvingStream(true);
+      setTorrentState(t('Fetching torrent metadata...'));
+      setTorrentDownloaded(0);
+      setTorrentDownloadSpeed(0);
+      try {
+        const added = await torrentManager.addTorrent(selectedStream.link);
+        if (!active) {
+          await torrentManager.deleteTorrent(added.infoHash, true);
+          return;
+        }
+        activeTorrentRef.current = added.infoHash;
+        torrentProgressRef.current = setInterval(async () => {
+          try {
+            const stats = await torrentManager.getStats(added.infoHash);
+            if (active) {
+              setTorrentState(stats.state || '');
+              setTorrentDownloaded((stats.totalDone || 0) / 1024 / 1024);
+              setTorrentDownloadSpeed(stats.downloadRate || 0);
+            }
+          } catch {}
+        }, 1000);
+
+        const fileIndex = await findTorrentVideoFile(
+          added.infoHash,
+          selectedStream.link,
+        );
+        const preparation = torrentManager.prepareVideoFile(
+          added.infoHash,
+          fileIndex,
+        );
+        const streamUrl = await torrentManager.getStreamUrl(
+          added.infoHash,
+          fileIndex,
+        );
+        if (active) {
+          setProcessedStreamUrl(streamUrl);
+          setIsResolvingStream(false);
+        }
+        await preparation;
+      } catch (torrentError) {
+        console.error('Failed to start torrent stream:', torrentError);
+        if (active) {
+          setIsResolvingStream(false);
+          if (!switchToNextStream()) {
+            ToastAndroid.show(
+              t('Failed to load torrent stream.'),
+              ToastAndroid.SHORT,
+            );
+          }
+        }
+      }
+    };
+
+    void resolveStream();
+    return () => {
+      active = false;
+      void stopCurrentTorrent();
+    };
+    // switchToNextStream changes identity on each render in useStream.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findTorrentVideoFile, selectedStream, t]);
 
   // Custom hooks for video settings
   const {
@@ -476,7 +621,8 @@ const Player = ({route}: Props): React.JSX.Element => {
   }, [streamData]);
   const isSubtitleGatePending =
     hasExpectedExternalSubs && !subtitleGatePassed;
-  const isPreparingPlayer = streamLoading || isSubtitleGatePending;
+  const isPreparingPlayer =
+    streamLoading || isSubtitleGatePending || isResolvingStream;
   const mergedTextTracks = useMemo(() => {
     const normalizedInternal = (textTracks || []).map((track, idx) => ({
       ...track,
@@ -2680,7 +2826,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       showOnStart: !isPlayerLocked,
       source: {
         textTracks: externalSubs,
-        uri: selectedStream?.link || '',
+        uri: processedStreamUrl,
         bufferConfig: {backBufferDurationMs: 30000},
         shouldCache: true,
         ...(selectedStream?.type === 'm3u8' && {type: 'm3u8'}),
@@ -2784,6 +2930,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       hideSeekButtons,
       externalSubs,
       selectedStream,
+      processedStreamUrl,
       route.params,
       activeEpisode,
       armStreamStartupGuard,
@@ -2924,6 +3071,23 @@ const Player = ({route}: Props): React.JSX.Element => {
 
       {/* Video Player */}
       <VideoPlayer key={videoReloadNonce} {...videoPlayerProps} />
+
+      {selectedStream?.type === 'torrent' &&
+        torrentState &&
+        torrentState !== 'seeding' &&
+        torrentState !== 'finished' && (
+          <View className="absolute top-4 self-center px-3 py-2 rounded-full bg-black/70 z-50">
+            <Text className="text-white text-xs text-center">
+              {torrentState}
+              {torrentDownloaded > 0
+                ? ` · ${torrentDownloaded.toFixed(1)} MB`
+                : ''}
+              {torrentDownloadSpeed > 0
+                ? ` · ${(torrentDownloadSpeed / 1024 / 1024).toFixed(1)} MB/s`
+                : ''}
+            </Text>
+          </View>
+        )}
 
       {/* Full-screen overlay to detect taps when locked */}
       {isPlayerLocked && (

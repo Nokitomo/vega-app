@@ -174,6 +174,7 @@ export class ExtensionManager {
         version: item.version,
         icon: item.icon || '',
         type: item.type || 'global',
+        hasSettings: Boolean(item.hasSettings),
         installed: false,
       }));
 
@@ -214,7 +215,7 @@ export class ExtensionManager {
 
     try {
       const requiredFiles = ['posts', 'meta', 'stream', 'catalog'];
-      const optionalFiles = ['episodes'];
+      const optionalFiles = ['episodes', 'settings'];
       const allFiles = [...requiredFiles, ...optionalFiles];
 
       const modules: Record<string, string> = {};
@@ -268,6 +269,7 @@ export class ExtensionManager {
           stream: modules.stream,
           catalog: modules.catalog,
           episodes: modules.episodes,
+          settings: modules.settings,
         },
         cachedAt: Date.now(),
       };
@@ -288,7 +290,7 @@ export class ExtensionManager {
     try {
       const url = `${this.baseUrlTestMode}/dist/${providerValue}/`;
       const requiredFiles = ['posts', 'meta', 'stream', 'catalog'];
-      const optionalFiles = ['episodes'];
+      const optionalFiles = ['episodes', 'settings'];
       const allFiles = [...requiredFiles, ...optionalFiles];
       const modules: Record<string, string> = {};
       const downloadPromises = allFiles.map(async fileName => {
@@ -342,6 +344,7 @@ export class ExtensionManager {
           stream: modules.stream,
           catalog: modules.catalog,
           episodes: modules.episodes,
+          settings: modules.settings,
         },
         cachedAt: Date.now(),
       };

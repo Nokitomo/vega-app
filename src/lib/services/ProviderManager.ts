@@ -1,17 +1,37 @@
 import {Alert, Platform, ToastAndroid} from 'react-native';
-import {providerContext} from '../providers/providerContext';
+import axios from 'axios';
+import {createProviderContext} from '../providers/providerContext';
 import {
   ArchiveFilters,
   Catalog,
   EpisodeLink,
   Info,
   Post,
+  ProviderContext,
+  SettingsField,
 } from '../providers/types';
 import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
+import {extensionStorage} from '../storage/extensionStorage';
+import {clearProviderKvStore} from '../providers/providerKvStore';
 
 export class ProviderManager {
   private readonly moduleExportsCache = new Map<string, any>();
+  private readonly settingsSchemaCache = new Map<string, SettingsField[]>();
+
+  private getProviderContext(
+    providerValue: string,
+    sourceAuthor?: string,
+  ): ProviderContext {
+    const module = extensionManager.getProviderModules(
+      providerValue,
+      sourceAuthor,
+    );
+    return createProviderContext(
+      providerValue,
+      module?.sourceAuthor || sourceAuthor,
+    );
+  }
 
   private getProviderErrorMessage(
     error: unknown,
@@ -175,6 +195,7 @@ export class ProviderManager {
     providerValue: string;
     signal: AbortSignal;
   }): Promise<Post[]> => {
+    const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
     const getPostsModule =
       extensionManager.getProviderModules(providerValue)?.modules.posts;
@@ -225,6 +246,7 @@ export class ProviderManager {
     providerValue: string;
     signal: AbortSignal;
   }): Promise<Post[]> => {
+    const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
     const getPostsModule =
       extensionManager.getProviderModules(providerValue)?.modules.posts;
@@ -273,6 +295,7 @@ export class ProviderManager {
     provider: string;
     purpose?: 'full' | 'hero';
   }): Promise<Info> => {
+    const providerContext = this.getProviderContext(provider);
     // Use extensionManager which now handles test mode automatically
     const getMetaDataModule =
       extensionManager.getProviderModules(provider)?.modules.meta;
@@ -328,6 +351,7 @@ export class ProviderManager {
     background?: string;
     resolved?: boolean;
   }> => {
+    const providerContext = this.getProviderContext(provider);
     const metaModule =
       extensionManager.getProviderModules(provider)?.modules.meta;
     if (!metaModule) {
@@ -366,6 +390,7 @@ export class ProviderManager {
     signal: AbortSignal;
     providerValue: string;
   }): Promise<any[]> => {
+    const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
     const getStreamModule =
       extensionManager.getProviderModules(providerValue)?.modules.stream;
@@ -410,6 +435,7 @@ export class ProviderManager {
     url: string;
     providerValue: string;
   }): Promise<EpisodeLink[]> => {
+    const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
     const getEpisodeLinksModule =
       extensionManager.getProviderModules(providerValue)?.modules.episodes;
@@ -445,6 +471,116 @@ export class ProviderManager {
         Alert.alert(i18n.t('Error'), errorMessage);
       }
       throw new Error(errorMessage);
+    }
+  };
+
+  getSettingsSchema = async ({
+    providerValue,
+    sourceAuthor,
+  }: {
+    providerValue: string;
+    sourceAuthor?: string;
+  }): Promise<SettingsField[]> => {
+    let providerModule = extensionManager.getProviderModules(
+      providerValue,
+      sourceAuthor,
+    );
+    let settingsModule = providerModule?.modules.settings;
+
+    if (!settingsModule) {
+      const source = sourceAuthor
+        ? extensionStorage
+            .getProviderSources()
+            .find(item => item.author === sourceAuthor)
+        : extensionStorage.getProviderSource();
+
+      if (source?.url) {
+        try {
+          const response = await axios.get(
+            `${source.url}/dist/${providerValue}/settings.js`,
+            {timeout: 6000},
+          );
+          if (typeof response.data === 'string' && response.data.trim()) {
+            settingsModule = response.data;
+            if (providerModule) {
+              providerModule = {
+                ...providerModule,
+                modules: {...providerModule.modules, settings: settingsModule},
+                cachedAt: Date.now(),
+              };
+              extensionStorage.cacheProviderModules(providerModule);
+            }
+          }
+        } catch {
+          return [];
+        }
+      }
+    }
+
+    if (!settingsModule) {
+      return [];
+    }
+
+    const resolvedAuthor = providerModule?.sourceAuthor || sourceAuthor;
+    const cacheKey = `${resolvedAuthor || 'legacy'}:${providerValue}:${
+      providerModule?.cachedAt || settingsModule.length
+    }`;
+    const cached = this.settingsSchemaCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const moduleExports = this.executeModule(settingsModule);
+      if (typeof moduleExports.getSettingsSchema !== 'function') {
+        return [];
+      }
+      const raw = await moduleExports.getSettingsSchema({
+        providerContext: this.getProviderContext(
+          providerValue,
+          resolvedAuthor,
+        ),
+      });
+      if (!Array.isArray(raw)) {
+        return [];
+      }
+
+      const supportedTypes = new Set([
+        'text',
+        'toggle',
+        'select',
+        'multiselect',
+        'number',
+      ]);
+      const schema = raw.filter(
+        (field): field is SettingsField =>
+          field &&
+          typeof field === 'object' &&
+          typeof field.key === 'string' &&
+          field.key.trim().length > 0 &&
+          typeof field.label === 'string' &&
+          supportedTypes.has(field.type),
+      );
+      this.settingsSchemaCache.set(cacheKey, schema);
+      return schema;
+    } catch (error) {
+      console.warn(
+        `Provider ${providerValue} settings schema failed:`,
+        error,
+      );
+      return [];
+    }
+  };
+
+  clearProviderStorage = async (
+    providerValue: string,
+    sourceAuthor?: string,
+  ): Promise<void> => {
+    await clearProviderKvStore(providerValue, sourceAuthor);
+    for (const key of this.settingsSchemaCache.keys()) {
+      if (key.includes(`:${providerValue}:`)) {
+        this.settingsSchemaCache.delete(key);
+      }
     }
   };
 }

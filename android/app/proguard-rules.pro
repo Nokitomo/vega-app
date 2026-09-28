@@ -19,3 +19,9 @@
 -dontwarn java.beans.PropertyDescriptor
 
 # Add any project specific keep options here:
+
+# libtorrent4j
+-keep class org.libtorrent4j.** { *; }
+-keep interface org.libtorrent4j.** { *; }
+-keep enum org.libtorrent4j.** { *; }
+-keep class com.vega.Torrent** { *; }

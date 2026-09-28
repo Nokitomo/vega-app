@@ -17,6 +17,7 @@ const userWebViewEnabled =
 
 module.exports = () => {
   const plugins = [
+    './plugins/with-torrent-module.js',
     './plugins/android-native-config.js',
     './plugins/with-saf-copy-module.js',
     './plugins/with-android-notification-icons.js',

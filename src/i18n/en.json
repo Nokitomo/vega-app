@@ -582,5 +582,20 @@
   "Verify you are human": "Verify you are human",
   "Complete the challenge below, then tap Done.": "Complete the challenge below, then tap Done.",
   "Reload": "Reload",
-  "Done": "Done"
+  "Done": "Done",
+  "Provider settings": "Provider settings",
+  "{{provider}} settings": "{{provider}} settings",
+  "Configure this provider": "Configure this provider",
+  "Loading settings...": "Loading settings...",
+  "Unable to load provider settings.": "Unable to load provider settings.",
+  "Unable to save provider settings.": "Unable to save provider settings.",
+  "This provider has no configurable settings.": "This provider has no configurable settings.",
+  "Reset provider settings": "Reset provider settings",
+  "Reset all settings for {{provider}} to their defaults?": "Reset all settings for {{provider}} to their defaults?",
+  "Show sensitive value": "Show sensitive value",
+  "Hide sensitive value": "Hide sensitive value",
+  "Retry": "Retry",
+  "Save": "Save",
+  "Fetching torrent metadata...": "Fetching torrent metadata...",
+  "Failed to load torrent stream.": "Failed to load torrent stream."
 }

@@ -1,5 +1,10 @@
 // Export StorageService
-export {StorageService, mainStorage, cacheStorage} from './StorageService';
+export {
+  StorageService,
+  mainStorage,
+  cacheStorage,
+  providerKvStorage,
+} from './StorageService';
 
 // Export SettingsStorage
 export {SettingsStorage, settingsStorage} from './SettingsStorage';

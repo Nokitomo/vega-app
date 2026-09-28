@@ -35,6 +35,7 @@ import {settingsStorage} from '../../lib/storage';
 import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
 import ProviderSourceManager from './components/ProviderSourceManager';
+import ProviderSettingsModal from './components/ProviderSettingsModal';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Extensions'>;
 
@@ -94,6 +95,8 @@ const Extensions = ({navigation}: Props) => {
   const [activeSourceAuthor, setActiveSourceAuthor] = useState<string>(
     extensionStorage.getProviderSource()?.author || '',
   );
+  const [settingsProvider, setSettingsProvider] =
+    useState<ProviderExtension | null>(null);
   // Load providers on component mount
   useEffect(() => {
     const initializeExtensions = async () => {
@@ -122,7 +125,22 @@ const Extensions = ({navigation}: Props) => {
       author || extensionStorage.getProviderSource()?.author || '';
     const installed = dedupeProviders(
       extensionStorage.getInstalledProviders() || [],
-    );
+    ).map(provider => {
+      const sourceAuthor = provider.source?.author || selectedAuthor;
+      const manifestEntry = extensionStorage
+        .getAvailableProviders(sourceAuthor)
+        .find(item => item.value === provider.value);
+      const cachedSettings = extensionStorage.getProviderModules(
+        provider.value,
+        provider.source?.author,
+      )?.modules.settings;
+      return {
+        ...provider,
+        hasSettings: Boolean(
+          provider.hasSettings || manifestEntry?.hasSettings || cachedSettings,
+        ),
+      };
+    });
     const available = selectedAuthor
       ? dedupeProviders(extensionStorage.getAvailableProviders(selectedAuthor))
       : [];
@@ -417,6 +435,18 @@ const Extensions = ({navigation}: Props) => {
           <View className="flex-row gap-3 items-center">
             {activeTab === 'installed' ? (
               <>
+                {item.hasSettings && (
+                  <TouchableOpacity
+                    onPress={() => setSettingsProvider(item)}
+                    accessibilityLabel={t('Provider settings')}
+                    className="w-9 h-9 rounded-full items-center justify-center bg-gray-700">
+                    <MaterialCommunityIcons
+                      name="cog-outline"
+                      size={20}
+                      color="white"
+                    />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   onPress={() => handleSetActiveProvider(item)}
                   className={`w-9 h-9 rounded-full items-center justify-center ${
@@ -597,6 +627,11 @@ const Extensions = ({navigation}: Props) => {
             </Text>
           </View>
         }
+      />
+      <ProviderSettingsModal
+        visible={settingsProvider !== null}
+        provider={settingsProvider}
+        onClose={() => setSettingsProvider(null)}
       />
     </View>
   );
