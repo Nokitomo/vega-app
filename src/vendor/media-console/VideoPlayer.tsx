@@ -136,7 +136,11 @@ const AnimatedVideoPlayer = (
   const [cachedPosition, setCachedPosition] = useState(0);
   const [seekThumbnailUri, setSeekThumbnailUri] = useState<string | null>(null);
   const [seekThumbnailLoading, setSeekThumbnailLoading] = useState(false);
+  const [seekThumbnailSampleTimestampMs, setSeekThumbnailSampleTimestampMs] =
+    useState<number | null>(null);
   const seekThumbnailRequestId = useRef(0);
+  const seekThumbnailTimestampRef = useRef(0);
+  const seekThumbnailRequestInFlight = useRef(false);
   const seekThumbnailMemoryCache = useRef(new Map<string, string>());
   const [skipFeedbackLeft, setSkipFeedbackLeft] = useState(0);
   const [skipFeedbackRight, setSkipFeedbackRight] = useState(0);
@@ -817,6 +821,7 @@ const AnimatedVideoPlayer = (
     );
     return Math.round(representativeTime * 1000);
   }, [duration, seekPreviewTime]);
+  seekThumbnailTimestampRef.current = seekThumbnailTimestampMs;
 
   // The responder clears the active timer on touch-down. Keep enforcing that
   // invariant while scrubbing in case another control schedules a timeout.
@@ -825,6 +830,31 @@ const AnimatedVideoPlayer = (
       clearControlTimeout();
     }
   }, [clearControlTimeout, seeking]);
+
+  // Scrubbing can update the thumb position every frame. A trailing debounce
+  // never gets a chance to fire in that situation and is then cancelled when
+  // the finger is released. Sample the latest bucket at a steady cadence
+  // instead, and never queue another decoder while one is still running.
+  useEffect(() => {
+    if (!seeking) {
+      setSeekThumbnailSampleTimestampMs(null);
+      return;
+    }
+
+    const sampleLatestTimestamp = () => {
+      if (seekThumbnailRequestInFlight.current) return;
+      const latestTimestamp = seekThumbnailTimestampRef.current;
+      setSeekThumbnailSampleTimestampMs(currentTimestamp =>
+        currentTimestamp === latestTimestamp
+          ? currentTimestamp
+          : latestTimestamp,
+      );
+    };
+
+    sampleLatestTimestamp();
+    const sampler = setInterval(sampleLatestTimestamp, 350);
+    return () => clearInterval(sampler);
+  }, [seeking]);
 
   useEffect(() => {
     const requestId = ++seekThumbnailRequestId.current;
@@ -839,7 +869,7 @@ const AnimatedVideoPlayer = (
         }
       | undefined;
 
-    if (!seeking) {
+    if (!seeking || seekThumbnailSampleTimestampMs === null) {
       setSeekThumbnailUri(null);
       setSeekThumbnailLoading(false);
       return;
@@ -851,7 +881,7 @@ const AnimatedVideoPlayer = (
       return;
     }
 
-    const memoryCacheKey = `${thumbnailSource}|${thumbnailHeadersKey}|${seekThumbnailTimestampMs}`;
+    const memoryCacheKey = `${thumbnailSource}|${thumbnailHeadersKey}|${seekThumbnailSampleTimestampMs}`;
     const memoryCachedUri =
       seekThumbnailMemoryCache.current.get(memoryCacheKey);
     if (memoryCachedUri) {
@@ -863,57 +893,59 @@ const AnimatedVideoPlayer = (
       return;
     }
 
-    // Never leave the previous timestamp's frame visible while the debounced
-    // request for the new position is pending.
-    setSeekThumbnailUri(null);
+    // Keep the last decoded frame visible while the next bucket is loading.
+    // Remote streams can take a few seconds to seek; clearing it here would
+    // make the preview look permanently empty during continuous scrubbing.
+    if (seekThumbnailRequestInFlight.current) return;
+
     setSeekThumbnailLoading(true);
-    const debounce = setTimeout(() => {
-      const thumbnailRequest = thumbnailModule
-        ? thumbnailModule.getThumbnail(
-            thumbnailSource,
-            seekThumbnailTimestampMs,
-            thumbnailHeaders,
-            {
-              maxWidth: 320,
-              maxHeight: 180,
-              quality: 78,
-              cache: true,
-            },
-          )
-        : VideoThumbnails.getThumbnailAsync(thumbnailSource, {
-            time: seekThumbnailTimestampMs,
-            quality: 0.78,
-            headers: thumbnailHeaders,
-          });
-
-      thumbnailRequest
-        .then(result => {
-          seekThumbnailMemoryCache.current.set(memoryCacheKey, result.uri);
-          if (seekThumbnailMemoryCache.current.size > 48) {
-            const oldestKey = seekThumbnailMemoryCache.current
-              .keys()
-              .next().value;
-            if (oldestKey) {
-              seekThumbnailMemoryCache.current.delete(oldestKey);
-            }
-          }
-          if (seekThumbnailRequestId.current === requestId) {
-            setSeekThumbnailUri(result.uri);
-            setSeekThumbnailLoading(false);
-          }
-        })
-        .catch(() => {
-          if (seekThumbnailRequestId.current === requestId) {
-            setSeekThumbnailUri(null);
-            setSeekThumbnailLoading(false);
-          }
+    seekThumbnailRequestInFlight.current = true;
+    const thumbnailRequest = thumbnailModule
+      ? thumbnailModule.getThumbnail(
+          thumbnailSource,
+          seekThumbnailSampleTimestampMs,
+          thumbnailHeaders,
+          {
+            maxWidth: 320,
+            maxHeight: 180,
+            quality: 78,
+            cache: true,
+          },
+        )
+      : VideoThumbnails.getThumbnailAsync(thumbnailSource, {
+          time: seekThumbnailSampleTimestampMs,
+          quality: 0.78,
+          headers: thumbnailHeaders,
         });
-    }, 180);
 
-    return () => clearTimeout(debounce);
+    thumbnailRequest
+      .then(result => {
+        seekThumbnailMemoryCache.current.set(memoryCacheKey, result.uri);
+        if (seekThumbnailMemoryCache.current.size > 48) {
+          const oldestKey = seekThumbnailMemoryCache.current.keys().next().value;
+          if (oldestKey) {
+            seekThumbnailMemoryCache.current.delete(oldestKey);
+          }
+        }
+        if (seekThumbnailRequestId.current === requestId) {
+          setSeekThumbnailUri(result.uri);
+          setSeekThumbnailLoading(false);
+        }
+      })
+      .catch(thumbnailError => {
+        if (__DEV__) {
+          console.warn('Failed to generate seek thumbnail:', thumbnailError);
+        }
+        if (seekThumbnailRequestId.current === requestId) {
+          setSeekThumbnailLoading(false);
+        }
+      })
+      .finally(() => {
+        seekThumbnailRequestInFlight.current = false;
+      });
   }, [
     seeking,
-    seekThumbnailTimestampMs,
+    seekThumbnailSampleTimestampMs,
     thumbnailHeaders,
     thumbnailHeadersKey,
     thumbnailSource,

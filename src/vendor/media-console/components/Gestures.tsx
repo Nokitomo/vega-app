@@ -352,8 +352,6 @@ const Gestures = ({
     volume: 0,
     brightness: 0,
   });
-  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartPosRef = useRef<{x: number; y: number} | null>(null);
   const is2xActiveRef = useRef(false);
 
   // Shared values
@@ -420,8 +418,7 @@ const Gestures = ({
   }, [toastOpacity]);
 
   const start2x = useCallback(() => {
-    if (!enable2xGesture || disableGesture || showControls || isPanActive.value)
-      return;
+    if (!enable2xGesture || showControls || isPanActive.value) return;
     if (settingsStorage.isHapticFeedbackEnabled()) {
       ReactNativeHapticFeedback.trigger('impactMedium', {
         enableVibrateFallback: true,
@@ -433,7 +430,6 @@ const Gestures = ({
     setPlayback(2);
     show2xToast();
   }, [
-    disableGesture,
     enable2xGesture,
     showControls,
     setPlayback,
@@ -443,11 +439,6 @@ const Gestures = ({
   ]);
 
   const cancel2x = useCallback(() => {
-    if (longPressTimeoutRef.current) {
-      clearTimeout(longPressTimeoutRef.current);
-      longPressTimeoutRef.current = null;
-    }
-    touchStartPosRef.current = null;
     is2xActiveShared.value = false;
     if (is2xActiveRef.current) {
       is2xActiveRef.current = false;
@@ -455,35 +446,6 @@ const Gestures = ({
       hideToast();
     }
   }, [hideToast, setPlayback, is2xActiveShared]);
-
-  const handleTouchDown = useCallback(
-    (x: number, y: number) => {
-      if (!enable2xGesture || disableGesture || showControls) return;
-      cancel2x();
-      touchStartPosRef.current = {x, y};
-      longPressTimeoutRef.current = setTimeout(() => {
-        start2x();
-      }, 450);
-    },
-    [disableGesture, enable2xGesture, showControls, cancel2x, start2x],
-  );
-
-  const handleTouchMove = useCallback(
-    (x: number, y: number) => {
-      if (is2xActiveRef.current) return;
-      if (!touchStartPosRef.current) return;
-      const dx = Math.abs(x - touchStartPosRef.current.x);
-      const dy = Math.abs(y - touchStartPosRef.current.y);
-      if (dx > 8 || dy > 8) {
-        cancel2x();
-      }
-    },
-    [cancel2x],
-  );
-
-  const handleTouchUp = useCallback(() => {
-    cancel2x();
-  }, [cancel2x]);
 
   // The accumulated label is owned by the seek button and fades out on its own
   // timer, so resetting the tap tracking must not clear it. Otherwise the
@@ -650,34 +612,6 @@ const Gestures = ({
         .enabled(!disableGesture)
         .maxPointers(1)
         .minDistance(10) // Minimum distance before gesture starts
-        .onTouchesDown(event => {
-          'worklet';
-          isPanActive.value = false;
-          is2xActiveShared.value = false;
-          if (event.allTouches && event.allTouches.length > 0) {
-            runOnJS(handleTouchDown)(
-              event.allTouches[0].x,
-              event.allTouches[0].y,
-            );
-          }
-        })
-        .onTouchesMove(event => {
-          'worklet';
-          if (event.allTouches && event.allTouches.length > 0) {
-            runOnJS(handleTouchMove)(
-              event.allTouches[0].x,
-              event.allTouches[0].y,
-            );
-          }
-        })
-        .onTouchesUp(() => {
-          'worklet';
-          runOnJS(handleTouchUp)();
-        })
-        .onTouchesCancelled(() => {
-          'worklet';
-          runOnJS(handleTouchUp)();
-        })
         .onStart(event => {
           'worklet';
           if (is2xActiveShared.value) {
@@ -725,7 +659,6 @@ const Gestures = ({
           'worklet';
           isPanActive.value = false;
           is2xActiveShared.value = false;
-          runOnJS(handleTouchUp)();
           runOnJS(setIsVolumeVisible)(false);
           runOnJS(setIsBrightnessVisible)(false);
         }),
@@ -735,9 +668,6 @@ const Gestures = ({
       disableGesture,
       is2xActiveShared,
       isPanActive,
-      handleTouchDown,
-      handleTouchMove,
-      handleTouchUp,
       cancel2x,
       updateSystemBrightness,
       updateSystemVolume,
@@ -797,25 +727,31 @@ const Gestures = ({
       if (tapActionTimeout.current) {
         clearTimeout(tapActionTimeout.current);
       }
-      if (longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
-      }
+      cancel2x();
     };
-  }, []);
+  }, [cancel2x, tapActionTimeout]);
 
   useEffect(() => {
-    if (!enable2xGesture || disableGesture || showControls) {
+    if (!enable2xGesture || showControls) {
       cancel2x();
     }
-  }, [cancel2x, disableGesture, enable2xGesture, showControls]);
+  }, [cancel2x, enable2xGesture, showControls]);
 
   // Memoize container styles
   const containerStyle = useMemo(
     () => ({
-      width: '100%' as const,
-      height: '70%' as const,
+      position: 'absolute' as const,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      // Hidden controls still leave transparent layout layers mounted. Lift
+      // the gesture surface above them so the whole video remains tappable and
+      // swipe/long-press gestures do not depend on the seekbar area.
+      zIndex: showControls ? 0 : 1000,
+      elevation: showControls ? 0 : 1000,
     }),
-    [],
+    [showControls],
   );
 
   const gestureContainerStyle = useMemo(
@@ -882,9 +818,33 @@ const Gestures = ({
     [SCREEN_WIDTH, gestureWidth, handleTap, is2xActiveShared],
   );
 
+  const longPressGesture = useMemo(
+    () =>
+      Gesture.LongPress()
+        // The 2x preference is intentionally independent from vertical swipe
+        // gestures. The component is not rendered while the player is locked.
+        .enabled(enable2xGesture && !showControls)
+        .minDuration(450)
+        .maxDistance(8)
+        .onStart(() => {
+          'worklet';
+          runOnJS(start2x)();
+        })
+        .onFinalize(() => {
+          'worklet';
+          runOnJS(cancel2x)();
+        }),
+    [cancel2x, enable2xGesture, showControls, start2x],
+  );
+
   const composedGesture = useMemo(
-    () => Gesture.Simultaneous(pinchGesture, panGesture, tapGesture),
-    [panGesture, pinchGesture, tapGesture],
+    () =>
+      Gesture.Simultaneous(
+        pinchGesture,
+        panGesture,
+        Gesture.Exclusive(longPressGesture, tapGesture),
+      ),
+    [longPressGesture, panGesture, pinchGesture, tapGesture],
   );
 
   const visualOverlayStyle = useMemo(

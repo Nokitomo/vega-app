@@ -1,10 +1,5 @@
 import React, {ReactNode} from 'react';
-import {
-  TouchableWithoutFeedback,
-  Platform,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
+import {Platform, StyleProp, View, ViewStyle} from 'react-native';
 import {TVOSSupport} from './TVOSSupport';
 import {_styles} from '../styles';
 
@@ -35,12 +30,16 @@ export const PlatformSupport = ({
     );
   }
 
+  // Touches on phones and tablets are owned by the GestureDetector rendered
+  // by VideoPlayer. Keeping a second TouchableWithoutFeedback here makes a
+  // single tap pass through two independent double-tap state machines, which
+  // can cancel the control toggle or execute it twice. TV keeps its dedicated
+  // remote-control path above.
   return (
-    <TouchableWithoutFeedback
+    <View
       testID={testID}
-      onPress={onScreenTouch}
       style={[_styles.player.container, containerStyles]}>
       {children}
-    </TouchableWithoutFeedback>
+    </View>
   );
 };

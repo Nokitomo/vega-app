@@ -3191,7 +3191,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       )}
 
       {/* Lock/Unlock button */}
-      {!isPreparingPlayer && !Platform.isTV && (
+      {!isPreparingPlayer && !Platform.isTV && !showEpisodeSidebar && (
         <Animated.View
           style={[lockButtonStyle]}
           className="absolute top-5 right-5 flex-row items-center gap-2 z-50">

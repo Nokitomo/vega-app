@@ -7,7 +7,12 @@ export const Overlay = ({
 }: {
   animations: VideoAnimations;
 }) => {
-  return <AnimatedView style={[_styles.overlay, controlsOpacity]} />;
+  return (
+    <AnimatedView
+      pointerEvents="none"
+      style={[_styles.overlay, controlsOpacity]}
+    />
+  );
 };
 
 const _styles = StyleSheet.create({

@@ -202,7 +202,7 @@ const PlayerEpisodeSidebar = ({
   return (
     <View
       pointerEvents={visible ? 'box-none' : 'none'}
-      style={StyleSheet.absoluteFill}>
+      style={styles.root}>
       <Animated.View style={[styles.backdrop, backdropStyle]}>
         <Pressable
           accessibilityRole="button"
@@ -324,6 +324,11 @@ const PlayerEpisodeSidebar = ({
 };
 
 const styles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+    elevation: 30,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',

@@ -63,7 +63,9 @@ export const TopControls = memo(
     );
 
     return (
-      <AnimatedView style={[_styles.top, controlsOpacity, topControl]}>
+      <AnimatedView
+        pointerEvents={showControls ? 'box-none' : 'none'}
+        style={[_styles.top, controlsOpacity, topControl]}>
         {/* <ImageBackground
           source={require('../assets/img/top-vignette.png')}
           style={[styles.column]}
