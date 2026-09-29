@@ -2905,6 +2905,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     () => ({
       disableGesture: isPlayerLocked || !enableSwipeGesture,
       enable2xGesture,
+      thumbnailContentType: selectedStream?.type,
       doubleTapTime: 200,
       disableSeekButtons: isPlayerLocked || hideSeekButtons,
       showOnStart: !isPlayerLocked,

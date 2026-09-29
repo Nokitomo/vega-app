@@ -352,6 +352,8 @@ const Gestures = ({
     volume: 0,
     brightness: 0,
   });
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPosRef = useRef<{x: number; y: number} | null>(null);
   const is2xActiveRef = useRef(false);
 
   // Shared values
@@ -439,6 +441,11 @@ const Gestures = ({
   ]);
 
   const cancel2x = useCallback(() => {
+    if (longPressTimeoutRef.current) {
+      clearTimeout(longPressTimeoutRef.current);
+      longPressTimeoutRef.current = null;
+    }
+    touchStartPosRef.current = null;
     is2xActiveShared.value = false;
     if (is2xActiveRef.current) {
       is2xActiveRef.current = false;
@@ -446,6 +453,34 @@ const Gestures = ({
       hideToast();
     }
   }, [hideToast, setPlayback, is2xActiveShared]);
+
+  const handleTouchDown = useCallback(
+    (x: number, y: number) => {
+      if (!enable2xGesture || showControls) return;
+      cancel2x();
+      touchStartPosRef.current = {x, y};
+      longPressTimeoutRef.current = setTimeout(start2x, 450);
+    },
+    [cancel2x, enable2xGesture, showControls, start2x],
+  );
+
+  const handleTouchMove = useCallback(
+    (x: number, y: number) => {
+      // Once 2x has started, movement must not end it. Playback returns to the
+      // configured rate only when the finger is lifted or the touch is cancelled.
+      if (is2xActiveRef.current || !touchStartPosRef.current) return;
+      const dx = Math.abs(x - touchStartPosRef.current.x);
+      const dy = Math.abs(y - touchStartPosRef.current.y);
+      if (dx > 8 || dy > 8) {
+        cancel2x();
+      }
+    },
+    [cancel2x],
+  );
+
+  const handleTouchUp = useCallback(() => {
+    cancel2x();
+  }, [cancel2x]);
 
   // The accumulated label is owned by the seek button and fades out on its own
   // timer, so resetting the tap tracking must not clear it. Otherwise the
@@ -609,12 +644,41 @@ const Gestures = ({
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!disableGesture)
+        // The 2x preference is independent from vertical brightness/volume
+        // gestures, so keep observing raw touches when only 2x is enabled.
+        .enabled(!disableGesture || (enable2xGesture && !showControls))
         .maxPointers(1)
         .minDistance(10) // Minimum distance before gesture starts
+        .onTouchesDown(event => {
+          'worklet';
+          isPanActive.value = false;
+          if (event.allTouches?.length) {
+            runOnJS(handleTouchDown)(
+              event.allTouches[0].x,
+              event.allTouches[0].y,
+            );
+          }
+        })
+        .onTouchesMove(event => {
+          'worklet';
+          if (event.allTouches?.length) {
+            runOnJS(handleTouchMove)(
+              event.allTouches[0].x,
+              event.allTouches[0].y,
+            );
+          }
+        })
+        .onTouchesUp(() => {
+          'worklet';
+          runOnJS(handleTouchUp)();
+        })
+        .onTouchesCancelled(() => {
+          'worklet';
+          runOnJS(handleTouchUp)();
+        })
         .onStart(event => {
           'worklet';
-          if (is2xActiveShared.value) {
+          if (is2xActiveShared.value || disableGesture) {
             return;
           }
           isPanActive.value = true;
@@ -631,7 +695,11 @@ const Gestures = ({
         })
         .onUpdate(event => {
           'worklet';
-          if (is2xActiveShared.value || !isPanActive.value) {
+          if (
+            disableGesture ||
+            is2xActiveShared.value ||
+            !isPanActive.value
+          ) {
             return;
           }
           const isLeftSide = event.x < (gestureWidth.value || SCREEN_WIDTH) / 2;
@@ -658,7 +726,7 @@ const Gestures = ({
         .onFinalize(() => {
           'worklet';
           isPanActive.value = false;
-          is2xActiveShared.value = false;
+          runOnJS(handleTouchUp)();
           runOnJS(setIsVolumeVisible)(false);
           runOnJS(setIsBrightnessVisible)(false);
         }),
@@ -666,8 +734,13 @@ const Gestures = ({
       SCREEN_WIDTH,
       gestureWidth,
       disableGesture,
+      enable2xGesture,
+      showControls,
       is2xActiveShared,
       isPanActive,
+      handleTouchDown,
+      handleTouchMove,
+      handleTouchUp,
       cancel2x,
       updateSystemBrightness,
       updateSystemVolume,
@@ -818,33 +891,10 @@ const Gestures = ({
     [SCREEN_WIDTH, gestureWidth, handleTap, is2xActiveShared],
   );
 
-  const longPressGesture = useMemo(
-    () =>
-      Gesture.LongPress()
-        // The 2x preference is intentionally independent from vertical swipe
-        // gestures. The component is not rendered while the player is locked.
-        .enabled(enable2xGesture && !showControls)
-        .minDuration(450)
-        .maxDistance(8)
-        .onStart(() => {
-          'worklet';
-          runOnJS(start2x)();
-        })
-        .onFinalize(() => {
-          'worklet';
-          runOnJS(cancel2x)();
-        }),
-    [cancel2x, enable2xGesture, showControls, start2x],
-  );
-
   const composedGesture = useMemo(
     () =>
-      Gesture.Simultaneous(
-        pinchGesture,
-        panGesture,
-        Gesture.Exclusive(longPressGesture, tapGesture),
-      ),
-    [longPressGesture, panGesture, pinchGesture, tapGesture],
+      Gesture.Simultaneous(pinchGesture, panGesture, tapGesture),
+    [panGesture, pinchGesture, tapGesture],
   );
 
   const visualOverlayStyle = useMemo(

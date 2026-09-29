@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
@@ -65,6 +66,7 @@ class VideoThumbnailModule(
         val maxWidth = options.intOr("maxWidth", 0).coerceAtLeast(0)
         val maxHeight = options.intOr("maxHeight", 0).coerceAtLeast(0)
         val useCache = options.booleanOr("cache", true)
+        val contentType = options.stringOr("contentType", "")
         val requestedTimestampMs = timestampMs.roundToLong()
 
         executor.execute {
@@ -83,6 +85,7 @@ class VideoThumbnailModule(
                     quality,
                     maxWidth,
                     maxHeight,
+                    contentType,
                 )
                 val outputFile = File(outputDirectory, "$cacheKey.jpg")
                 if (useCache && outputFile.isFile && outputFile.length() > 0) {
@@ -104,7 +107,7 @@ class VideoThumbnailModule(
 
                 val extractedFrame = if (isRemoteSource(source)) {
                     try {
-                        extractRemoteFrame(source, requestedTimestampMs)
+                        extractRemoteFrame(source, requestedTimestampMs, contentType)
                     } catch (_: Throwable) {
                         // Authenticated sources may require their request
                         // headers, which the platform retriever supports.
@@ -234,7 +237,11 @@ class VideoThumbnailModule(
      * on HTTP sources. Media3 prepares the stream and performs a real seek.
      */
     @UnstableApi
-    private fun extractRemoteFrame(source: String, timestampMs: Long): Bitmap {
+    private fun extractRemoteFrame(
+        source: String,
+        timestampMs: Long,
+        contentType: String,
+    ): Bitmap {
         val thread = HandlerThread("vega-thumbnail-frame-extractor").apply { start() }
         val handler = Handler(thread.looper)
         val result = CompletableFuture<Bitmap>()
@@ -247,7 +254,13 @@ class VideoThumbnailModule(
                     .setMediaCodecSelector(MediaCodecSelector.DEFAULT)
                     .build()
                 extractor = ExperimentalFrameExtractor(reactApplicationContext, configuration)
-                extractor.setMediaItem(MediaItem.fromUri(source), emptyList())
+                val mediaItem = MediaItem.Builder()
+                    .setUri(source)
+                    .apply {
+                        thumbnailMimeType(source, contentType)?.let(::setMimeType)
+                    }
+                    .build()
+                extractor.setMediaItem(mediaItem, emptyList())
 
                 val frameFuture = extractor.getFrame(timestampMs)
                 frameFuture.addListener(
@@ -350,13 +363,15 @@ class VideoThumbnailModule(
         quality: Int,
         maxWidth: Int,
         maxHeight: Int,
+        contentType: String,
     ): String {
         val value = buildString {
-            append("media3-frame-extractor-v1|")
+            append("media3-frame-extractor-v2|")
             append(source)
             append('|').append(timestampMs)
             append('|').append(quality)
             append('|').append(maxWidth).append('x').append(maxHeight)
+            append('|').append(contentType.lowercase())
             headers.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (name, headerValue) ->
                 append('|').append(name.lowercase()).append(':').append(headerValue)
             }
@@ -364,6 +379,20 @@ class VideoThumbnailModule(
         return MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray(Charsets.UTF_8))
             .joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private fun thumbnailMimeType(source: String, contentType: String): String? {
+        return when (contentType.trim().lowercase()) {
+            "m3u8", "hls", MimeTypes.APPLICATION_M3U8 -> MimeTypes.APPLICATION_M3U8
+            "mp4", MimeTypes.VIDEO_MP4 -> MimeTypes.VIDEO_MP4
+            else -> when {
+                Uri.parse(source).path?.lowercase()?.endsWith(".m3u8") == true ->
+                    MimeTypes.APPLICATION_M3U8
+                Uri.parse(source).path?.lowercase()?.endsWith(".mp4") == true ->
+                    MimeTypes.VIDEO_MP4
+                else -> null
+            }
+        }
     }
 }
 
@@ -396,6 +425,14 @@ private fun ReadableMap?.booleanOr(key: String, fallback: Boolean): Boolean {
     if (this == null || !hasKey(key) || isNull(key)) return fallback
     return when (getType(key)) {
         ReadableType.Boolean -> getBoolean(key)
+        else -> fallback
+    }
+}
+
+private fun ReadableMap?.stringOr(key: String, fallback: String): String {
+    if (this == null || !hasKey(key) || isNull(key)) return fallback
+    return when (getType(key)) {
+        ReadableType.String -> getString(key) ?: fallback
         else -> fallback
     }
 }

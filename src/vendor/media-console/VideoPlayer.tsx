@@ -95,6 +95,7 @@ const AnimatedVideoPlayer = (
     testID,
     disableGesture = false,
     enable2xGesture = true,
+    thumbnailContentType: thumbnailContentTypeProp = '',
     hideAllControlls = false,
     onSeekSnap,
     skips,
@@ -792,6 +793,21 @@ const AnimatedVideoPlayer = (
     return {};
   }, [source]);
 
+  const thumbnailContentType = useMemo(() => {
+    if (thumbnailContentTypeProp) {
+      return thumbnailContentTypeProp;
+    }
+    if (
+      source &&
+      typeof source === 'object' &&
+      'type' in source &&
+      typeof source.type === 'string'
+    ) {
+      return source.type;
+    }
+    return '';
+  }, [source, thumbnailContentTypeProp]);
+
   const thumbnailHeadersKey = useMemo(
     () =>
       Object.entries(thumbnailHeaders)
@@ -864,7 +880,7 @@ const AnimatedVideoPlayer = (
             uri: string,
             timestampMs: number,
             headers: Record<string, string>,
-            options: Record<string, number | boolean>,
+            options: Record<string, number | boolean | string>,
           ) => Promise<{uri: string}>;
         }
       | undefined;
@@ -910,6 +926,7 @@ const AnimatedVideoPlayer = (
             maxHeight: 180,
             quality: 78,
             cache: true,
+            contentType: thumbnailContentType,
           },
         )
       : VideoThumbnails.getThumbnailAsync(thumbnailSource, {
@@ -948,6 +965,7 @@ const AnimatedVideoPlayer = (
     seekThumbnailSampleTimestampMs,
     thumbnailHeaders,
     thumbnailHeadersKey,
+    thumbnailContentType,
     thumbnailSource,
   ]);
 
