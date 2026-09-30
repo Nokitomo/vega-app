@@ -56,6 +56,7 @@ export enum SettingsKeys {
   // Runtime feature flags
   ANDROID_GECKO_WEBVIEW_ENABLED = 'androidGeckoWebViewEnabled',
   ANDROID_GECKO_ADGUARD_ENABLED = 'androidGeckoAdGuardEnabled',
+  ANDROID_WARP_ENABLED = 'androidWarpEnabled',
 }
 
 /**
@@ -344,6 +345,14 @@ export class SettingsStorage {
 
   setAndroidGeckoAdGuardEnabled(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.ANDROID_GECKO_ADGUARD_ENABLED, enabled);
+  }
+
+  isAndroidWarpEnabled(): boolean {
+    return this.getBoolWithDefault(SettingsKeys.ANDROID_WARP_ENABLED, false);
+  }
+
+  setAndroidWarpEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.ANDROID_WARP_ENABLED, enabled);
   }
 
   // Generic get/set methods for settings not covered by specific methods

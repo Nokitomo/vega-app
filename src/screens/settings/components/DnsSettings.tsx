@@ -1,7 +1,9 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
+  Switch,
   Text,
   TextInput,
   ToastAndroid,
@@ -16,6 +18,7 @@ import {
   dnsService,
   validateCustomDohUrl,
 } from '../../../lib/services/dns';
+import {WarpStatus, warpService} from '../../../lib/services/warp';
 
 type DnsSettingsProps = {
   primary: string;
@@ -56,6 +59,8 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<TestStatus>(null);
+  const [warpStatus, setWarpStatus] = useState<WarpStatus | null>(null);
+  const [isUpdatingWarp, setIsUpdatingWarp] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -83,6 +88,35 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
 
     return () => {
       mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!warpService.isAvailable) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    const refresh = () => {
+      warpService
+        .getStatus()
+        .then(status => {
+          if (mounted) {
+            setWarpStatus(status);
+          }
+        })
+        .catch(error => {
+          console.warn('Unable to load WARP status:', error);
+        });
+    };
+
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -203,10 +237,94 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
     }
   };
 
+  const updateWarp = async (enabled: boolean) => {
+    if (isUpdatingWarp) {
+      return;
+    }
+    setIsUpdatingWarp(true);
+    try {
+      const status = await warpService.setEnabled(enabled);
+      setWarpStatus(status);
+      ToastAndroid.show(
+        enabled ? t('WARP enabled') : t('WARP disabled'),
+        ToastAndroid.SHORT,
+      );
+    } catch (error) {
+      console.warn('Unable to update WARP:', error);
+      setWarpStatus(current =>
+        current ? {...current, state: 'error', running: false, port: null} : current,
+      );
+      ToastAndroid.show(t('Failed to update WARP'), ToastAndroid.LONG);
+    } finally {
+      setIsUpdatingWarp(false);
+    }
+  };
+
+  const handleWarpToggle = (enabled: boolean) => {
+    if (!enabled) {
+      updateWarp(false);
+      return;
+    }
+
+    Alert.alert(
+      t('Enable WARP?'),
+      t(
+        'Vega will register an independent WARP client and route supported app traffic through Cloudflare. By continuing, you accept Cloudflare terms. This is not a device VPN.',
+      ),
+      [
+        {text: t('Cancel'), style: 'cancel'},
+        {text: t('Enable'), onPress: () => updateWarp(true)},
+      ],
+    );
+  };
+
   return (
     <View className="mb-6">
       <Text className="text-gray-400 text-sm mb-3">{t('Network')}</Text>
       <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
+        {warpService.isAvailable && (
+          <View className="p-4 border-b border-[#262626]">
+            <View className="flex-row items-center justify-between gap-4">
+              <View className="flex-1">
+                <Text className="text-white text-base font-medium">
+                  {t('Cloudflare WARP')}
+                </Text>
+                <Text className="text-gray-400 text-xs mt-1">
+                  {t(
+                    'Route supported Vega requests and internal player traffic through WARP. It does not affect WebView, casting or other apps.',
+                  )}
+                </Text>
+                <Text
+                  className={`text-xs mt-2 ${
+                    warpStatus?.running
+                      ? 'text-green-400'
+                      : warpStatus?.state === 'error'
+                        ? 'text-red-400'
+                        : 'text-gray-500'
+                  }`}>
+                  {isUpdatingWarp
+                    ? t('WARP is connecting…')
+                    : warpStatus?.running
+                      ? t('WARP is active')
+                      : warpStatus?.state === 'error'
+                        ? t('WARP connection failed')
+                        : t('WARP is inactive')}
+                </Text>
+              </View>
+              {isUpdatingWarp ? (
+                <ActivityIndicator color={primary} />
+              ) : (
+                <Switch
+                  value={Boolean(warpStatus?.running)}
+                  disabled={!warpStatus?.supported}
+                  onValueChange={handleWarpToggle}
+                  trackColor={{false: '#3A3A3A', true: primary}}
+                  thumbColor="white"
+                />
+              )}
+            </View>
+          </View>
+        )}
         <View className="p-4 border-b border-[#262626]">
           <View className="flex-row items-center justify-between gap-4">
             <View className="flex-1">

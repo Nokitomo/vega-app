@@ -24,6 +24,7 @@ module.exports = () => {
     './plugins/with-android-release-gradle.js',
     './plugins/with-android-signing.js',
     './plugins/with-android-okhttp.js',
+    './plugins/with-android-warp.js',
     ...(hasAndroidGoogleServices || hasIosGooglePlist
       ? ['@react-native-firebase/app']
       : []),

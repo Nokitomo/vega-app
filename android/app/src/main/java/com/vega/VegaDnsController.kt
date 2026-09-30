@@ -4,6 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.facebook.react.modules.network.OkHttpClientProvider
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.ProxySelector
+import java.net.SocketAddress
+import java.net.URI
 import java.net.UnknownHostException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -97,14 +102,21 @@ object VegaDnsController : Dns {
 
   private val dohResolvers = ConcurrentHashMap<String, Dns>()
 
+  @Volatile
+  private var warpProxyPort: Int? = null
+
+  private var fallbackProxySelector: ProxySelector? = null
+
   fun install(context: Context) {
     appContext = context.applicationContext
     customUrl = readStoredCustomUrl()
     selectedProviderId = readStoredProviderId()
+    fallbackProxySelector = ProxySelector.getDefault()
 
     OkHttpClientProvider.setOkHttpClientFactory {
       OkHttpClientProvider.createClientBuilder(appContext)
         .dns(this)
+        .proxySelector(VegaProxySelector(fallbackProxySelector))
         .build()
     }
 
@@ -114,6 +126,17 @@ object VegaDnsController : Dns {
   fun getSelectedProviderId(): String = selectedProviderId
 
   fun getCustomUrl(): String? = customUrl
+
+  fun setWarpProxyPort(port: Int?) {
+    require(port == null || port in 1..65535) { "Invalid WARP proxy port" }
+    if (warpProxyPort == port) {
+      return
+    }
+
+    warpProxyPort = port
+    evictIdleConnections()
+    Log.i(TAG, if (port == null) "WARP proxy disabled" else "WARP proxy enabled")
+  }
 
   fun setSelectedProvider(providerId: String) {
     require(findProvider(providerId) != null) { "Unsupported DNS provider: $providerId" }
@@ -200,6 +223,7 @@ object VegaDnsController : Dns {
       val bootstrapHosts = provider.bootstrapAddresses.map(InetAddress::getByName)
       val bootstrapClient = OkHttpClient.Builder()
         .dns(Dns.SYSTEM)
+        .proxy(Proxy.NO_PROXY)
         .connectTimeout(DNS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(DNS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(DNS_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -239,5 +263,37 @@ object VegaDnsController : Dns {
     // Active requests are not cancelled; subsequent connections use the new resolver.
     runCatching { OkHttpClientProvider.getOkHttpClient().connectionPool.evictAll() }
       .onFailure { error -> Log.w(TAG, "Unable to evict idle HTTP connections", error) }
+  }
+
+  private class VegaProxySelector(
+    private val fallback: ProxySelector?,
+  ) : ProxySelector() {
+    override fun select(uri: URI?): List<Proxy> {
+      if (uri == null || isLoopbackHost(uri.host)) {
+        return listOf(Proxy.NO_PROXY)
+      }
+
+      val port = VegaDnsController.warpProxyPort
+      if (port != null) {
+        return listOf(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
+      }
+
+      return fallback?.select(uri)?.takeIf { it.isNotEmpty() }
+        ?: listOf(Proxy.NO_PROXY)
+    }
+
+    override fun connectFailed(uri: URI?, socketAddress: SocketAddress?, error: java.io.IOException?) {
+      if (VegaDnsController.warpProxyPort == null) {
+        fallback?.connectFailed(uri, socketAddress, error)
+      }
+    }
+
+    private fun isLoopbackHost(host: String?): Boolean {
+      val normalized = host?.trim()?.lowercase() ?: return false
+      return normalized == "localhost" ||
+        normalized == "127.0.0.1" ||
+        normalized == "::1" ||
+        normalized == "[::1]"
+    }
   }
 }

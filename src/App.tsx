@@ -66,6 +66,7 @@ import useUiSettingsStore from './lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {applyAndroidUserOrientation} from './lib/utils/vegaOrientation';
 import WafWebViewDialog from './components/WafWebViewDialog';
+import {warpService} from './lib/services/warp';
 // Lazy-load Firebase modules so app runs without google-services files
 const getAnalytics = (): any | null => {
   try {
@@ -541,6 +542,14 @@ const AppContent = () => {
     },
     [clearCache, getActiveTabName],
   );
+
+  useEffect(() => {
+    if (warpService.isAvailable) {
+      warpService.syncPreference().catch(error => {
+        console.warn('Unable to restore WARP setting:', error);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     // Apply telemetry preference before using analytics

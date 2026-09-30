@@ -2,6 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 apply from: 'with-okhttp.gradle'
+apply from: 'with-android-warp.gradle'
 apply from: 'with-signing.gradle'
 apply from: 'with-release-config.gradle'
 apply from: 'with-abi-splits.gradle'

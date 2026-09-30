@@ -1,0 +1,8 @@
+// Auto-applied by with-android-warp config plugin
+android {
+    sourceSets {
+        main {
+            jniLibs.srcDirs += ['../../native-src/android/jniLibs']
+        }
+    }
+}

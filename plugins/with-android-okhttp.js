@@ -3,7 +3,8 @@ const path = require('path');
 const {withDangerousMod} = require('@expo/config-plugins');
 
 /**
- * Adds OkHttp dependencies and force resolution strategy after prebuild.
+ * Adds the OkHttp dependencies shared by app-scoped DoH and WARP routing,
+ * plus the force resolution strategy after prebuild.
  * Generates a Gradle file that applies OkHttp dependencies and resolution strategy.
  */
 module.exports = function withAndroidOkHttp(config) {
@@ -17,6 +18,7 @@ module.exports = function withAndroidOkHttp(config) {
 
       // Create OkHttp gradle that adds dependencies and force resolution
       const okHttpContent = `// Auto-applied by with-android-okhttp config plugin
+// Shared by VegaDnsController and the app-scoped WARP proxy selector.
 dependencies {
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
     implementation "com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0"

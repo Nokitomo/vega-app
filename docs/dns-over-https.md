@@ -56,6 +56,11 @@ Il DoH e app-scoped: non cambia il DNS del dispositivo e non e una VPN. Cifra le
 DNS verso il resolver scelto, ma non nasconde l'indirizzo IP dell'utente e non aggira
 blocchi basati su IP.
 
+L'impostazione WARP e separata. Quando e attiva, le destinazioni coperte vengono
+risolte dal proxy dentro il tunnel e la preferenza DoH resta memorizzata per il
+traffico diretto e per quando WARP viene disattivato. Il bootstrap DoH non usa mai
+il proxy locale, evitando dipendenze circolari. Dettagli in `docs/warp.md`.
+
 ## Comportamento in caso di errore
 
 La modalita e stretta: quando viene selezionato un provider DoH, Vega non esegue un
@@ -71,7 +76,9 @@ latenza e numero di indirizzi restituiti.
 
 - `VegaDnsController` implementa `okhttp3.Dns` e delega al DNS di sistema oppure a
   `okhttp3.dnsoverhttps.DnsOverHttps`.
-- `MainApplication` registra un `OkHttpClientFactory` prima dell'avvio di React Native.
+- `MainApplication` registra un `OkHttpClientFactory` prima dell'avvio di React Native;
+  la factory conserva il resolver DoH e aggiunge il selettore proxy dinamico usato
+  da WARP.
 - `VegaDnsModule` espone stato, cambio provider e diagnostica al livello TypeScript.
 - La scelta e l'eventuale URL personalizzato sono persistiti in `SharedPreferences`
   nativo, per essere disponibili prima della creazione del bridge React Native al

@@ -13,5 +13,7 @@ Le sezioni includono note su localizzazione (i18n) e supporto lingua inglese/ita
 - build-and-run.md: setup, build e avvio in locale.
 - testing-and-quality.md: linting e test.
 - configuration.md: configurazioni Expo/Metro/Tailwind/NativeWind.
+- dns-over-https.md: resolver DNS cifrato Android app-scoped.
+- warp.md: proxy WARP Android app-scoped, copertura e sicurezza.
 - permissions.md: permessi Android usati e motivazioni.
 - troubleshooting.md: problemi noti e risoluzioni (incluso splash bloccato).
