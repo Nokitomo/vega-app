@@ -11,7 +11,7 @@ File: src/lib/services/Notification.ts
 File: src/screens/settings/About.tsx
 - Verifica release da GitHub e confronto versione app locale/remota.
 - Su Android seleziona l'APK piu compatibile per ABI device (arm64/armeabi-v7a, fallback universal).
-- Se auto-download e abilitato, scarica APK in `Download`.
+- L'installazione automatica degli aggiornamenti e abilitata per impostazione predefinita; se attiva, scarica l'APK in `Download`.
 - Dopo update riuscito, al primo avvio con nuova versione elimina automaticamente l'APK scaricato in precedenza.
 
 ## Download
