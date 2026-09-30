@@ -23,7 +23,11 @@ export const getProviderCacheScope = (providerValue: string): string => {
     module?.version || installed?.version,
     'legacy',
   );
-  return `${source}:${normalizedValue}:${version}`;
+  const revision = normalizeScopePart(
+    module?.cachedAt || installed?.lastUpdated,
+    'legacy',
+  );
+  return `${source}:${normalizedValue}:${version}:${revision}`;
 };
 
 export const buildProviderCacheKey = (

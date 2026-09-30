@@ -43,7 +43,10 @@ export interface ProviderModule {
     settings?: string;
   };
   cachedAt: number;
+  cacheRevision?: number;
 }
+
+export const PROVIDER_MODULE_CACHE_REVISION = 2;
 
 /**
  * Storage keys for extensions.

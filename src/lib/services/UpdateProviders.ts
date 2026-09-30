@@ -1,4 +1,9 @@
-import {extensionStorage, ProviderExtension} from '../storage/extensionStorage';
+import {
+  extensionStorage,
+  ProviderExtension,
+  ProviderModule,
+  PROVIDER_MODULE_CACHE_REVISION,
+} from '../storage/extensionStorage';
 import {extensionManager} from './ExtensionManager';
 import {settingsStorage} from '../storage';
 import {notificationService} from './Notification';
@@ -12,6 +17,36 @@ export interface UpdateInfo {
   newVersion: string;
   hasUpdate: boolean;
 }
+
+const PROVIDER_MODULE_REFRESH_MS = 24 * 60 * 60 * 1000;
+
+export const isProviderModuleCurrent = (
+  module: ProviderModule | undefined,
+  provider: ProviderExtension,
+  now = Date.now(),
+): boolean => {
+  const sourceAuthor = provider.source?.author;
+  const requiredModules: Array<keyof ProviderModule['modules']> = [
+    'posts',
+    'meta',
+    'stream',
+    'catalog',
+  ];
+
+  return !!(
+    module &&
+    module.version === provider.version &&
+    (!sourceAuthor || module.sourceAuthor === sourceAuthor) &&
+    module.cacheRevision === PROVIDER_MODULE_CACHE_REVISION &&
+    Number.isFinite(module.cachedAt) &&
+    now - module.cachedAt < PROVIDER_MODULE_REFRESH_MS &&
+    requiredModules.every(
+      name =>
+        typeof module.modules[name] === 'string' &&
+        module.modules[name]!.trim().length > 0,
+    )
+  );
+};
 
 class UpdateProvidersService {
   private isUpdating = false;
@@ -99,8 +134,10 @@ class UpdateProvidersService {
 
       for (const [author, source] of sourceByAuthor.entries()) {
         try {
-          const availableProviders =
-            await extensionManager.fetchManifest(source, true);
+          const availableProviders = await extensionManager.fetchManifest(
+            source,
+            true,
+          );
           sources.set(author, availableProviders);
         } catch (error) {
           console.warn(`Failed to fetch source ${author} for updates:`, error);
@@ -115,10 +152,25 @@ class UpdateProvidersService {
           .get(installed.source?.author || 'unknown')
           ?.find(p => p.value === installed.value);
 
-        if (
+        const hasNewerVersion = !!(
+          available && this.isNewerVersion(available.version, installed.version)
+        );
+        const manifestMatchesInstalled = !!(
           available &&
-          this.isNewerVersion(available.version, installed.version)
-        ) {
+          !hasNewerVersion &&
+          !this.isNewerVersion(installed.version, available.version)
+        );
+        const cachedModule = extensionStorage.getProviderModules(
+          installed.value,
+          installed.source?.author,
+        );
+        const needsModuleRepair = !!(
+          available &&
+          manifestMatchesInstalled &&
+          !isProviderModuleCurrent(cachedModule, installed)
+        );
+
+        if (available && (hasNewerVersion || needsModuleRepair)) {
           updateInfos.push({
             provider: available,
             currentVersion: installed.version,

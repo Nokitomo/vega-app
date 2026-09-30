@@ -3,6 +3,7 @@ import {
   extensionStorage,
   ProviderExtension,
   ProviderModule,
+  PROVIDER_MODULE_CACHE_REVISION,
   ProviderSource,
 } from '../storage/extensionStorage';
 import {mainStorage} from '../storage/StorageService';
@@ -272,6 +273,7 @@ export class ExtensionManager {
           settings: modules.settings,
         },
         cachedAt: Date.now(),
+        cacheRevision: PROVIDER_MODULE_CACHE_REVISION,
       };
 
       // Cache the modules
@@ -347,6 +349,7 @@ export class ExtensionManager {
           settings: modules.settings,
         },
         cachedAt: Date.now(),
+        cacheRevision: PROVIDER_MODULE_CACHE_REVISION,
       };
 
       // Cache the test module
