@@ -7,9 +7,8 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
-import {NativeModules, Platform, View} from 'react-native';
+import {Platform, View} from 'react-native';
 import * as Brightness from 'expo-brightness';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 import Video, {
   OnLoadData,
   OnLoadStartData,
@@ -95,7 +94,6 @@ const AnimatedVideoPlayer = (
     testID,
     disableGesture = false,
     enable2xGesture = true,
-    thumbnailContentType: thumbnailContentTypeProp = '',
     hideAllControlls = false,
     onSeekSnap,
     skips,
@@ -135,14 +133,6 @@ const AnimatedVideoPlayer = (
   const [buffering, setBuffering] = useState(false);
   const [cachedDuration, setCachedDuration] = useState(0);
   const [cachedPosition, setCachedPosition] = useState(0);
-  const [seekThumbnailUri, setSeekThumbnailUri] = useState<string | null>(null);
-  const [seekThumbnailLoading, setSeekThumbnailLoading] = useState(false);
-  const [seekThumbnailSampleTimestampMs, setSeekThumbnailSampleTimestampMs] =
-    useState<number | null>(null);
-  const seekThumbnailRequestId = useRef(0);
-  const seekThumbnailTimestampRef = useRef(0);
-  const seekThumbnailRequestInFlight = useRef(false);
-  const seekThumbnailMemoryCache = useRef(new Map<string, string>());
   const [skipFeedbackLeft, setSkipFeedbackLeft] = useState(0);
   const [skipFeedbackRight, setSkipFeedbackRight] = useState(0);
   const skipFeedbackResetRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -772,72 +762,10 @@ const AnimatedVideoPlayer = (
     return String(source);
   }, [source]);
 
-  const thumbnailSource = useMemo(() => {
-    if (!source) return null;
-    if (typeof source === 'string') return source;
-    if (typeof source === 'object' && 'uri' in source) {
-      return typeof source.uri === 'string' ? source.uri : null;
-    }
-    return null;
-  }, [source]);
-
-  const thumbnailHeaders = useMemo(() => {
-    if (
-      source &&
-      typeof source === 'object' &&
-      'headers' in source &&
-      source.headers
-    ) {
-      return source.headers;
-    }
-    return {};
-  }, [source]);
-
-  const thumbnailContentType = useMemo(() => {
-    if (thumbnailContentTypeProp) {
-      return thumbnailContentTypeProp;
-    }
-    if (
-      source &&
-      typeof source === 'object' &&
-      'type' in source &&
-      typeof source.type === 'string'
-    ) {
-      return source.type;
-    }
-    return '';
-  }, [source, thumbnailContentTypeProp]);
-
-  const thumbnailHeadersKey = useMemo(
-    () =>
-      Object.entries(thumbnailHeaders)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([name, value]) => `${name}:${value}`)
-        .join('|'),
-    [thumbnailHeaders],
-  );
-
   const seekPreviewTime = useMemo(() => {
     if (!seeking || seekerWidth <= 0 || duration <= 0) return currentTime;
     return duration * Math.max(0, Math.min(1, seekerPosition / seekerWidth));
   }, [currentTime, duration, seekerPosition, seekerWidth, seeking]);
-
-  // Reuse one representative frame for a timeline region instead of asking
-  // the native decoder for another frame after every tiny thumb movement.
-  // Short videos retain finer previews while feature-length content uses
-  // wider regions to keep scrubbing responsive.
-  const seekThumbnailTimestampMs = useMemo(() => {
-    if (duration <= 0) return 0;
-    const bucketSeconds = duration >= 3600 ? 15 : duration >= 1200 ? 10 : 5;
-    const bucketStart =
-      Math.floor(Math.max(0, seekPreviewTime) / bucketSeconds) * bucketSeconds;
-    const representativeTime = Math.min(
-      duration,
-      bucketStart + bucketSeconds / 2,
-    );
-    return Math.round(representativeTime * 1000);
-  }, [duration, seekPreviewTime]);
-  seekThumbnailTimestampRef.current = seekThumbnailTimestampMs;
 
   // The responder clears the active timer on touch-down. Keep enforcing that
   // invariant while scrubbing in case another control schedules a timeout.
@@ -846,128 +774,6 @@ const AnimatedVideoPlayer = (
       clearControlTimeout();
     }
   }, [clearControlTimeout, seeking]);
-
-  // Scrubbing can update the thumb position every frame. A trailing debounce
-  // never gets a chance to fire in that situation and is then cancelled when
-  // the finger is released. Sample the latest bucket at a steady cadence
-  // instead, and never queue another decoder while one is still running.
-  useEffect(() => {
-    if (!seeking) {
-      setSeekThumbnailSampleTimestampMs(null);
-      return;
-    }
-
-    const sampleLatestTimestamp = () => {
-      if (seekThumbnailRequestInFlight.current) return;
-      const latestTimestamp = seekThumbnailTimestampRef.current;
-      setSeekThumbnailSampleTimestampMs(currentTimestamp =>
-        currentTimestamp === latestTimestamp
-          ? currentTimestamp
-          : latestTimestamp,
-      );
-    };
-
-    sampleLatestTimestamp();
-    const sampler = setInterval(sampleLatestTimestamp, 350);
-    return () => clearInterval(sampler);
-  }, [seeking]);
-
-  useEffect(() => {
-    const requestId = ++seekThumbnailRequestId.current;
-    const thumbnailModule = NativeModules.VideoThumbnailModule as
-      | {
-          getThumbnail: (
-            uri: string,
-            timestampMs: number,
-            headers: Record<string, string>,
-            options: Record<string, number | boolean | string>,
-          ) => Promise<{uri: string}>;
-        }
-      | undefined;
-
-    if (!seeking || seekThumbnailSampleTimestampMs === null) {
-      setSeekThumbnailUri(null);
-      setSeekThumbnailLoading(false);
-      return;
-    }
-
-    if (!thumbnailSource) {
-      setSeekThumbnailUri(null);
-      setSeekThumbnailLoading(false);
-      return;
-    }
-
-    const memoryCacheKey = `${thumbnailSource}|${thumbnailHeadersKey}|${seekThumbnailSampleTimestampMs}`;
-    const memoryCachedUri =
-      seekThumbnailMemoryCache.current.get(memoryCacheKey);
-    if (memoryCachedUri) {
-      // Refresh insertion order so the bounded map behaves as an LRU cache.
-      seekThumbnailMemoryCache.current.delete(memoryCacheKey);
-      seekThumbnailMemoryCache.current.set(memoryCacheKey, memoryCachedUri);
-      setSeekThumbnailUri(memoryCachedUri);
-      setSeekThumbnailLoading(false);
-      return;
-    }
-
-    // Keep the last decoded frame visible while the next bucket is loading.
-    // Remote streams can take a few seconds to seek; clearing it here would
-    // make the preview look permanently empty during continuous scrubbing.
-    if (seekThumbnailRequestInFlight.current) return;
-
-    setSeekThumbnailLoading(true);
-    seekThumbnailRequestInFlight.current = true;
-    const thumbnailRequest = thumbnailModule
-      ? thumbnailModule.getThumbnail(
-          thumbnailSource,
-          seekThumbnailSampleTimestampMs,
-          thumbnailHeaders,
-          {
-            maxWidth: 320,
-            maxHeight: 180,
-            quality: 78,
-            cache: true,
-            contentType: thumbnailContentType,
-          },
-        )
-      : VideoThumbnails.getThumbnailAsync(thumbnailSource, {
-          time: seekThumbnailSampleTimestampMs,
-          quality: 0.78,
-          headers: thumbnailHeaders,
-        });
-
-    thumbnailRequest
-      .then(result => {
-        seekThumbnailMemoryCache.current.set(memoryCacheKey, result.uri);
-        if (seekThumbnailMemoryCache.current.size > 48) {
-          const oldestKey = seekThumbnailMemoryCache.current.keys().next().value;
-          if (oldestKey) {
-            seekThumbnailMemoryCache.current.delete(oldestKey);
-          }
-        }
-        if (seekThumbnailRequestId.current === requestId) {
-          setSeekThumbnailUri(result.uri);
-          setSeekThumbnailLoading(false);
-        }
-      })
-      .catch(thumbnailError => {
-        if (__DEV__) {
-          console.warn('Failed to generate seek thumbnail:', thumbnailError);
-        }
-        if (seekThumbnailRequestId.current === requestId) {
-          setSeekThumbnailLoading(false);
-        }
-      })
-      .finally(() => {
-        seekThumbnailRequestInFlight.current = false;
-      });
-  }, [
-    seeking,
-    seekThumbnailSampleTimestampMs,
-    thumbnailHeaders,
-    thumbnailHeadersKey,
-    thumbnailContentType,
-    thumbnailSource,
-  ]);
 
   // Keep track of previous source to prevent unnecessary resets
   const prevSourceUri = useRef(sourceUri);
@@ -1102,8 +908,6 @@ const AnimatedVideoPlayer = (
                   cachedPosition={cachedPosition}
                   seeking={seeking}
                   seekPreviewTime={seekPreviewTime}
-                  seekThumbnailUri={seekThumbnailUri}
-                  seekThumbnailLoading={seekThumbnailLoading}
                   seekSnapPosition={seekSnapPosition}
                   isFullscreen={isFullscreen}
                   disableFullscreen={disableFullscreen}

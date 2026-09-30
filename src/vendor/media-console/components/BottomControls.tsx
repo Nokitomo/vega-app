@@ -38,8 +38,6 @@ interface BottomControlsProps {
   cachedPosition: number;
   seeking: boolean;
   seekPreviewTime: number;
-  seekThumbnailUri: string | null;
-  seekThumbnailLoading: boolean;
   seekSnapPosition: number | null;
   skips?: SkipInterval[];
 }
@@ -67,8 +65,6 @@ export const BottomControls = ({
   cachedPosition,
   seeking,
   seekPreviewTime,
-  seekThumbnailUri,
-  seekThumbnailLoading,
   seekSnapPosition,
   skips,
 }: BottomControlsProps) => {
@@ -109,8 +105,6 @@ export const BottomControls = ({
       resetControlTimeout={resetControlTimeout}
       seeking={seeking}
       previewTime={seekPreviewTime}
-      thumbnailUri={seekThumbnailUri}
-      thumbnailLoading={seekThumbnailLoading}
       snapPosition={seekSnapPosition}
       skips={skips}
     />

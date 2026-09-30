@@ -1,12 +1,5 @@
 import React, {Dispatch, SetStateAction, useMemo, useState} from 'react';
-import {
-  ActivityIndicator,
-  View,
-  GestureResponderHandlers,
-  Image,
-  Pressable,
-  Text,
-} from 'react-native';
+import {View, GestureResponderHandlers, Pressable, Text} from 'react-native';
 import {styles} from './styles';
 import {formatTime} from '../../utils';
 import type {SkipInterval} from '../../../../lib/providers/types';
@@ -27,13 +20,11 @@ interface SeekbarProps {
   resetControlTimeout: () => void;
   seeking: boolean;
   previewTime: number;
-  thumbnailUri: string | null;
-  thumbnailLoading: boolean;
   snapPosition: number | null;
   skips?: SkipInterval[];
 }
 
-const PREVIEW_WIDTH = 160;
+const TIME_PREVIEW_WIDTH = 72;
 
 export const Seekbar = ({
   seekColor,
@@ -51,8 +42,6 @@ export const Seekbar = ({
   resetControlTimeout,
   seeking,
   previewTime,
-  thumbnailUri,
-  thumbnailLoading,
   snapPosition,
   skips,
 }: SeekbarProps) => {
@@ -62,8 +51,8 @@ export const Seekbar = ({
       Math.max(
         0,
         Math.min(
-          Math.max(0, trackWidth - PREVIEW_WIDTH),
-          seekerPosition - PREVIEW_WIDTH / 2,
+          Math.max(0, trackWidth - TIME_PREVIEW_WIDTH),
+          seekerPosition - TIME_PREVIEW_WIDTH / 2,
         ),
       ),
     [seekerPosition, trackWidth],
@@ -111,34 +100,17 @@ export const Seekbar = ({
         {...seekerPanHandlers}>
         {seeking && trackWidth > 0 ? (
           <View
-            style={[styles.preview, {left: previewLeft}]}
+            style={[styles.timePreview, {left: previewLeft}]}
             pointerEvents="none">
-            {thumbnailUri ? (
-              <Image
-                key={thumbnailUri}
-                source={{uri: thumbnailUri}}
-                style={styles.previewImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.previewPlaceholder} />
-            )}
-            {thumbnailLoading ? (
-              <View style={styles.previewLoading}>
-                <ActivityIndicator size="small" color="#fff" />
-              </View>
-            ) : null}
-            <View style={styles.previewTimestampContainer}>
-              <Text style={styles.previewTimestamp}>
-                {formatTime({
-                  duration,
-                  time: previewTime,
-                  showDuration,
-                  showHours,
-                  showTimeRemaining: false,
-                })}
-              </Text>
-            </View>
+            <Text style={styles.timePreviewText}>
+              {formatTime({
+                duration,
+                time: previewTime,
+                showDuration,
+                showHours,
+                showTimeRemaining: false,
+              })}
+            </Text>
           </View>
         ) : null}
         <View

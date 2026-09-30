@@ -285,12 +285,6 @@ export interface VideoPlayerProps extends ReactVideoProps {
   enable2xGesture?: boolean;
 
   /**
-   * Provider-declared media type used only by the seek thumbnail extractor.
-   * This avoids changing the source consumed by the playback component.
-   */
-  thumbnailContentType?: string;
-
-  /**
    * is Player Locked
    *
    * @default false

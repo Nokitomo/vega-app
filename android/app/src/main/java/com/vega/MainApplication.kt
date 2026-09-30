@@ -33,7 +33,6 @@ class MainApplication : Application(), ReactApplication {
               add(SafCopyPackage())
               add(DeviceAbiPackage())
               add(VegaDnsPackage())
-              add(VideoThumbnailPackage())
               if (BuildConfig.VEGA_USER_WEBVIEW_ENABLED) {
                 try {
                   val packageClass = Class.forName("com.vega.VegaGeckoViewPackage")
