@@ -15,6 +15,12 @@ import {ScrollView} from 'react-native';
 import {Dropdown} from 'react-native-element-dropdown';
 import {TextTracks, TextTrackType} from 'react-native-video';
 import {useTranslation} from 'react-i18next';
+import {
+  getOpenSubtitlesApiKey,
+  getOpenSubtitlesDownloadUrl,
+  OpenSubtitlesResult,
+  searchOpenSubtitles,
+} from '../lib/services/openSubtitles';
 
 const SearchSubtitles = ({
   searchQuery,
@@ -30,71 +36,54 @@ const SearchSubtitles = ({
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [season, setSeason] = useState('');
   const [episode, setEpisode] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState<OpenSubtitlesResult[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [subId, setSubId] = useState('eng');
+  const [subId, setSubId] = useState('en');
 
   const subLanguageIds = useMemo(
     () => [
-      {name: t('English'), id: 'eng'},
-      {name: t('Spanish'), id: 'spa'},
-      {name: t('French'), id: 'fre'},
-      {name: t('German'), id: 'ger'},
-      {name: t('Italian'), id: 'ita'},
-      {name: t('Portuguese'), id: 'por'},
-      {name: t('Russian'), id: 'rus'},
-      {name: t('Chinese'), id: 'chi'},
-      {name: t('Japanese'), id: 'jpn'},
-      {name: t('Korean'), id: 'kor'},
-      {name: t('Arabic'), id: 'ara'},
-      {name: t('Hindi'), id: 'hin'},
-      {name: t('Dutch'), id: 'dut'},
-      {name: t('Swedish'), id: 'swe'},
-      {name: t('Polish'), id: 'pol'},
-      {name: t('Turkish'), id: 'tur'},
-      {name: t('Danish'), id: 'dan'},
-      {name: t('Norwegian'), id: 'nor'},
-      {name: t('Finnish'), id: 'fin'},
-      {name: t('Vietnamese'), id: 'vie'},
-      {name: t('Indonesian'), id: 'ind'},
+      {name: t('English'), id: 'en'},
+      {name: t('Spanish'), id: 'es'},
+      {name: t('French'), id: 'fr'},
+      {name: t('German'), id: 'de'},
+      {name: t('Italian'), id: 'it'},
+      {name: t('Portuguese'), id: 'pt'},
+      {name: t('Russian'), id: 'ru'},
+      {name: t('Chinese'), id: 'zh'},
+      {name: t('Japanese'), id: 'ja'},
+      {name: t('Korean'), id: 'ko'},
+      {name: t('Arabic'), id: 'ar'},
+      {name: t('Hindi'), id: 'hi'},
+      {name: t('Dutch'), id: 'nl'},
+      {name: t('Swedish'), id: 'sv'},
+      {name: t('Polish'), id: 'pl'},
+      {name: t('Turkish'), id: 'tr'},
+      {name: t('Danish'), id: 'da'},
+      {name: t('Norwegian'), id: 'no'},
+      {name: t('Finnish'), id: 'fi'},
+      {name: t('Vietnamese'), id: 'vi'},
+      {name: t('Indonesian'), id: 'id'},
     ],
     [t],
   );
 
   const searchSubtitles = async () => {
     try {
+      if (!getOpenSubtitlesApiKey()) {
+        setError(
+          t('Configure your OpenSubtitles API key in Subtitle Preferences.'),
+        );
+        return;
+      }
       setLoading(true);
-      console.log(
-        'openSubtitles',
-        `https://rest.opensubtitles.org/search${
-          episode ? '/episode-' + episode : ''
-        }${
-          (searchQuery?.startsWith('tt') ? '/imdbid-' : '/query-') +
-          encodeURIComponent(searchQuery.toLocaleLowerCase())
-        }${season ? '/season-' + season : ''}${
-          subId ? '/sublanguageid-' + subId : ''
-        }`,
-      );
-      const response = await fetch(
-        `https://rest.opensubtitles.org/search${
-          episode ? '/episode-' + episode : ''
-        }${
-          (searchQuery?.startsWith('tt') ? '/imdbid-' : '/query-') +
-          encodeURIComponent(searchQuery.toLocaleLowerCase())
-        }${season ? '/season-' + season : ''}${
-          subId ? '/sublanguageid-' + subId : ''
-        }`,
-        {
-          method: 'GET',
-          headers: {
-            'x-user-agent': 'VLSub 0.10.2',
-          },
-        },
-      );
-      console.log('openSubtitles⭐', response);
-      const data = await response.json();
-      setLoading(false);
+      setError('');
+      const data = await searchOpenSubtitles({
+        query: searchQuery,
+        language: subId,
+        season,
+        episode,
+      });
       if (data?.length === 0) {
         setError(t('No Results Found'));
         setSearchResults([]);
@@ -102,10 +91,32 @@ const SearchSubtitles = ({
       }
       setSearchResults(data);
     } catch (e: any) {
-      console.log('openSubtitles err', e);
-      setLoading(false);
-      setError(e?.message);
+      setError(e?.message || t('Error fetching subtitles'));
       ToastAndroid.show(t('Error fetching subtitles'), ToastAndroid.SHORT);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectSubtitle = async (result: OpenSubtitlesResult) => {
+    try {
+      setLoading(true);
+      const uri = await getOpenSubtitlesDownloadUrl(result.fileId);
+      setExternalSubs(prev => [
+        {
+          type: TextTrackType.SUBRIP,
+          language: result.language,
+          title: [result.release, result.uploader].filter(Boolean).join(' '),
+          uri,
+        },
+        ...prev,
+      ]);
+      setSearchModalVisible(false);
+    } catch (e: any) {
+      setError(e?.message || t('Unable to download subtitle.'));
+      ToastAndroid.show(t('Unable to download subtitle.'), ToastAndroid.SHORT);
+    } finally {
+      setLoading(false);
     }
   };
   return (
@@ -208,42 +219,28 @@ const SearchSubtitles = ({
                 <ActivityIndicator size="large" color={primary} />
               </View>
             ) : (
-              searchResults.map((result: any) => (
+              searchResults.map(result => (
                 <TouchableOpacity
-                  key={result?.IDSubtitleFile}
+                  key={`${result.id}:${result.fileId}`}
                   className="flex-row justify- items-center gap-x-4 p-2 my-1 border border-b border-white/10 rounded-md"
-                  onPress={() => {
-                    setSearchModalVisible(false);
-                    setExternalSubs(prev => [
-                      {
-                        type: TextTrackType.SUBRIP,
-                        language: result?.ISO639,
-                        title:
-                          result?.InfoReleaseGroup + ' ' + result?.UserNickName,
-                        uri: result?.SubDownloadLink?.replace('.gz', ''),
-                      },
-                      ...prev,
-                    ]);
-                  }}>
+                  disabled={loading}
+                  onPress={() => selectSubtitle(result)}>
                   <Text className="text-white text-lg font-semibold capitalize">
-                    {result?.SubLanguageID}
+                    {result.language}
                   </Text>
                   <Text className="text-white text-base">
-                    {result?.MovieName?.trim()}
+                    {result.title.trim()}
                   </Text>
                   <Text className="text-white text-lg">
-                    {Number(result?.SeriesSeason) > 0
-                      ? `S${result?.SeriesSeason}`
-                      : ''}
+                    {Number(result.season) > 0 ? `S${result.season}` : ''}
                   </Text>
                   <Text className="text-white text-lg">
-                    {Number(result?.SeriesEpisode) > 0
-                      ? `E${result?.SeriesEpisode}`
-                      : ''}
+                    {Number(result.episode) > 0 ? `E${result.episode}` : ''}
                   </Text>
                   <Text className="text-white text-xs italic">
-                    {result?.InfoReleaseGroup + ' '}
-                    {result?.UserNickName}
+                    {[result.release, result.uploader]
+                      .filter(Boolean)
+                      .join(' ')}
                   </Text>
                 </TouchableOpacity>
               ))

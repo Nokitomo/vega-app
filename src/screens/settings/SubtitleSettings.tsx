@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   TouchableNativeFeedback,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import React from 'react';
 import {startActivityAsync, ActivityAction} from 'expo-intent-launcher';
@@ -12,6 +13,10 @@ import {settingsStorage} from '../../lib/storage';
 import useThemeStore from '../../lib/zustand/themeStore';
 import {Feather, Entypo} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
+import {
+  getOpenSubtitlesApiKey,
+  setOpenSubtitlesApiKey,
+} from '../../lib/services/openSubtitles';
 
 const SubtitlePreference = () => {
   const [fontSize, setFontSize] = React.useState(
@@ -23,6 +28,10 @@ const SubtitlePreference = () => {
   const [bottomElevation, setBottomElevation] = React.useState(
     settingsStorage.getSubtitleBottomPadding(),
   );
+  const [openSubtitlesApiKey, setOpenSubtitlesApiKeyValue] = React.useState(
+    getOpenSubtitlesApiKey(),
+  );
+  const [apiKeySaved, setApiKeySaved] = React.useState(false);
   const {primary} = useThemeStore();
   const {t} = useTranslation();
 
@@ -152,6 +161,42 @@ const SubtitlePreference = () => {
             </View>
           </TouchableNativeFeedback>
 
+          <View className="p-4 border-b border-[#262626]">
+            <Text className="text-white text-base">
+              {t('OpenSubtitles API key')}
+            </Text>
+            <Text className="text-gray-400 text-sm mt-1 mb-3">
+              {t(
+                'Required for online subtitle search. Create a key in your OpenSubtitles account.',
+              )}
+            </Text>
+            <TextInput
+              value={openSubtitlesApiKey}
+              onChangeText={value => {
+                setOpenSubtitlesApiKeyValue(value);
+                setApiKeySaved(false);
+              }}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={t('Enter your OpenSubtitles API key')}
+              placeholderTextColor="#6b7280"
+              className="text-white bg-[#262626] rounded-lg px-3 py-3"
+            />
+            <TouchableOpacity
+              className="self-end mt-3 px-4 py-2 rounded-lg"
+              style={{backgroundColor: primary}}
+              onPress={() => {
+                setOpenSubtitlesApiKey(openSubtitlesApiKey);
+                setOpenSubtitlesApiKeyValue(openSubtitlesApiKey.trim());
+                setApiKeySaved(true);
+              }}>
+              <Text className="text-white font-semibold">
+                {apiKeySaved ? t('Saved') : t('Save')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* reset */}
           <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
             <Text className="text-white text-base">
@@ -162,9 +207,12 @@ const SubtitlePreference = () => {
                 settingsStorage.setSubtitleFontSize(16);
                 settingsStorage.setSubtitleOpacity(1);
                 settingsStorage.setSubtitleBottomPadding(10);
+                setOpenSubtitlesApiKey('');
                 setFontSize(16);
                 setOpacity(1);
                 setBottomElevation(10);
+                setOpenSubtitlesApiKeyValue('');
+                setApiKeySaved(false);
               }}>
               <View className="w-32 flex-row items-center justify-center">
                 <Text className="text-white text-base bg-[#262626] px-3 py-1 rounded-md text-center">

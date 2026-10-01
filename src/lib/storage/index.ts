@@ -3,6 +3,7 @@ export {
   StorageService,
   mainStorage,
   cacheStorage,
+  secureStorage,
   providerKvStorage,
 } from './StorageService';
 

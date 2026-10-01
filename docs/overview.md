@@ -3,11 +3,14 @@
 Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e costruita con React Native + Expo (SDK 54) e integra un sistema di provider esterni caricati dinamicamente. Il web non e supportato.
 
 ## Obiettivo principale
+
 - Consentire all'utente di cercare contenuti, consultarne i dettagli e riprodurli.
 - Supportare watchlist, cronologia, download e riproduzione con player interno/esterno.
 
 ## Flussi principali utente
-1) Home
+
+1. Home
+
 - Visualizza contenuti in base al provider attivo.
 - Slider per categorie e hero in evidenza.
 - Le card per episodi recenti e calendario mostrano il badge "Ep. X" quando disponibile.
@@ -23,14 +26,16 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Ogni slider in home gestisce loading/error in modo indipendente; un refresh di una sezione non blocca le altre gia mostrate.
 - L'apertura swipe del drawer provider in Home usa un edge-handle dedicato sul bordo sinistro (16px) con gesture custom; il drawer nativo non ascolta piu l'apertura globale quando e chiuso. Durante i drag orizzontali degli slider il drawer resta temporaneamente bloccato e viene riabilitato con un piccolo delay.
 
-2) Ricerca
+2. Ricerca
+
 - Ricerca per titolo o filtro.
 - La schermata Search usa OMDb per suggerimenti rapidi e salva la cronologia locale.
 - Risultati raggruppati per provider.
 - La ricerca globale usa cache LRU (max 10 query): resta valida mentre la tab Search e attiva, poi scade dopo 10 minuti dall'uscita.
 - La cache della ricerca globale include un fingerprint dei provider installati (value/version/lastUpdated) e una TTL interna: se cambiano provider o versione, la stessa query viene ricalcolata evitando risultati parziali.
 
-3) Dettaglio contenuto (Info)
+3. Dettaglio contenuto (Info)
+
 - Metadati, poster, trama e accesso alle sorgenti/episodi.
 - Supporta vista Episodi e vista Correlati.
 - Include controlli di chiusura e ritorno al contenuto precedente.
@@ -49,7 +54,8 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Per AnimeUnity il titolo mostrato in app usa sempre quello del provider.
 - In Info, per AnimeUnity doppiati, viene mostrata la dicitura "Doppiato in italiano" sotto il titolo usando info.extra.flags.dub.
 
-4) Player
+4. Player
+
 - Riproduzione video con supporto a qualita, sottotitoli, controlli.
 - L'elenco episodi si apre dal pulsante laterale del player come drawer animato, mostra thumbnail/sinossi quando fornite dal provider e conserva il caricamento on-demand delle stagioni.
 - La pressione prolungata sull'area video abilita temporaneamente la velocita 2x solo se la relativa preferenza e attiva; usa un riconoscitore dedicato, indipendente dalla preferenza per gli swipe verticali, e al rilascio ripristina la velocita precedente.
@@ -70,7 +76,8 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Per usare WVC, l'app Web Video Caster deve essere installata sul telefono. In caso contrario l'app prova ad aprire lo store.
 - L'app resta in verticale fuori dal player; il player blocca l'orizzontale.
 
-5) Watchlist e Cronologia
+5. Watchlist e Cronologia
+
 - Salva e consulta elementi preferiti e gia visti.
 - La sezione Continue Watching mostra il badge episodio quando disponibile, fino a 30 elementi unici recenti.
 - In Home, Continue Watching espone il comando "Altro" che apre la schermata WatchHistory.
@@ -79,21 +86,31 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - La pulizia della cronologia rimuove anche i progressi salvati.
 - La rimozione di un titolo dalla cronologia azzera anche i progressi episodio.
 
-6) Download
+6. Download
+
 - Download locale con stato e gestione file.
 - Per AnimeUnity il download in-app usa solo il server "AnimeUnity Download"; i server HLS non supportati vengono esclusi.
 - Nella lista episodi di una serie (da Downloads) e possibile selezionare ed eliminare singoli episodi.
 
 ## Estensioni/Provider
+
 - I provider sono moduli JS remoti che forniscono catalogo, metadata e stream.
 - Il sistema supporta aggiornamenti automatici e installazione/rimozione.
 - Per AnimeUnity, se un'immagine fallisce il caricamento in lista, viene cercato il poster dai metadata.
 - Alcuni provider (es. AnimeUnity) usano una lista Pastebin per risolvere il base URL; i fallback restano nel provider.
 
 ## Persistenza dati
+
 - Impostazioni utente, watchlist, cronologia e download vengono salvati in storage locale MMKV.
 
+## Sottotitoli online
+
+- Il player cerca i sottotitoli tramite la REST API moderna di OpenSubtitles.com.
+- La chiave API personale si configura in `Impostazioni > Preferenze sottotitoli` ed e salvata nello storage MMKV cifrato dell'app.
+- La ricerca supporta titolo o ID IMDb, lingua, stagione ed episodio; il link temporaneo del file viene richiesto solo quando l'utente seleziona un risultato.
+
 ## Lingua e localizzazione (i18n)
+
 - Lingue supportate: inglese e italiano (selezione in Preferenze).
 - Al primo avvio, la lingua predefinita e italiano.
 - Le stringhe UI usano `react-i18next` con chiavi in `src/i18n/en.json` e `src/i18n/it.json`.

@@ -49,7 +49,7 @@ export class StorageService implements IStorageService {
   // Boolean operations
   getBool(key: string, defaultValue?: boolean): boolean | null {
     const value = this.storage.getBool(key);
-    return value == null ? defaultValue ?? null : value;
+    return value == null ? (defaultValue ?? null) : value;
   }
 
   setBool(key: string, value: boolean): void {
@@ -129,6 +129,10 @@ export class StorageService implements IStorageService {
 // Create and export default instances
 export const mainStorage: IStorageService = new StorageService();
 export const cacheStorage: IStorageService = new StorageService('cache');
+export const secureStorage: IStorageService = new StorageService(
+  'secure',
+  true,
+);
 export const providerKvStorage: IStorageService = new StorageService(
   'provider_kv',
   true,
