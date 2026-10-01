@@ -384,7 +384,16 @@ const SeasonList: React.FC<SeasonListProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [aniSkipMalId, contentIds, metaTitle, showFillerLabels, type]);
+  }, [
+    aniSkipMalId,
+    contentIds?.anilistId,
+    contentIds?.imdbId,
+    contentIds?.malId,
+    contentIds?.tmdbId,
+    metaTitle,
+    showFillerLabels,
+    type,
+  ]);
   const {addItem, updatePlaybackInfo} = useWatchHistoryStore(state => state);
   const {fetchStreams} = useStreamData();
   const resolveTitle = useCallback(

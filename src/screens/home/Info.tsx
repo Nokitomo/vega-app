@@ -43,6 +43,7 @@ import type {
 import {selectArtworkCandidates} from '../../lib/services/artworkSelection';
 import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
 import {resolveWebViewLink} from '../../lib/utils/providerLinks';
+import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
 import RemoteLogo from '../../components/RemoteLogo';
 // import {BlurView} from 'expo-blur';
 
@@ -115,6 +116,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     error,
     refetch,
   } = useContentDetails(activeLink, providerValue);
+  const animeExternalIds = useMemo(
+    () => resolveAnimeExternalIds(info?.extra?.ids),
+    [info?.extra?.ids],
+  );
 
   // UI state
   const [threeDotsMenuOpen, setThreeDotsMenuOpen] = useState(false);
@@ -242,8 +247,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const hasAnimeExternalIds = useMemo(
     () =>
       providerValue === 'animeunity' &&
-      (!!info?.extra?.ids?.malId || !!info?.extra?.ids?.anilistId),
-    [providerValue, info?.extra?.ids?.malId, info?.extra?.ids?.anilistId],
+      (!!animeExternalIds.malId || !!animeExternalIds.anilistId),
+    [animeExternalIds.anilistId, animeExternalIds.malId, providerValue],
   );
   const allowProviderStudio = useMemo(() => {
     if (!allowProviderMetadata || !info?.studio) {
@@ -1137,14 +1142,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           refreshVersion={episodeRefreshVersion}
                           providerValue={providerValue}
                           aniSkipMalId={
-                            Number.isFinite(Number(info?.extra?.ids?.malId)) &&
-                            Number(info?.extra?.ids?.malId) > 0
-                              ? Number(info?.extra?.ids?.malId)
-                              : undefined
+                            animeExternalIds.malId
                           }
                           contentIds={{
-                            malId: info?.extra?.ids?.malId,
-                            anilistId: info?.extra?.ids?.anilistId,
+                            malId: animeExternalIds.malId,
+                            anilistId: animeExternalIds.anilistId,
                             imdbId:
                               info?.imdbId ||
                               info?.extra?.ids?.imdbShowIds?.[0] ||

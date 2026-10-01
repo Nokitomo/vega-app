@@ -32,6 +32,7 @@ const Account = ({}: Props): React.JSX.Element => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [expandedService, setExpandedService] = useState<string>();
 
   useFocusEffect(
     useCallback(() => {
@@ -71,8 +72,18 @@ const Account = ({}: Props): React.JSX.Element => {
       contentContainerStyle={{padding: 20, paddingTop: 28}}>
       <Text className="mb-6 text-2xl font-bold text-white">{t('Account')}</Text>
 
-      <View className="overflow-hidden rounded-xl bg-[#1A1A1A] p-4">
-        <View className="mb-4 flex-row items-center">
+      <View className="overflow-hidden rounded-xl bg-[#1A1A1A]">
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{expanded: expandedService === 'animeskip'}}
+          className={`flex-row items-center p-4 ${
+            expandedService === 'animeskip' ? 'border-b border-[#262626]' : ''
+          }`}
+          onPress={() =>
+            setExpandedService(current =>
+              current === 'animeskip' ? undefined : 'animeskip',
+            )
+          }>
           <View
             className="mr-3 h-11 w-11 items-center justify-center rounded-full"
             style={{backgroundColor: `${primary}33`}}>
@@ -90,68 +101,91 @@ const Account = ({}: Props): React.JSX.Element => {
               {session ? t('Connected') : t('Not connected')}
             </Text>
           </View>
-        </View>
+          <MaterialCommunityIcons
+            name={
+              expandedService === 'animeskip' ? 'chevron-up' : 'chevron-down'
+            }
+            size={24}
+            color="#999"
+          />
+        </TouchableOpacity>
 
-        {session ? (
-          <>
-            <Text className="text-base text-white">{session.username}</Text>
-            <Text className="mb-5 text-sm text-white/60">{session.email}</Text>
-            <TouchableOpacity
-              className="items-center rounded-lg bg-[#2A2A2A] p-3"
-              onPress={handleLogout}>
-              <Text className="font-semibold text-white">{t('Log out')}</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text className="mb-4 text-sm leading-5 text-white/60">
-              {t(
-                'Sign in to use AnimeSkip when the public skip databases have no result.',
-              )}
-            </Text>
-            <TextInput
-              value={username}
-              onChangeText={setUsername}
-              editable={!loading}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder={t('Username or email')}
-              placeholderTextColor="#777"
-              className="mb-3 rounded-lg bg-[#262626] px-4 py-3 text-white"
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-              secureTextEntry
-              placeholder={t('Password')}
-              placeholderTextColor="#777"
-              className="mb-4 rounded-lg bg-[#262626] px-4 py-3 text-white"
-            />
-            <TouchableOpacity
-              className="mb-3 min-h-12 items-center justify-center rounded-lg"
-              style={{backgroundColor: primary, opacity: loading ? 0.7 : 1}}
-              disabled={loading}
-              onPress={handleLogin}>
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text className="font-semibold text-white">{t('Log in')}</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="items-center rounded-lg bg-[#2A2A2A] p-3"
-              disabled={loading}
-              onPress={() =>
-                Linking.openURL(animeSkipAccountUrl).catch(() =>
-                  Alert.alert(t('AnimeSkip'), t('Unable to open account page.')),
-                )
-              }>
-              <Text className="font-semibold text-white">
-                {t('Create new account')}
-              </Text>
-            </TouchableOpacity>
-          </>
+        {expandedService === 'animeskip' && (
+          <View className="p-4">
+            {session ? (
+              <>
+                <Text className="text-base text-white">{session.username}</Text>
+                <Text className="mb-5 text-sm text-white/60">
+                  {session.email}
+                </Text>
+                <TouchableOpacity
+                  className="items-center rounded-lg bg-[#2A2A2A] p-3"
+                  onPress={handleLogout}>
+                  <Text className="font-semibold text-white">
+                    {t('Log out')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text className="mb-4 text-sm leading-5 text-white/60">
+                  {t(
+                    'Sign in to use AnimeSkip when the public skip databases have no result.',
+                  )}
+                </Text>
+                <TextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  editable={!loading}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder={t('Username or email')}
+                  placeholderTextColor="#777"
+                  className="mb-3 rounded-lg bg-[#262626] px-4 py-3 text-white"
+                />
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading}
+                  secureTextEntry
+                  placeholder={t('Password')}
+                  placeholderTextColor="#777"
+                  className="mb-4 rounded-lg bg-[#262626] px-4 py-3 text-white"
+                />
+                <TouchableOpacity
+                  className="mb-3 min-h-12 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor: primary,
+                    opacity: loading ? 0.7 : 1,
+                  }}
+                  disabled={loading}
+                  onPress={handleLogin}>
+                  {loading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="font-semibold text-white">
+                      {t('Log in')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="items-center rounded-lg bg-[#2A2A2A] p-3"
+                  disabled={loading}
+                  onPress={() =>
+                    Linking.openURL(animeSkipAccountUrl).catch(() =>
+                      Alert.alert(
+                        t('AnimeSkip'),
+                        t('Unable to open account page.'),
+                      ),
+                    )
+                  }>
+                  <Text className="font-semibold text-white">
+                    {t('Create new account')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         )}
       </View>
     </ScrollView>

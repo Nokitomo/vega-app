@@ -57,6 +57,8 @@ File: app.config.js
 - `Preferences -> Player -> Filler episodes` abilita la dicitura `Filler` nella lista episodi; il valore predefinito e disattivato.
 - I servizi di timestamp e il database filler non richiedono chiavi configurate nell'app.
 - AnimeSkip richiede un account personale configurabile da `Settings -> Account`; senza login il relativo resolver viene ignorato.
+- In `Settings -> Account` ogni servizio e inizialmente compatto; toccando la riga AnimeSkip si aprono stato, login o logout e collegamento per creare un account.
+- All'apertura di uno stream il player preferisce l'audio italiano, poi inglese e infine la prima traccia disponibile. Attiva automaticamente solo sottotitoli italiani marcati `forced`; in loro assenza i sottotitoli partono disabilitati.
 
 ## Signing release
 - La build Android legge prima `android/signing.local.properties` e, solo come fallback, le variabili d'ambiente legacy (`MYAPP_UPLOAD_*`).

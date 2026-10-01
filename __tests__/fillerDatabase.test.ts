@@ -11,7 +11,7 @@ const database = parseFillerDatabase(
         mal_id: 21,
         anilist_id: 30013,
         imdb_id: 'tt0388629',
-        season: {tmdb: 37854},
+        themoviedb_id: 37854,
       },
       show: {title: 'One Piece', filler: [54, 55], mixedCanon: []},
     },
@@ -28,6 +28,12 @@ describe('filler database', () => {
   it('falls back to a normalized title', () => {
     expect(
       [...findFillerEpisodes(database, {title: 'One-Piece!'})],
+    ).toEqual([54, 55]);
+  });
+
+  it('matches the TMDB identifier used at the root of current records', () => {
+    expect(
+      [...findFillerEpisodes(database, {title: 'Other', tmdbId: 37854})],
     ).toEqual([54, 55]);
   });
 

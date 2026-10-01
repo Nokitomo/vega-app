@@ -104,6 +104,11 @@ import {
   VideoSkipStamp,
   VideoSkipType,
 } from '../../lib/services/videoSkip';
+import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
+import {
+  pickInitialAudioTrack,
+  pickItalianForcedSubtitle,
+} from '../../lib/services/playerTrackSelection';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -173,7 +178,8 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Player ref
   const playerRef = useRef<VideoRef>(null!);
-  const hasSetInitialTracksRef = useRef(false);
+  const hasSetInitialAudioTrackRef = useRef(false);
+  const hasSetInitialTextTrackRef = useRef(false);
   const loadedDurationRef = useRef(0);
   const streamRetryRef = useRef({
     retryKey: '',
@@ -430,6 +436,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     setSelectedAudioTrackIndex,
     setSelectedTextTrackIndex,
     setSelectedQualityIndex,
+    setAudioTracks,
     setTextTracks,
     processAudioTracks,
     processVideoTracks,
@@ -615,9 +622,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     );
   }, [mergedTextTracks, selectedTextTrackIndex, t]);
   const skipMalId = useMemo(() => {
-    const raw = skipInfo?.extra?.ids?.malId;
-    return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
-  }, [skipInfo?.extra?.ids?.malId]);
+    return resolveAnimeExternalIds(skipInfo?.extra?.ids).malId;
+  }, [skipInfo?.extra?.ids]);
   const skipImdbId = useMemo(
     () =>
       skipInfo?.imdbId ||
@@ -954,7 +960,8 @@ const Player = ({route}: Props): React.JSX.Element => {
         return false;
       }
 
-      hasSetInitialTracksRef.current = false;
+      hasSetInitialAudioTrackRef.current = false;
+      hasSetInitialTextTrackRef.current = false;
       navigation.replace('Player', {
         linkIndex: nextIndex,
         episodeList: normalizedEpisodes,
@@ -2576,9 +2583,18 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Reset track selections when stream changes
   useEffect(() => {
+    hasSetInitialAudioTrackRef.current = false;
+    hasSetInitialTextTrackRef.current = false;
+    setSelectedAudioTrack({
+      type: SelectedTrackType.INDEX,
+      value: 0,
+    });
+    setSelectedTextTrack({type: SelectedTrackType.DISABLED});
     setSelectedAudioTrackIndex(0);
     setSelectedTextTrackIndex(1000);
     setSelectedQualityIndex(1000);
+    setAudioTracks([]);
+    setTextTracks([]);
     resetVideoTracks();
   }, [
     selectedStream,
@@ -2586,6 +2602,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     setSelectedAudioTrackIndex,
     setSelectedTextTrackIndex,
     setSelectedQualityIndex,
+    setAudioTracks,
+    setTextTracks,
   ]);
 
   // Initialize search query
@@ -2688,47 +2706,47 @@ const Player = ({route}: Props): React.JSX.Element => {
     provider.value,
   ]);
 
-  // Set last selected audio and subtitle tracks
+  // Select predictable startup tracks for each stream.
   useEffect(() => {
-    if (hasSetInitialTracksRef.current) {
+    if (audioTracks.length === 0) {
+      hasSetInitialAudioTrackRef.current = false;
       return;
     }
-
-    const lastAudioTrack = cacheStorage.getString('lastAudioTrack') || 'auto';
-    const lastTextTrack = cacheStorage.getString('lastTextTrack') || 'auto';
-
-    const audioTrackIndex = audioTracks.findIndex(
-      track => track.language === lastAudioTrack,
-    );
-    const textTrackIndex = textTracks.findIndex(
-      track => track.language === lastTextTrack,
-    );
-
-    if (audioTrackIndex !== -1) {
+    if (hasSetInitialAudioTrackRef.current) {
+      return;
+    }
+    const selection = pickInitialAudioTrack(audioTracks);
+    if (selection) {
+      hasSetInitialAudioTrackRef.current = true;
       setSelectedAudioTrack({
         type: SelectedTrackType.INDEX,
-        value: audioTrackIndex,
+        value: selection.nativeIndex,
       });
-      setSelectedAudioTrackIndex(audioTrackIndex);
+      setSelectedAudioTrackIndex(selection.listIndex);
     }
+  }, [audioTracks, setSelectedAudioTrackIndex]);
 
-    if (textTrackIndex !== -1) {
+  useEffect(() => {
+    if (textTracks.length === 0) {
+      hasSetInitialTextTrackRef.current = false;
+      return;
+    }
+    if (hasSetInitialTextTrackRef.current) {
+      return;
+    }
+    hasSetInitialTextTrackRef.current = true;
+    const selection = pickItalianForcedSubtitle(textTracks);
+    if (selection) {
       setSelectedTextTrack({
         type: SelectedTrackType.INDEX,
-        value: textTrackIndex,
+        value: selection.nativeIndex,
       });
-      setSelectedTextTrackIndex(textTrackIndex);
+      setSelectedTextTrackIndex(selection.listIndex);
+      return;
     }
-
-    if (audioTracks.length > 0 && textTracks.length > 0) {
-      hasSetInitialTracksRef.current = true;
-    }
-  }, [
-    textTracks,
-    audioTracks,
-    setSelectedAudioTrackIndex,
-    setSelectedTextTrackIndex,
-  ]);
+    setSelectedTextTrack({type: SelectedTrackType.DISABLED});
+    setSelectedTextTrackIndex(1000);
+  }, [textTracks, setSelectedTextTrackIndex]);
 
   // Cleanup timer on unmount
   useEffect(() => {

@@ -15,6 +15,7 @@ type FillerMedia = {
     imdb_id?: string;
     kitsu_id?: number;
     mal_id?: number;
+    themoviedb_id?: number;
     season?: {tmdb?: number};
   };
   show: {title: string; filler: number[]};
@@ -78,7 +79,6 @@ const downloadLatest = async (): Promise<FillerMedia[] | undefined> => {
   if (cached && Date.now() - lastCheck < CHECK_INTERVAL_MS) {
     return cached;
   }
-  mainStorage.setString(LAST_CHECK_KEY, String(Date.now()));
   try {
     const metadataResponse = await fetch(METADATA_URL, {
       headers: {Accept: 'application/vnd.github+json'},
@@ -104,9 +104,15 @@ const downloadLatest = async (): Promise<FillerMedia[] | undefined> => {
       throw new Error('Unexpected filler database URL');
     }
     if (cached && mainStorage.getString(SHA_KEY) === metadata.sha) {
+      mainStorage.setString(LAST_CHECK_KEY, String(Date.now()));
       return cached;
     }
-    const databaseResponse = await fetch(downloadUrl.toString());
+    let databaseResponse = await fetch(downloadUrl.toString());
+    if (!databaseResponse.ok) {
+      databaseResponse = await fetch(METADATA_URL, {
+        headers: {Accept: 'application/vnd.github.raw+json'},
+      });
+    }
     if (!databaseResponse.ok) {
       throw new Error(`Filler database HTTP ${databaseResponse.status}`);
     }
@@ -117,6 +123,7 @@ const downloadLatest = async (): Promise<FillerMedia[] | undefined> => {
     const parsed = parseFillerDatabase(raw);
     mainStorage.setString(CACHE_KEY, raw);
     mainStorage.setString(SHA_KEY, metadata.sha);
+    mainStorage.setString(LAST_CHECK_KEY, String(Date.now()));
     memoryDatabase = parsed;
     return parsed;
   } catch (error) {
@@ -133,7 +140,11 @@ export const findFillerEpisodes = (
     database.find(item => item.mapping?.anilist_id === lookup.anilistId) ||
     database.find(item => item.mapping?.kitsu_id === lookup.kitsuId) ||
     database.find(item => !!lookup.imdbId && item.mapping?.imdb_id === lookup.imdbId) ||
-    database.find(item => item.mapping?.season?.tmdb === lookup.tmdbId) ||
+    database.find(
+      item =>
+        item.mapping?.themoviedb_id === lookup.tmdbId ||
+        item.mapping?.season?.tmdb === lookup.tmdbId,
+    ) ||
     database.find(item => normalizeTitle(item.show.title) === normalizeTitle(lookup.title));
   return new Set(media?.show.filler || []);
 };

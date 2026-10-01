@@ -20,6 +20,7 @@ import {
 } from '../services/animeArtwork';
 import {fetchAniListBanner} from '../services/animeMeta';
 import {selectArtworkCandidates} from '../services/artworkSelection';
+import {resolveAnimeExternalIds} from '../providers/externalIds';
 
 export interface HomePageData {
   title: string;
@@ -632,17 +633,18 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         return merged;
       };
 
+      const animeExternalIds = resolveAnimeExternalIds(info.extra?.ids);
       const metaKey = buildEnhancedMetaKey({
         imdbId: providerValue === 'animeunity' ? undefined : info.imdbId,
         type: providerValue === 'animeunity' ? undefined : info.type,
-        malId: info.extra?.ids?.malId,
-        anilistId: info.extra?.ids?.anilistId,
+        malId: animeExternalIds.malId,
+        anilistId: animeExternalIds.anilistId,
       });
       const artworkSources = info?.extra?.artworkSources;
       const needsAnimeArtworkFallback =
         providerValue === 'animeunity' &&
         shouldFetchAniListBanner({
-          anilistId: info.extra?.ids?.anilistId,
+          anilistId: animeExternalIds.anilistId,
           backgroundSource: artworkSources?.background,
         });
 
@@ -655,14 +657,14 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
             providerValue === 'animeunity'
               ? {
                   banner: await fetchAniListBanner(
-                    Number(info.extra?.ids?.anilistId),
+                    Number(animeExternalIds.anilistId),
                   ),
                 }
               : await fetchEnhancedMetadata({
                   imdbId: info.imdbId,
                   type: info.type,
-                  malId: info.extra?.ids?.malId,
-                  anilistId: info.extra?.ids?.anilistId,
+                  malId: animeExternalIds.malId,
+                  anilistId: animeExternalIds.anilistId,
                 });
           if (enhancedMeta && Object.keys(enhancedMeta).length > 0) {
             const merged = mergeHeroMeta(info, enhancedMeta);
