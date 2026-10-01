@@ -14,6 +14,7 @@ Store principali:
 Wrapper: src/lib/storage/StorageService.ts
 - mainStorage: storage principale
 - cacheStorage: storage secondario per cache
+- secureStorage: istanza MMKV cifrata per token e sessioni sensibili
 
 Manager specifici:
 - SettingsStorage: preferenze UI, feedback, player, telemetry, lingua app.
@@ -22,6 +23,8 @@ Manager specifici:
 - ProvidersStorage / ExtensionStorage: provider disponibili e installati.
 - CacheStorage: cache generica.
 - cacheStorage include cache home/hero con TTL settimanale.
+- Il database filler usa `mainStorage`: la copia valida non scade e un controllo SHA settimanale scarica il file solo quando cambia.
+- La sessione AnimeSkip usa `secureStorage`; la password non viene persistita.
 
 ## Principi
 - Stato volatile in Zustand, persistenza tramite MMKV.

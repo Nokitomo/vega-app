@@ -45,6 +45,7 @@ Nota: lo stack WatchHistory e raggiungibile da Settings.
 - Preferences
 - Downloads
 - Extensions
+- Account (login/logout AnimeSkip e collegamento alla creazione account)
 - WatchHistoryStack
 - SubTitlesPreferences
 

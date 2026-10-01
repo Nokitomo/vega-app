@@ -97,6 +97,14 @@ const Preferences = () => {
     settingsStorage.isSwipeGestureEnabled(),
   );
 
+  const [enableVideoSkip, setEnableVideoSkip] = useState<boolean>(
+    settingsStorage.isVideoSkipEnabled(),
+  );
+
+  const [showFillerEpisodes, setShowFillerEpisodes] = useState<boolean>(
+    settingsStorage.showFillerEpisodes(),
+  );
+
   const showTabBarLables = useUiSettingsStore(
     state => state.showTabBarLabels,
   );
@@ -492,6 +500,45 @@ const Preferences = () => {
                 onValueChange={val => {
                   settingsStorage.setBool('useExternalPlayer', val);
                   setOpenExternalPlayer(val);
+                }}
+              />
+            </View>
+
+            {/* Video skip database */}
+            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+              <View className="flex-1 pr-4">
+                <Text className="text-white text-base">
+                  {t('Skip timestamps')}
+                </Text>
+                <Text className="text-white/50 text-xs mt-1">
+                  {t('Show skip buttons from supported databases.')}
+                </Text>
+              </View>
+              <Switch
+                thumbColor={enableVideoSkip ? primary : 'gray'}
+                value={enableVideoSkip}
+                onValueChange={value => {
+                  settingsStorage.setVideoSkipEnabled(value);
+                  setEnableVideoSkip(value);
+                }}
+              />
+            </View>
+
+            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+              <View className="flex-1 pr-4">
+                <Text className="text-white text-base">
+                  {t('Filler episodes')}
+                </Text>
+                <Text className="text-white/50 text-xs mt-1">
+                  {t('Mark filler episodes in anime episode lists.')}
+                </Text>
+              </View>
+              <Switch
+                thumbColor={showFillerEpisodes ? primary : 'gray'}
+                value={showFillerEpisodes}
+                onValueChange={value => {
+                  settingsStorage.setShowFillerEpisodes(value);
+                  setShowFillerEpisodes(value);
                 }}
               />
             </View>

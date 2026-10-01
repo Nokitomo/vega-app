@@ -52,6 +52,12 @@ File: app.config.js
   - `vega`
   - `wvc`
 
+## Player: timestamp e filler
+- `Preferences -> Player -> Skip timestamps` abilita i pulsanti di skip; il valore predefinito e attivo.
+- `Preferences -> Player -> Filler episodes` abilita la dicitura `Filler` nella lista episodi; il valore predefinito e disattivato.
+- I servizi di timestamp e il database filler non richiedono chiavi configurate nell'app.
+- AnimeSkip richiede un account personale configurabile da `Settings -> Account`; senza login il relativo resolver viene ignorato.
+
 ## Signing release
 - La build Android legge prima `android/signing.local.properties` e, solo come fallback, le variabili d'ambiente legacy (`MYAPP_UPLOAD_*`).
 - Esempio pronto: `android/signing.local.properties.example`.

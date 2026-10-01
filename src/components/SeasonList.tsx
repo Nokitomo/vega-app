@@ -73,6 +73,7 @@ import {setClipboardString} from '../lib/utils/clipboard';
 import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 import EpisodeMetadata from './EpisodeMetadata';
+import {getFillerEpisodes} from '../lib/services/fillerDatabase';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -85,6 +86,12 @@ interface SeasonListProps {
   metaTitle: string;
   providerValue: string;
   aniSkipMalId?: number;
+  contentIds?: {
+    malId?: number;
+    anilistId?: number;
+    imdbId?: string;
+    tmdbId?: number;
+  };
   refreshing?: boolean;
   refreshVersion?: number;
   routeParams: Readonly<{
@@ -330,6 +337,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   metaTitle,
   providerValue,
   aniSkipMalId,
+  contentIds,
   refreshing: _refreshing,
   refreshVersion = 0,
   routeParams,
@@ -340,9 +348,43 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const [isAppActive, setIsAppActive] = useState(
     AppState.currentState === 'active',
   );
+  const [showFillerLabels, setShowFillerLabels] = useState(
+    settingsStorage.showFillerEpisodes(),
+  );
+  const [fillerEpisodes, setFillerEpisodes] = useState<Set<number>>(new Set());
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useFocusEffect(
+    useCallback(() => {
+      setShowFillerLabels(settingsStorage.showFillerEpisodes());
+    }, []),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!showFillerLabels || (!aniSkipMalId && !/anime|ova/i.test(type))) {
+      setFillerEpisodes(new Set());
+      return () => {
+        cancelled = true;
+      };
+    }
+    getFillerEpisodes({
+      title: metaTitle,
+      malId: contentIds?.malId ?? aniSkipMalId,
+      anilistId: contentIds?.anilistId,
+      imdbId: contentIds?.imdbId,
+      tmdbId: contentIds?.tmdbId,
+    }).then(episodes => {
+      if (!cancelled) {
+        setFillerEpisodes(episodes);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [aniSkipMalId, contentIds, metaTitle, showFillerLabels, type]);
   const {addItem, updatePlaybackInfo} = useWatchHistoryStore(state => state);
   const {fetchStreams} = useStreamData();
   const resolveTitle = useCallback(
@@ -2295,6 +2337,19 @@ const SeasonList: React.FC<SeasonListProps> = ({
         !item.titleKey && item.episodeNumber != null
           ? t('Episode {{number}}', {number: item.episodeNumber})
           : undefined;
+      const fillerEpisodeNumber =
+        normalizeNumericValue(item.sourceEpisodeNumber) ??
+        normalizeNumericValue(item.episodeNumber) ??
+        getEpisodeNumber(item.title);
+      const isFiller =
+        showFillerLabels &&
+        fillerEpisodeNumber != null &&
+        fillerEpisodes.has(fillerEpisodeNumber);
+      const metadataLabel = isFiller
+        ? episodeLabel
+          ? `${episodeLabel} · ${t('Filler')}`
+          : t('Filler')
+        : episodeLabel;
       const hasExtendedMetadata = !!(
         item.thumbnail?.trim() || item.synopsis?.trim()
       );
@@ -2331,7 +2386,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
               onLongPress={() => onLongPressHandler(true, item.link, 'series')}>
               <EpisodeMetadata
                 title={episodeTitle}
-                label={episodeLabel}
+                label={metadataLabel}
                 synopsis={item.synopsis}
                 thumbnail={item.thumbnail}
                 accentColor={primary}
@@ -2384,6 +2439,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
       onLongPressHandler,
       primary,
       providerValue,
+      fillerEpisodes,
+      showFillerLabels,
       t,
     ],
   );
@@ -2398,6 +2455,17 @@ const SeasonList: React.FC<SeasonListProps> = ({
       const directTitle = item.titleKey
         ? t(item.titleKey, item.titleParams)
         : item.title;
+      const directEpisodeNumber =
+        normalizeNumericValue(item.sourceEpisodeNumber) ??
+        normalizeNumericValue(item.episodeNumber) ??
+        getEpisodeNumber(item.title);
+      const isDirectFiller =
+        showFillerLabels &&
+        directEpisodeNumber != null &&
+        fillerEpisodes.has(directEpisodeNumber);
+      const directDisplayTitle = isDirectFiller
+        ? `${directTitle} · ${t('Filler')}`
+        : directTitle;
 
       return (
         <View
@@ -2433,11 +2501,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 <Ionicons name="play-circle" size={28} color={primary} />
               </View>
               <Text className="text-white flex-1" numberOfLines={1}>
-                {activeSeason?.directLinks?.length &&
-                activeSeason?.directLinks?.length > 1
-                  ? directTitle?.length > 27
-                    ? directTitle.slice(0, 27) + '...'
-                    : directTitle
+                {isDirectFiller ||
+                (activeSeason?.directLinks?.length &&
+                  activeSeason?.directLinks?.length > 1)
+                  ? directDisplayTitle?.length > 27
+                    ? directDisplayTitle.slice(0, 27) + '...'
+                    : directDisplayTitle
                   : t('Play')}
               </Text>
               {episodeProgressMap[item.link] ? (
@@ -2489,6 +2558,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
       onLongPressHandler,
       primary,
       providerValue,
+      fillerEpisodes,
+      showFillerLabels,
       t,
     ],
   );

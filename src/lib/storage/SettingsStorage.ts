@@ -35,6 +35,8 @@ export enum SettingsKeys {
   HIDE_SEEK_BUTTONS = 'hideSeekButtons',
   ENABLE_2X_GESTURE = 'enable2xGesture',
   ENABLE_SWIPE_GESTURE = 'enableSwipeGesture',
+  ENABLE_VIDEO_SKIP = 'enableVideoSkip',
+  SHOW_FILLER_EPISODES = 'showFillerEpisodes',
 
   // Quality settings
   EXCLUDED_QUALITIES = 'excludedQualities',
@@ -219,6 +221,22 @@ export class SettingsStorage {
 
   setSwipeGestureEnabled(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.ENABLE_SWIPE_GESTURE, enabled);
+  }
+
+  isVideoSkipEnabled(): boolean {
+    return this.getBoolWithDefault(SettingsKeys.ENABLE_VIDEO_SKIP, true);
+  }
+
+  setVideoSkipEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.ENABLE_VIDEO_SKIP, enabled);
+  }
+
+  showFillerEpisodes(): boolean {
+    return this.getBoolWithDefault(SettingsKeys.SHOW_FILLER_EPISODES, false);
+  }
+
+  setShowFillerEpisodes(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.SHOW_FILLER_EPISODES, enabled);
   }
 
   // Quality settings

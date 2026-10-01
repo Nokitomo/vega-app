@@ -99,6 +99,11 @@ import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../../lib/utils/streamHeaders';
 import {torrentManager} from '../../lib/torrentManager';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import {
+  getVideoSkipStamps,
+  VideoSkipStamp,
+  VideoSkipType,
+} from '../../lib/services/videoSkip';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Player'>;
 
@@ -122,27 +127,11 @@ const exitFullScreen = () => {
 const STREAM_RETRY_COOLDOWN_MS = 3000;
 const STREAM_START_TIMEOUT_MS = 8000;
 const SUBTITLE_GATE_TIMEOUT_MS = 1500;
-const ANISKIP_BASE_URL = 'https://api.aniskip.com/v2/skip-times';
-const ANISKIP_TYPES = ['op', 'mixed-op'];
-const SKIP_INTRO_TIMEOUT_MS = 8000;
 const SKIP_INTRO_LEAD_SECONDS = 1.5;
 const PLAYER_CONTROL_COLOR = 'rgba(255,255,255,0.68)';
 const PLAYER_CONTROL_LABEL_STYLE = {
   color: PLAYER_CONTROL_COLOR,
   fontWeight: '300' as const,
-};
-
-type SkipIntroInterval = {
-  startTime: number;
-  endTime: number;
-};
-
-type AniSkipResult = {
-  interval?: {
-    startTime?: number;
-    endTime?: number;
-  };
-  skipType?: string;
 };
 
 const parseEpisodeNumberFromTitle = (title?: string): number | undefined => {
@@ -155,73 +144,6 @@ const parseEpisodeNumberFromTitle = (title?: string): number | undefined => {
   }
   const parsed = Number.parseFloat(match[1]);
   return Number.isFinite(parsed) ? parsed : undefined;
-};
-
-const buildAniSkipUrl = (
-  malId: number,
-  episodeNumber: number,
-  episodeLength: number,
-): string => {
-  const typesQuery = ANISKIP_TYPES.map(type => `types=${type}`).join('&');
-  const length = Math.max(0, Math.round(episodeLength));
-  return `${ANISKIP_BASE_URL}/${malId}/${episodeNumber}?${typesQuery}&episodeLength=${length}`;
-};
-
-const pickIntroInterval = (
-  results: AniSkipResult[],
-  episodeDuration: number,
-): SkipIntroInterval | null => {
-  const normalized = results
-    .map(result => ({
-      skipType: result.skipType || '',
-      startTime:
-        typeof result.interval?.startTime === 'number'
-          ? result.interval.startTime
-          : Number.NaN,
-      endTime:
-        typeof result.interval?.endTime === 'number'
-          ? result.interval.endTime
-          : Number.NaN,
-    }))
-    .filter(
-      item =>
-        Number.isFinite(item.startTime) &&
-        Number.isFinite(item.endTime) &&
-        item.endTime > item.startTime,
-    );
-
-  if (normalized.length === 0) {
-    return null;
-  }
-
-  const preferred = normalized.filter(item => item.skipType === 'op');
-  const candidates =
-    preferred.length > 0
-      ? preferred
-      : normalized.filter(item => item.skipType === 'mixed-op');
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const sorted = [...candidates].sort((a, b) => {
-    if (a.startTime !== b.startTime) {
-      return a.startTime - b.startTime;
-    }
-    return b.endTime - a.endTime;
-  });
-  const chosen = sorted[0];
-  const endTime =
-    episodeDuration > 0
-      ? Math.min(chosen.endTime, episodeDuration)
-      : chosen.endTime;
-  if (endTime <= chosen.startTime) {
-    return null;
-  }
-
-  return {
-    startTime: Math.max(0, chosen.startTime),
-    endTime,
-  };
 };
 
 const Player = ({route}: Props): React.JSX.Element => {
@@ -322,9 +244,9 @@ const Player = ({route}: Props): React.JSX.Element => {
     const currentEpisodeIndex = episodeList.findIndex(
       item => item?.link === activeEpisode?.link,
     );
-    const episodeNumberFromTitle = parseEpisodeNumberFromTitle(
-      activeEpisode?.title,
-    );
+    const episodeNumberFromTitle =
+      activeEpisode?.episodeNumber ??
+      parseEpisodeNumberFromTitle(activeEpisode?.title);
     const fallbackEpisodeNumber =
       currentEpisodeIndex >= 0 ? currentEpisodeIndex + 1 : undefined;
     return episodeNumberFromTitle ?? fallbackEpisodeNumber;
@@ -588,12 +510,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     };
   }, [providerValue, route.params?.infoUrl, route.params?.primaryTitle]);
 
-  const infoLinkForSkip =
-    providerValue === 'animeunity' ? route.params?.infoUrl || '' : '';
+  const infoLinkForSkip = route.params?.infoUrl || '';
   const {data: skipInfo} = useContentInfo(infoLinkForSkip, providerValue);
 
-  const [skipIntroInterval, setSkipIntroInterval] =
-    useState<SkipIntroInterval | null>(null);
+  const [videoSkipStamps, setVideoSkipStamps] = useState<VideoSkipStamp[]>([]);
   const [episodeDuration, setEpisodeDuration] = useState(0);
   const skipIntroAbortRef = useRef<AbortController | null>(null);
   const [subtitleGatePassed, setSubtitleGatePassed] = useState(true);
@@ -698,6 +618,26 @@ const Player = ({route}: Props): React.JSX.Element => {
     const raw = skipInfo?.extra?.ids?.malId;
     return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
   }, [skipInfo?.extra?.ids?.malId]);
+  const skipImdbId = useMemo(
+    () =>
+      skipInfo?.imdbId ||
+      skipInfo?.extra?.ids?.imdbShowIds?.[0] ||
+      skipInfo?.extra?.ids?.imdbMovieIds?.[0],
+    [
+      skipInfo?.extra?.ids?.imdbMovieIds,
+      skipInfo?.extra?.ids?.imdbShowIds,
+      skipInfo?.imdbId,
+    ],
+  );
+  const skipTmdbId = useMemo(
+    () =>
+      skipInfo?.extra?.ids?.tmdbShowIds?.[0] ||
+      skipInfo?.extra?.ids?.tmdbMovieIds?.[0],
+    [
+      skipInfo?.extra?.ids?.tmdbMovieIds,
+      skipInfo?.extra?.ids?.tmdbShowIds,
+    ],
+  );
 
   // Memoized watched duration
   const watchedDuration = useMemo(() => {
@@ -1265,13 +1205,38 @@ const Player = ({route}: Props): React.JSX.Element => {
     }
   }, [isPlayerLocked, showSettings]);
 
+  const canAdvanceFromSkip = useMemo(() => {
+    const episodes = route.params?.episodeList || [];
+    const index = episodes.findIndex(item => item?.link === activeEpisode?.link);
+    return (
+      (index >= 0 && index < episodes.length - 1) || !!nextSeasonInfo?.season
+    );
+  }, [activeEpisode?.link, nextSeasonInfo?.season, route.params?.episodeList]);
+
   const handleSkipIntro = useCallback(() => {
-    if (!skipIntroInterval) {
+    const position = videoPositionRef.current.position;
+    const stamp = videoSkipStamps.find(
+      item =>
+        position >= Math.max(0, item.startTime - SKIP_INTRO_LEAD_SECONDS) &&
+        position < item.endTime,
+    );
+    if (!stamp) {
       return;
     }
-    playerRef?.current?.seek(skipIntroInterval.endTime);
+    if (canAdvanceFromSkip && episodeDuration - stamp.endTime < 20) {
+      handleNextEpisode();
+      return;
+    }
+    playerRef?.current?.seek(stamp.endTime);
     setShowControls(true);
-  }, [skipIntroInterval, setShowControls]);
+  }, [
+    canAdvanceFromSkip,
+    episodeDuration,
+    handleNextEpisode,
+    setShowControls,
+    videoPositionRef,
+    videoSkipStamps,
+  ]);
 
   const handleSeekSnap = useCallback(() => {
     if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -1318,86 +1283,60 @@ const Player = ({route}: Props): React.JSX.Element => {
       skipIntroAbortRef.current = null;
     }
 
-    if (providerValue !== 'animeunity') {
-      setSkipIntroInterval(null);
-      return;
-    }
-    if (!skipMalId || !currentEpisodeNumber || episodeDuration <= 0) {
-      setSkipIntroInterval(null);
+    if (
+      !settingsStorage.isVideoSkipEnabled() ||
+      !currentEpisodeNumber ||
+      episodeDuration <= 0 ||
+      !skipInfo
+    ) {
+      setVideoSkipStamps([]);
       return;
     }
 
-    const duration = Math.round(episodeDuration);
-    const cacheKey = `aniskip:v2:${skipMalId}:${currentEpisodeNumber}:${duration}`;
-    const cached = cacheStorage.getString(cacheKey);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        const interval = parsed?.interval;
-        if (
-          interval &&
-          Number.isFinite(interval.startTime) &&
-          Number.isFinite(interval.endTime) &&
-          interval.endTime > interval.startTime
-        ) {
-          setSkipIntroInterval(interval);
-          return;
-        }
-        if (parsed?.interval === null) {
-          setSkipIntroInterval(null);
-          return;
-        }
-      } catch (error) {
-        cacheStorage.delete(cacheKey);
-      }
-    }
-
-    setSkipIntroInterval(null);
+    setVideoSkipStamps([]);
 
     const controller = new AbortController();
     skipIntroAbortRef.current = controller;
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      SKIP_INTRO_TIMEOUT_MS,
-    );
-
-    const fetchSkip = async () => {
-      try {
-        const url = buildAniSkipUrl(skipMalId, currentEpisodeNumber, duration);
-        const response = await fetch(url, {signal: controller.signal});
-        if (!response.ok) {
-          throw new Error(`AniSkip HTTP ${response.status}`);
+    getVideoSkipStamps(
+      {
+        title: skipInfo.title || resolvedPrimaryTitle,
+        type: skipInfo.type || route.params?.type || 'series',
+        episodeNumber: currentEpisodeNumber,
+        seasonNumber:
+          activeEpisode?.seasonNumber ?? route.params?.seasonNumber,
+        duration: Math.round(episodeDuration),
+        malId: skipMalId,
+        imdbId: skipImdbId,
+        tmdbId: skipTmdbId,
+      },
+      controller.signal,
+    )
+      .then(stamps => {
+        if (!controller.signal.aborted) {
+          setVideoSkipStamps(stamps);
         }
-        const data = await response.json();
-        if (!data?.found || !Array.isArray(data?.results)) {
-          cacheStorage.setString(cacheKey, JSON.stringify({interval: null}));
-          return;
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) {
+          console.warn('Video skip request failed', error);
         }
-        const interval = pickIntroInterval(data.results, duration);
-        cacheStorage.setString(
-          cacheKey,
-          JSON.stringify({interval: interval || null}),
-        );
-        if (interval) {
-          setSkipIntroInterval(interval);
-        }
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
-        console.warn('AniSkip request failed', error);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    };
-
-    fetchSkip();
+      });
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [currentEpisodeNumber, episodeDuration, providerValue, skipMalId]);
+  }, [
+    activeEpisode?.seasonNumber,
+    currentEpisodeNumber,
+    episodeDuration,
+    resolvedPrimaryTitle,
+    route.params?.seasonNumber,
+    route.params?.type,
+    skipImdbId,
+    skipInfo,
+    skipMalId,
+    skipTmdbId,
+  ]);
 
   const extractHttpStatus = useCallback((errorEvent: any) => {
     const stackTrace = errorEvent?.error?.errorStackTrace || '';
@@ -2607,7 +2546,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   useEffect(() => {
     setEpisodeDuration(0);
-    setSkipIntroInterval(null);
+    setVideoSkipStamps([]);
   }, [activeEpisode?.link]);
 
   useEffect(() => {
@@ -3001,15 +2940,14 @@ const Player = ({route}: Props): React.JSX.Element => {
       },
       onVideoTracks: (e: any) => processVideoTracks(e.videoTracks),
       selectedVideoTrack,
-      skips: skipIntroInterval
-        ? [
-            {
-              title: t('Skip Intro'),
-              from: skipIntroInterval.startTime,
-              to: skipIntroInterval.endTime,
-            },
-          ]
-        : undefined,
+      skips:
+        videoSkipStamps.length > 0
+          ? videoSkipStamps.map(stamp => ({
+              title: t(`skip.${stamp.type}`),
+              from: stamp.startTime,
+              to: stamp.endTime,
+            }))
+          : undefined,
       onSeekSnap: handleSeekSnap,
       style: {flex: 1, zIndex: 100},
       controlAnimationTiming: 357,
@@ -3044,7 +2982,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       selectedVideoTrack,
       processAudioTracks,
       processVideoTracks,
-      skipIntroInterval,
+      videoSkipStamps,
       handleSeekSnap,
       t,
     ],
@@ -3076,11 +3014,27 @@ const Player = ({route}: Props): React.JSX.Element => {
     videoTracks?.length === 1
       ? formatVideoTrackQuality(videoTracks[0])
       : formatVideoTrackQuality(videoTracks?.[selectedQualityIndex]);
-  const shouldShowSkipIntro =
-    !!skipIntroInterval &&
-    currentPosition >=
-      Math.max(0, skipIntroInterval.startTime - SKIP_INTRO_LEAD_SECONDS) &&
-    currentPosition < skipIntroInterval.endTime;
+  const activeSkipStamp = videoSkipStamps.find(
+    stamp =>
+      currentPosition >=
+        Math.max(0, stamp.startTime - SKIP_INTRO_LEAD_SECONDS) &&
+      currentPosition < stamp.endTime,
+  );
+  const shouldShowSkipIntro = !!activeSkipStamp;
+  const activeSkipAdvancesEpisode =
+    !!activeSkipStamp &&
+    hasNextEpisode &&
+    episodeDuration - activeSkipStamp.endTime < 20;
+  const skipLabelKey: Record<VideoSkipType, string> = {
+    opening: 'Skip Opening',
+    ending: 'Skip Ending',
+    recap: 'Skip Recap',
+    'mixed-opening': 'Skip Opening',
+    'mixed-ending': 'Skip Ending',
+    credits: 'Skip Credits',
+    intro: 'Skip Intro',
+    preview: 'Skip Preview',
+  };
   const castIconColor =
     castProvider === 'native' && castState === CastState.CONNECTED
       ? primary
@@ -3429,7 +3383,13 @@ const Player = ({route}: Props): React.JSX.Element => {
                 <Text
                   style={{opacity: overlayTextOpacity}}
                   className="text-white text-sm font-semibold uppercase">
-                  {t('Skip Intro')}
+                  {activeSkipAdvancesEpisode
+                    ? t('Next Episode')
+                    : t(
+                        activeSkipStamp
+                          ? skipLabelKey[activeSkipStamp.type]
+                          : 'Skip Intro',
+                      )}
                 </Text>
                 <MaterialIcons
                   name="skip-next"

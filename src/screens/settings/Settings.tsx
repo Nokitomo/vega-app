@@ -231,6 +231,25 @@ const Settings = ({navigation}: Props) => {
           <View className="mb-6">
             <Text className="text-gray-400 text-sm mb-3">{t('Options')}</Text>
             <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
+              {/* Account */}
+              <TouchableNativeFeedback
+                onPress={() => navigation.navigate('Account')}
+                background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+                  <View className="flex-row items-center">
+                    <MaterialCommunityIcons
+                      name="account-circle-outline"
+                      size={22}
+                      color={primary}
+                    />
+                    <Text className="text-white ml-3 text-base">
+                      {t('Account')}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color="gray" />
+                </View>
+              </TouchableNativeFeedback>
+
               {/* Downloads */}
               <TouchableNativeFeedback
                 onPress={() => navigation.navigate('Downloads')}

@@ -1142,6 +1142,17 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                               ? Number(info?.extra?.ids?.malId)
                               : undefined
                           }
+                          contentIds={{
+                            malId: info?.extra?.ids?.malId,
+                            anilistId: info?.extra?.ids?.anilistId,
+                            imdbId:
+                              info?.imdbId ||
+                              info?.extra?.ids?.imdbShowIds?.[0] ||
+                              info?.extra?.ids?.imdbMovieIds?.[0],
+                            tmdbId:
+                              info?.extra?.ids?.tmdbShowIds?.[0] ||
+                              info?.extra?.ids?.tmdbMovieIds?.[0],
+                          }}
                           LinkList={filteredLinkList}
                           poster={{
                             logo: logoImage,

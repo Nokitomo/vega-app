@@ -42,3 +42,22 @@ File: src/lib/services/animeMeta.ts
 - Integrazione con AniList (GraphQL) e fallback Jikan per metadata anime quando non c'e imdbId.
 File: src/lib/services/enhancedMeta.ts
 - Seleziona la fonte esterna (Cinemeta/Stremio o AniList/Jikan) in base agli ID disponibili.
+
+## Timestamp video e AnimeSkip
+File: `src/lib/services/videoSkip.ts`
+- Interroga i resolver nello stesso ordine di Cloudstream: AniSkip, TheIntroDB, IntroDB e AnimeSkip.
+- Restituisce il primo risultato non vuoto senza fondere timestamp provenienti da fonti diverse.
+- AniSkip e AnimeSkip sono usati per anime/OVA; TheIntroDB copre film e serie; IntroDB copre contenuti episodici con ID IMDb.
+- I timestamp validi vengono mantenuti nella cache MMKV e il player mostra il testo appropriato per opening, ending, recap, crediti, intro e anteprima.
+- AnimeSkip viene interrogato solo se esiste una sessione salvata dalla schermata Account.
+
+File: `src/lib/services/animeSkipAuth.ts`
+- Replica il login usato da Cloudstream: hash MD5 della password, login GraphQL e recupero del primo client API dell'account.
+- Password e hash non vengono salvati. Token, refresh token, dati profilo e client ID vengono conservati nello storage MMKV cifrato.
+
+## Database filler
+File: `src/lib/services/fillerDatabase.ts`
+- Usa `recloudstream/anime-db` direttamente da GitHub senza API key.
+- Il JSON scaricato resta nello storage principale senza scadenza. Ogni sette giorni viene confrontato lo SHA del file tramite GitHub Contents API; viene sostituito solo quando lo SHA cambia e il nuovo JSON supera la validazione.
+- In caso di errore di rete o payload non valido resta disponibile l'ultima copia valida.
+- La ricerca segue la priorita di Cloudstream: MAL, AniList, Kitsu, IMDb, stagione TMDB e titolo normalizzato.

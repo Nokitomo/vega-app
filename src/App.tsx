@@ -52,6 +52,7 @@ import SeriesEpisodes from './screens/settings/SeriesEpisodes';
 import WatchHistory from './screens/WatchHistory';
 import SubtitlePreference from './screens/settings/SubtitleSettings';
 import Extensions from './screens/settings/Extensions';
+import Account from './screens/settings/Account';
 import Constants from 'expo-constants';
 import {settingsStorage} from './lib/storage';
 import {updateProvidersService} from './lib/services/UpdateProviders';
@@ -193,6 +194,7 @@ export type SettingsStackParamList = {
   WatchHistoryStack: undefined;
   SubTitlesPreferences: undefined;
   Extensions: undefined;
+  Account: undefined;
 };
 
 export type TabStackParamList = {
@@ -272,6 +274,7 @@ function SettingsStackScreen() {
       <SettingsStack.Screen name="Preferences" component={Preferences} />
       <SettingsStack.Screen name="Downloads" component={Downloads} />
       <SettingsStack.Screen name="Extensions" component={Extensions} />
+      <SettingsStack.Screen name="Account" component={Account} />
       <SettingsStack.Screen
         name="WatchHistoryStack"
         component={WatchHistoryStackScreen}
