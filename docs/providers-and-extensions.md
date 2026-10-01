@@ -1,10 +1,13 @@
 # Provider ed Estensioni
 
 ## Obiettivo
+
 I contenuti non sono hardcoded: il catalogo e la logica di scraping/streaming vengono forniti da moduli esterni (provider) caricati dinamicamente.
 
 ## ExtensionManager
+
 File: src/lib/services/ExtensionManager.ts
+
 - Gestisce una o piu sorgenti provider configurabili dall'app.
 - Se non esistono sorgenti locali, crea automaticamente la sorgente ufficiale:
   https://raw.githubusercontent.com/Nokitomo/vega-providers/refs/heads/main/manifest.json
@@ -13,7 +16,9 @@ File: src/lib/services/ExtensionManager.ts
 - Supporta modalita test con baseUrl alternativo.
 
 ## Struttura dei moduli provider
+
 Per ogni provider vengono scaricati file JS:
+
 - posts.js (obbligatorio)
 - meta.js (obbligatorio)
 - stream.js (obbligatorio)
@@ -24,6 +29,7 @@ Nota: per AnimeUnity, il campo `filter` del catalogo puo includere query params 
 Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fantasy`.
 
 ## Contratto filtri (UI)
+
 - `catalog.js` puo esportare `archiveFilters` con metadati (order, status, type, season, years, dubbed, genres).
 - `ProviderManager.getArchiveFilters()` espone questi metadati all'interfaccia senza rendere obbligatoria l'esportazione: i provider meno recenti continuano a restituire un oggetto vuoto.
 - `genres` espone scorciatoie per filtri di archive (usabili come sezioni o menu).
@@ -35,6 +41,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - La UI rispetta anche `staleTimeMs: 0`: le sezioni casuali mostrano subito l'eventuale cache ma vengono aggiornate a ogni nuova attivazione della Home, invece di ereditare la cache lunga dell'archivio.
 
 ## i18n dai provider (AnimeUnity)
+
 - Alcuni campi possono includere chiavi i18n opzionali per tradurre etichette in app.
 - `catalog.js`: `titleKey`/`titleParams` per i titoli delle sezioni.
 - `posts`: `episodeLabelKey`/`episodeLabelParams` (con fallback su `episodeLabel`).
@@ -43,6 +50,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Al momento queste chiavi sono usate solo da AnimeUnity e dai provider futuri.
 
 ## Campi card e artwork opzionali
+
 - I post possono includere `rating`, `dubStatus`/`dubStatusKey` e `variants`. `variants` conserva destinazioni SUB e ITA dello stesso titolo mantenendo `link` come fallback retrocompatibile.
 - Le card Home, ricerca, calendario e lista completa mostrano badge coerenti per episodio, disponibilita SUB/ITA e voto; i dati delle varianti vengono mantenuti nella navigazione verso Info.
 - Quando un post contiene piu `variants`, Info mostra il selettore di versione e ricarica metadata, episodi, player e azioni libreria usando il link SUB/ITA realmente selezionato. Il `Post.link` originario resta la selezione predefinita.
@@ -51,6 +59,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Per i provider film/serie, `artworkSources` dichiara la fonte scelta e `artworkCandidates` puo esporre i fallback ordinati. StreamingUnity fornisce poster/background in ordine provider -> TMDB -> TVDB; l'app aggiunge Cinemeta in coda. Il logo segue TMDB -> TVDB -> Cinemeta -> provider -> titolo testuale. Info e Hero condividono lo stesso selettore e passano al candidato successivo quando il caricamento fallisce; gli SVG remoti vengono renderizzati con `SvgUri`.
 
 ## Disponibilita contenuti futuri (upcoming)
+
 - I provider possono valorizzare in `Info.linkList[]` i campi opzionali:
   - `availabilityStatus`: `upcoming` o `available`
   - `availabilityDate`: data normalizzata (`YYYY-MM-DD` o `YYYY`)
@@ -64,6 +73,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Rationale: i campi editoriali sorgente (`status`/`release_date`) possono essere stale o incoerenti rispetto alla reale disponibilita stream.
 
 ## Metadati episodio/stagione per resume
+
 - I provider possono valorizzare su `EpisodeLink` e `Link.directLinks[]`:
   - `episodeNumber`: numero episodio strutturato
   - `seasonNumber`: numero stagione reale (quando applicabile)
@@ -73,6 +83,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Fallback retrocompatibile: se i campi mancano, la UI prova a estrarre il numero dal titolo episodio.
 
 ## Priorita metadati (sinossi)
+
 - Quando sono presenti metadati esterni (Stremio per imdbId, AniList/Jikan per malId/anilistId), la UI usa quelli esterni.
 - Per AnimeUnity la UI usa AniList tramite `anilistId` anche quando e presente un IMDb ID, cosi il banner stagionale resta separato dal background generale; Jikan resta fallback per i metadata non-artwork quando e disponibile soltanto `malId`.
 - Per AnimeUnity, se mancano malId/anilistId non viene richiesto alcun metadata esterno.
@@ -92,7 +103,9 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Se i metadati esterni falliscono ma il provider risponde correttamente, la scheda Info resta disponibile usando i dati del provider.
 
 ## ProviderManager
+
 File: src/lib/services/ProviderManager.ts
+
 - Esegue i moduli in un contesto isolato (new Function).
 - Espone API per catalogo, ricerca, metadata, stream, episodi.
 - Usa providerContext con axios, cheerio, estrattori e utility.
@@ -105,7 +118,9 @@ File: src/lib/services/ProviderManager.ts
 - Se sono presenti sottotitoli esterni, il player attende brevemente il loro download prima di avviare lo stream; se arrivano in ritardo, viene fatto un solo reload automatico per agganciarli.
 
 ## ProviderContext
+
 File: src/lib/providers/providerContext.ts
+
 - axios, cheerio, Crypto (expo-crypto)
 - headers comuni e funzioni di estrazione (hubcloud, gofile, gdflix, superVideo)
 - `openWebView(url, options)` per provider che devono risolvere una challenge WAF/captcha da WebView.
@@ -113,20 +128,24 @@ File: src/lib/providers/providerContext.ts
 - I cookie WebView vengono letti tramite `@preeternal/react-native-cookie-manager`; su Android il modulo e autolinkato nel dev client. Su iOS va rieseguito il normale flusso Pods quando si aggiorna il progetto nativo.
 
 ## Storage provider
+
 - ExtensionStorage gestisce sorgenti provider, cache locale per sorgente e stato installato/abilitato.
 - UpdateProvidersService verifica versioni per sorgente e aggiorna automaticamente.
 - Le cache di catalogo, metadata, episodi e stream includono sorgente, nome e versione del modulo provider. Dopo un aggiornamento l'app sincronizza subito il provider attivo e rimuove soltanto le query della vecchia versione, senza cancellare cronologia, watchlist o preferenze.
 - Le notifiche di aggiornamento provider usano testi localizzati.
 
 ## Dove stanno i provider
+
 - I provider non sono hardcoded nel repository dell'app.
 - Sono moduli JS ospitati su GitHub e scaricati a runtime.
+- Le icone mostrate dal Provider Manager sono URL HTTPS dichiarati nel campo `icon` del `manifest.json` della sorgente.
 - Sorgente ufficiale predefinita: `Nokitomo/vega-providers`
 - Sorgenti aggiuntive: configurabili dal tab "Disponibili" del Provider Manager.
 - Le nuove sorgenti vengono validate scaricando `manifest.json` prima di salvarle nello storage locale.
 - Non esiste un backend privato: l'app consuma solo risorse pubbliche via HTTP.
 
 ## Dipendenze DNS e rete
+
 - I provider eseguono chiamate HTTP direttamente dal device utente verso i domini target.
 - Se il resolver DNS del device/rete restituisce `NXDOMAIN` o blocca un dominio provider, la chiamata fallisce prima della risposta HTTP.
 - In questo scenario e possibile vedere provider installato ma risultati vuoti, anche con moduli corretti.
@@ -137,6 +156,7 @@ File: src/lib/providers/providerContext.ts
 - Dettagli tecnici e limiti: `docs/dns-over-https.md`.
 
 ## Come aggiungere provider personalizzati
+
 - Devi pubblicare un tuo set di provider (manifest + moduli JS) in un repository GitHub accessibile pubblicamente.
 - Dal Provider Manager, tab "Disponibili", usa il selettore sorgenti e aggiungi un autore GitHub o un URL `github.com`/`raw.githubusercontent.com`.
 - L'app converte la sorgente in URL raw GitHub, scarica `manifest.json`, salva la sorgente solo se il manifest e valido e mantiene cache/update separati per autore.
