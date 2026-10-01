@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {ProviderExtension} from '../../../lib/storage/extensionStorage';
 import type {SettingsField} from '../../../lib/providers/types';
 import {providerManager} from '../../../lib/services/ProviderManager';
@@ -37,6 +38,7 @@ const defaultsFor = (fields: SettingsField[]) =>
 
 const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
   const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
   const {primary} = useThemeStore(state => state);
   const [fields, setFields] = useState<SettingsField[]>([]);
   const [values, setValues] = useState<Record<string, unknown>>({});
@@ -151,7 +153,8 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
 
   const renderField = (field: SettingsField) => {
     const value = values[field.key];
-    const fieldContainer = 'bg-quaternary border border-gray-700 rounded-xl p-4';
+    const fieldContainer =
+      'bg-quaternary border border-gray-700 rounded-xl p-4';
 
     if (field.type === 'toggle') {
       return (
@@ -221,8 +224,8 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
                           ? 'radiobox-marked'
                           : 'radiobox-blank'
                         : isSelected
-                        ? 'checkbox-marked'
-                        : 'checkbox-blank-outline'
+                          ? 'checkbox-marked'
+                          : 'checkbox-blank-outline'
                     }
                     size={20}
                     color="white"
@@ -241,7 +244,9 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
     const revealed = revealedFields.has(field.key);
     return (
       <View key={field.key} className={fieldContainer}>
-        <Text className="text-white text-base font-semibold">{field.label}</Text>
+        <Text className="text-white text-base font-semibold">
+          {field.label}
+        </Text>
         {field.description ? (
           <Text className="text-gray-400 text-sm mt-1">
             {field.description}
@@ -256,7 +261,10 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
                 return;
               }
               const parsed = Number(text);
-              updateValue(field.key, text === '' || Number.isNaN(parsed) ? undefined : parsed);
+              updateValue(
+                field.key,
+                text === '' || Number.isNaN(parsed) ? undefined : parsed,
+              );
             }}
             placeholder={field.type === 'text' ? field.placeholder : undefined}
             placeholderTextColor="#6b7280"
@@ -305,7 +313,9 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1 justify-end bg-black/70">
         <Pressable className="flex-1" onPress={onClose} />
-        <View className="bg-tertiary rounded-t-3xl px-5 pt-5 pb-7 max-h-[88%] border-t border-gray-700">
+        <View
+          className="bg-tertiary rounded-t-3xl px-5 pt-5 max-h-[88%] border-t border-gray-700"
+          style={{paddingBottom: Math.max(insets.bottom, 16) + 12}}>
           <View className="flex-row items-center pb-4 border-b border-gray-700">
             <View className="flex-1">
               <Text className="text-white text-xl font-bold">
@@ -325,12 +335,17 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
           {loading ? (
             <View className="items-center py-14">
               <ActivityIndicator size="large" color={primary} />
-              <Text className="text-gray-400 mt-3">{t('Loading settings...')}</Text>
+              <Text className="text-gray-400 mt-3">
+                {t('Loading settings...')}
+              </Text>
             </View>
           ) : error ? (
             <View className="items-center py-12">
               <Text className="text-red-400 text-center">{error}</Text>
-              <TouchableOpacity onPress={load} className="mt-4 px-4 py-2 rounded-lg" style={{backgroundColor: primary}}>
+              <TouchableOpacity
+                onPress={load}
+                className="mt-4 px-4 py-2 rounded-lg"
+                style={{backgroundColor: primary}}>
                 <Text className="text-white font-semibold">{t('Retry')}</Text>
               </TouchableOpacity>
             </View>
