@@ -3,7 +3,7 @@ export interface TitleSuggestion {
   title: string;
   type: 'movie' | 'tv';
   year?: number;
-  source: 'imdb';
+  source: 'imdb' | 'omdb';
 }
 
 interface IMDbSuggestionItem {

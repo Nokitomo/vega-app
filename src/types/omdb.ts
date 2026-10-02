@@ -7,7 +7,8 @@ export interface OMDBResult {
 }
 
 export interface OMDBResponse {
-  Search: OMDBResult[];
-  totalResults: string;
-  Response: string;
+  Search?: OMDBResult[];
+  totalResults?: string;
+  Response: 'True' | 'False';
+  Error?: string;
 }

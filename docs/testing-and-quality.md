@@ -24,6 +24,7 @@ npm test
 - Selezionare un suggerimento e verificare che `SearchResults` interroghi tutti i provider installati.
 - Dalla Home aprire la ricerca, selezionare un suggerimento e verificare che `ScrollList` usi solo il provider attivo.
 - Verificare che cancellazione, back Android, invio manuale e assenza di rete non blocchino la ricerca.
+- Con `EXPO_PUBLIC_OMDB_API_KEY` configurata, simulare una risposta IMDb vuota e verificare che i suggerimenti provengano da OMDb; senza chiave non deve partire alcuna richiesta OMDb.
 
 ## Smoke test cast Android
 

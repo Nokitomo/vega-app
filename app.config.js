@@ -8,6 +8,7 @@ const castReceiverWebUrl =
   process.env.EXPO_PUBLIC_CAST_RECEIVER_WEB_URL ||
   'https://nokitomo.github.io/vega-cast-receiver/';
 const castPairApiBaseUrl = process.env.EXPO_PUBLIC_CAST_PAIR_API_BASE_URL || '';
+const omdbApiKey = process.env.EXPO_PUBLIC_OMDB_API_KEY || '';
 const userWebViewEnabled =
   String(
     process.env.EXPO_PUBLIC_VEGA_USER_WEBVIEW_ENABLED ||
@@ -163,6 +164,7 @@ module.exports = () => {
         castReceiverAppId,
         castReceiverWebUrl,
         castPairApiBaseUrl,
+        omdbApiKey,
         userWebViewEnabled,
       },
     },

@@ -1,15 +1,25 @@
 # Configurazione
 
 ## Expo
+
 File: app.config.js
+
 - newArchEnabled: false (disabilitato per stabilita).
 - android.package: com.vega
 - plugins: custom Android (android-native-config, with-android-notification-icons, with-android-release-gradle, with-android-signing, with-android-okhttp), react-native-video, react-native-edge-to-edge, react-native-bootsplash, expo-build-properties, expo-dev-client.
 - firebase: @react-native-firebase/app e crashlytics sono opzionali. In Gradle i plugin Firebase sono commentati per default; per abilitarli serve decommentare i classpath in `android/build.gradle`, gli apply plugin in `android/app/build.gradle` e aggiungere i file `google-services.json`/`GoogleService-Info.plist`.
 - android: minSdkVersion 24, edgeToEdgeEnabled true, supportsPictureInPicture true, launchMode singleTask, queries per http/https/vlc.
 
+## OMDb fallback per i suggerimenti
+
+- IMDb e la sorgente primaria e non richiede configurazione.
+- OMDb viene interrogato solo quando IMDb non restituisce suggerimenti e solo se `EXPO_PUBLIC_OMDB_API_KEY` e valorizzata durante l'avvio/build Expo.
+- Una chiave OMDb gratuita e soggetta al limite del relativo account. Essendo inclusa nel bundle mobile, deve essere considerata pubblica e non va riutilizzata come segreto per servizi privilegiati.
+
 ## Cast (Android)
+
 ### Cast nativo Google Cast (default)
+
 - Dipendenza: `react-native-google-cast`.
 - Inizializzazione Android:
   - `AndroidManifest.xml`: metadata cast options provider + receiver app id.
@@ -23,12 +33,14 @@ File: app.config.js
   - `extra.castPairApiBaseUrl`
 
 ### Cast Web Video Caster (fallback/alternativa)
+
 - Android: integrazione via `Intent ACTION_VIEW` con package `com.instantbits.cast.webvideo`.
 - iOS: integrazione via URL scheme `wvc-x-callback://open?...`.
 - Supporta passaggio URL stream, headers HTTP e sottotitoli (quando disponibili).
 - Se WVC non e installata, l'app tenta apertura store (market/play store URL).
 
 ### Vega Cast (LAN/Web)
+
 - Provider cast aggiuntivo che genera una sessione web per receiver browser TV/PC.
 - Base URL receiver letto da:
   - `extra.castReceiverWebUrl` (in `app.config.js`)
@@ -46,6 +58,7 @@ File: app.config.js
 - Backend richiesto per pairing professionale: Vercel Function + KV (serverless, senza VPS h24).
 
 ### Scelta provider cast
+
 - Impostazione utente: `Preferences -> Player -> Cast Provider`.
 - Valori supportati:
   - `native` (default)
@@ -53,6 +66,7 @@ File: app.config.js
   - `wvc`
 
 ## Player: timestamp e filler
+
 - `Preferences -> Player -> Skip timestamps` abilita i pulsanti di skip; il valore predefinito e attivo.
 - `Preferences -> Player -> Filler episodes` abilita un badge `Filler` ad alto contrasto nella lista episodi; il valore predefinito e disattivato.
 - I servizi di timestamp e il database filler non richiedono chiavi configurate nell'app.
@@ -61,6 +75,7 @@ File: app.config.js
 - All'apertura di uno stream il player preferisce l'audio italiano, poi inglese e infine la prima traccia disponibile. Attiva automaticamente solo sottotitoli italiani marcati `forced`; in loro assenza i sottotitoli partono disabilitati.
 
 ## Signing release
+
 - La build Android legge prima `android/signing.local.properties` e, solo come fallback, le variabili d'ambiente legacy (`MYAPP_UPLOAD_*`).
 - Esempio pronto: `android/signing.local.properties.example`.
 - Chiavi supportate nel file locale:
@@ -72,6 +87,7 @@ File: app.config.js
 - Con `useReleaseSigningForDebug=true`, anche `debug` usa la stessa chiave della `release` nei build locali.
 
 ## GitHub Nightly (Android)
+
 - Workflow: `.github/workflows/main.yml`
 - Il job Android usa `environment: nightly`.
 - La nightly pubblica una release GitHub `prerelease: true`.
@@ -93,6 +109,7 @@ File: app.config.js
 - La pipeline valida keystore/alias/password prima della build e fallisce subito con errore chiaro se i secret non sono corretti.
 
 ## GitHub Stable Release (Android, manuale)
+
 - Workflow: `.github/workflows/android-release.yml`
 - Trigger: `workflow_dispatch` da GitHub Actions.
 - Input richiesti:
@@ -116,23 +133,30 @@ File: app.config.js
   - in app (Android) il download update seleziona l'APK in base alle ABI del device, con fallback sicuro su `universal`
 
 ## Metro
+
 File: metro.config.js
+
 - usa expo/metro-config
 - integra NativeWind via withNativeWind con input `src/global.css`.
 
 ## Babel
+
 File: babel.config.js
+
 - plugin nativewind/babel
 - react-native-reanimated/plugin
 
 ## Tailwind / NativeWind
-- tailwind.config.js: content su src/**
+
+- tailwind.config.js: content su src/\*\*
 - nativewind: plugin babel
 - patch-package: patches/@dr.pogodin+react-native-fs+2.34.0.patch
 
 ## Typescript
+
 - tsconfig.json definisce target e path.
 
 ## Localizzazione (i18n)
+
 - Configurazione in `src/i18n/index.ts` con i18next + react-i18next.
 - Lingue supportate: en, it. Risorse in `src/i18n/en.json` e `src/i18n/it.json`.

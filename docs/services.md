@@ -54,7 +54,9 @@ File: `src/lib/services/imdbSuggestions.ts`
 
 File: src/lib/services/omdb.ts
 
-- Integrazione legacy per suggerimenti di ricerca; non viene usata dal flusso IMDb principale.
+- Fallback per i suggerimenti di ricerca quando IMDb non restituisce risultati.
+- Richiede `EXPO_PUBLIC_OMDB_API_KEY`; senza configurazione viene ignorato senza eseguire richieste.
+- Gestisce timeout, annullamento, errori HTTP e risposte OMDb negative senza bloccare la ricerca manuale.
 
 ## Metadata anime
 

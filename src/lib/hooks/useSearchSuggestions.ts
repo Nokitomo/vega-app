@@ -1,8 +1,6 @@
 import {useEffect, useState} from 'react';
-import {
-  fetchIMDbSuggestions,
-  type TitleSuggestion,
-} from '../services/imdbSuggestions';
+import {type TitleSuggestion} from '../services/imdbSuggestions';
+import {fetchTitleSuggestions} from '../services/searchSuggestions';
 
 const SUGGESTIONS_DEBOUNCE_MS = 250;
 
@@ -27,7 +25,7 @@ export const useSearchSuggestions = ({
     const controller = new AbortController();
     let active = true;
     const timer = setTimeout(() => {
-      fetchIMDbSuggestions(cleanQuery, controller.signal).then(results => {
+      fetchTitleSuggestions(cleanQuery, controller.signal).then(results => {
         if (active && !controller.signal.aborted) {
           setSuggestions(results);
         }
