@@ -5,6 +5,7 @@ import {Image, Text, View} from 'react-native';
 interface EpisodeMetadataProps {
   title: string;
   label?: string;
+  fillerLabel?: string;
   synopsis?: string;
   thumbnail?: string;
   accentColor: string;
@@ -18,6 +19,7 @@ const normalizeOptionalText = (value?: string) => {
 const EpisodeMetadata = ({
   title,
   label,
+  fillerLabel,
   synopsis,
   thumbnail,
   accentColor,
@@ -32,6 +34,10 @@ const EpisodeMetadata = ({
     [synopsis],
   );
   const normalizedLabel = useMemo(() => normalizeOptionalText(label), [label]);
+  const normalizedFillerLabel = useMemo(
+    () => normalizeOptionalText(fillerLabel),
+    [fillerLabel],
+  );
 
   useEffect(() => {
     setThumbnailFailed(false);
@@ -60,12 +66,23 @@ const EpisodeMetadata = ({
       )}
 
       <View className="min-w-0 flex-1 justify-center">
-        {normalizedLabel ? (
-          <Text
-            className="text-[10px] font-medium text-white/60"
-            numberOfLines={1}>
-            {normalizedLabel}
-          </Text>
+        {normalizedLabel || normalizedFillerLabel ? (
+          <View className="mb-0.5 flex-row items-center gap-2">
+            {normalizedFillerLabel ? (
+              <View className="h-6 justify-center rounded-full bg-white px-2.5">
+                <Text className="text-xs font-semibold text-black">
+                  {normalizedFillerLabel}
+                </Text>
+              </View>
+            ) : null}
+            {normalizedLabel ? (
+              <Text
+                className="min-w-0 flex-1 text-[10px] font-medium text-white/60"
+                numberOfLines={1}>
+                {normalizedLabel}
+              </Text>
+            ) : null}
+          </View>
         ) : null}
         <Text className="text-white" numberOfLines={1}>
           {title}

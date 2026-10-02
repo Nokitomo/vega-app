@@ -2354,11 +2354,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         showFillerLabels &&
         fillerEpisodeNumber != null &&
         fillerEpisodes.has(fillerEpisodeNumber);
-      const metadataLabel = isFiller
-        ? episodeLabel
-          ? `${episodeLabel} · ${t('Filler')}`
-          : t('Filler')
-        : episodeLabel;
+      const metadataLabel = episodeLabel;
       const hasExtendedMetadata = !!(
         item.thumbnail?.trim() || item.synopsis?.trim()
       );
@@ -2396,6 +2392,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
               <EpisodeMetadata
                 title={episodeTitle}
                 label={metadataLabel}
+                fillerLabel={isFiller ? t('Filler') : undefined}
                 synopsis={item.synopsis}
                 thumbnail={item.thumbnail}
                 accentColor={primary}
@@ -2472,9 +2469,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         showFillerLabels &&
         directEpisodeNumber != null &&
         fillerEpisodes.has(directEpisodeNumber);
-      const directDisplayTitle = isDirectFiller
-        ? `${directTitle} · ${t('Filler')}`
-        : directTitle;
+      const directDisplayTitle = directTitle;
 
       return (
         <View
@@ -2509,6 +2504,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
               <View className="w-8 items-center justify-center">
                 <Ionicons name="play-circle" size={28} color={primary} />
               </View>
+              {isDirectFiller ? (
+                <View className="h-6 justify-center rounded-full bg-white px-2.5">
+                  <Text className="text-xs font-semibold text-black">
+                    {t('Filler')}
+                  </Text>
+                </View>
+              ) : null}
               <Text className="text-white flex-1" numberOfLines={1}>
                 {isDirectFiller ||
                 (activeSeason?.directLinks?.length &&

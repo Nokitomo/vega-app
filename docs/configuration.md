@@ -54,7 +54,7 @@ File: app.config.js
 
 ## Player: timestamp e filler
 - `Preferences -> Player -> Skip timestamps` abilita i pulsanti di skip; il valore predefinito e attivo.
-- `Preferences -> Player -> Filler episodes` abilita la dicitura `Filler` nella lista episodi; il valore predefinito e disattivato.
+- `Preferences -> Player -> Filler episodes` abilita un badge `Filler` ad alto contrasto nella lista episodi; il valore predefinito e disattivato.
 - I servizi di timestamp e il database filler non richiedono chiavi configurate nell'app.
 - AnimeSkip richiede un account personale configurabile da `Settings -> Account`; senza login il relativo resolver viene ignorato.
 - In `Settings -> Account` ogni servizio e inizialmente compatto; toccando la riga AnimeSkip si aprono stato, login o logout e collegamento per creare un account.

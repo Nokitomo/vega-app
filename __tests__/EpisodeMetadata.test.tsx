@@ -55,3 +55,30 @@ it('keeps the compact fallback when optional TMDB metadata is missing', async ()
 
   await act(async () => component?.unmount());
 });
+
+it('renders filler as a separate high-contrast badge', async () => {
+  let component: renderer.ReactTestRenderer | undefined;
+
+  await act(async () => {
+    component = renderer.create(
+      <EpisodeMetadata
+        title="L'Incubo"
+        label="Episodio 54"
+        fillerLabel="Filler"
+        accentColor="#ff0000"
+      />,
+    );
+  });
+
+  expect(renderedText(component!)).toEqual([
+    'Filler',
+    'Episodio 54',
+    "L'Incubo",
+  ]);
+  const fillerText = component!.root
+    .findAllByType(Text)
+    .find(node => node.props.children === 'Filler');
+  expect(fillerText?.props.className).toContain('text-black');
+
+  await act(async () => component?.unmount());
+});
