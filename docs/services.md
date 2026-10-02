@@ -60,6 +60,6 @@ File: `src/lib/services/fillerDatabase.ts`
 - Usa `recloudstream/anime-db` direttamente da GitHub senza API key.
 - Il JSON scaricato resta nello storage principale senza scadenza. Ogni sette giorni viene confrontato lo SHA del file tramite GitHub Contents API; viene sostituito solo quando lo SHA cambia e il nuovo JSON supera la validazione.
 - In caso di errore di rete o payload non valido resta disponibile l'ultima copia valida.
-- La ricerca segue la priorita di Cloudstream: MAL, AniList, Kitsu, IMDb, stagione TMDB e titolo normalizzato.
-- Gli ID anime vengono normalizzati sia dai campi singoli sia dagli array restituiti dai provider. La ricerca TMDB riconosce sia `themoviedb_id` sia l'eventuale ID della stagione.
+- La ricerca segue la priorita di Cloudstream: MAL, AniList, Kitsu, IMDb, serie TMDB e titolo normalizzato. Gli identificativi assenti vengono ignorati per evitare corrispondenze accidentali con record privi di mapping.
+- Gli ID anime vengono normalizzati sia dai campi singoli sia dagli array restituiti dai provider. La ricerca TMDB confronta l'ID del titolo con `themoviedb_id`; `season.tmdb` indica invece il numero della stagione e non viene trattato come ID del titolo.
 - La lista episodi mantiene come riferimento il numero assoluto del provider, quindi le etichette filler restano corrette indipendentemente dalla suddivisione in stagioni usata per i metadata.

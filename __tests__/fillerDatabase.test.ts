@@ -7,6 +7,10 @@ import {
 const database = parseFillerDatabase(
   JSON.stringify([
     {
+      mapping: null,
+      show: {title: 'Black Butler OVAs', filler: [1, 2, 4, 5]},
+    },
+    {
       mapping: {
         mal_id: 21,
         anilist_id: 30013,
@@ -35,6 +39,39 @@ describe('filler database', () => {
     expect(
       [...findFillerEpisodes(database, {title: 'Other', tmdbId: 37854})],
     ).toEqual([54, 55]);
+  });
+
+  it('does not match missing identifiers against records without mappings', () => {
+    expect(
+      [
+        ...findFillerEpisodes(database, {
+          title: 'From Old Country Bumpkin to Master Swordsman',
+          malId: 59452,
+          anilistId: 179955,
+          tmdbId: 260823,
+        }),
+      ],
+    ).toEqual([]);
+  });
+
+  it('does not treat a TMDB season number as a TMDB title identifier', () => {
+    const seasonOnlyDatabase = parseFillerDatabase(
+      JSON.stringify([
+        {
+          mapping: {season: {tmdb: 1}},
+          show: {title: 'Unrelated', filler: [1]},
+        },
+      ]),
+    );
+
+    expect(
+      [
+        ...findFillerEpisodes(seasonOnlyDatabase, {
+          title: 'Other',
+          tmdbId: 1,
+        }),
+      ],
+    ).toEqual([]);
   });
 
   it('rejects malformed database payloads', () => {

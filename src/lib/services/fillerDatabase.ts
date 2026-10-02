@@ -136,16 +136,27 @@ export const findFillerEpisodes = (
   database: FillerMedia[],
   lookup: FillerLookup,
 ): Set<number> => {
-  const media = database.find(item => item.mapping?.mal_id === lookup.malId) ||
-    database.find(item => item.mapping?.anilist_id === lookup.anilistId) ||
-    database.find(item => item.mapping?.kitsu_id === lookup.kitsuId) ||
-    database.find(item => !!lookup.imdbId && item.mapping?.imdb_id === lookup.imdbId) ||
+  const media =
+    (lookup.malId != null
+      ? database.find(item => item.mapping?.mal_id === lookup.malId)
+      : undefined) ||
+    (lookup.anilistId != null
+      ? database.find(item => item.mapping?.anilist_id === lookup.anilistId)
+      : undefined) ||
+    (lookup.kitsuId != null
+      ? database.find(item => item.mapping?.kitsu_id === lookup.kitsuId)
+      : undefined) ||
+    (lookup.imdbId
+      ? database.find(item => item.mapping?.imdb_id === lookup.imdbId)
+      : undefined) ||
+    (lookup.tmdbId != null
+      ? database.find(
+          item => item.mapping?.themoviedb_id === lookup.tmdbId,
+        )
+      : undefined) ||
     database.find(
-      item =>
-        item.mapping?.themoviedb_id === lookup.tmdbId ||
-        item.mapping?.season?.tmdb === lookup.tmdbId,
-    ) ||
-    database.find(item => normalizeTitle(item.show.title) === normalizeTitle(lookup.title));
+      item => normalizeTitle(item.show.title) === normalizeTitle(lookup.title),
+    );
   return new Set(media?.show.filler || []);
 };
 
