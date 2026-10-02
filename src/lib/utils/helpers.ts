@@ -8,6 +8,14 @@ export const formatName = (name: string): string => {
 export const hasItaBadge = (title?: string): boolean =>
   /\(\s*ita\s*\)/i.test(title || '');
 
+export const sanitizeSearchQuery = (text: string): string =>
+  text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const DEFAULT_REPO_NAME = 'vega-providers';
 const DEFAULT_BRANCH = 'main';
 const RAW_GITHUB_HOST = 'raw.githubusercontent.com';

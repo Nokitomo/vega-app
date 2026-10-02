@@ -1,21 +1,32 @@
 # Testing e Qualita
 
 ## Lint
+
 ```
 npm run lint
 ```
 
 ## Test
+
 ```
 npm test
 ```
 
 ## Note
+
 - Gli errori bloccanti (rossi) e i warning (gialli) vanno corretti prima del commit.
 - Gli info possono essere ignorati.
 - Per nuove stringhe UI, aggiornare en/it e verificare che la lingua sia consistente.
 
+## Smoke test suggerimenti di ricerca
+
+- Nella ricerca globale digitare almeno due caratteri e verificare la comparsa dei suggerimenti IMDb.
+- Selezionare un suggerimento e verificare che `SearchResults` interroghi tutti i provider installati.
+- Dalla Home aprire la ricerca, selezionare un suggerimento e verificare che `ScrollList` usi solo il provider attivo.
+- Verificare che cancellazione, back Android, invio manuale e assenza di rete non blocchino la ricerca.
+
 ## Smoke test cast Android
+
 - Verificare `Preferences -> Player -> Cast Provider` su `native`, `vega` e `wvc`.
 - Da Player e da lista server:
   - cast nativo: apertura dialog device, start playback remoto, next/prev da queue quando disponibile.
@@ -28,6 +39,7 @@ npm test
 - Durante cast nativo da Player, verificare aggiornamento progresso episodio in cronologia/cache.
 
 ## Smoke test Player Android
+
 - Da player nativo app (non Webview), attivare fullscreen e verificare che status/navigation bar Android siano nascoste.
 - In fullscreen player nativo, mettere app in background e tornare in foreground: verificare che status/navigation bar restino nascoste senza dover togglare il pulsante fullscreen.
 - Uscire dal fullscreen player nativo: verificare ripristino corretto delle system bars.
@@ -44,6 +56,7 @@ npm test
 - Disattivare solo gli swipe verticali lasciando attivo il gesto 2x: luminosita/volume devono restare disattivati, mentre la pressione prolungata deve continuare ad attivare e ripristinare il 2x.
 
 ## Smoke test WebView/GeckoView
+
 - Android:
   - Da Info -> menu -> `Open in Web`, verificare apertura pagina nello screen Webview.
   - In Webview con auto-rotate OFF, verificare che lo schermo non ruoti.
