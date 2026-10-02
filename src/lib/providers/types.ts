@@ -189,6 +189,7 @@ export interface EpisodeLink {
   titleParams?: I18nParams;
   episodeNumber?: number;
   sourceEpisodeNumber?: number;
+  sourceEpisodeEndNumber?: number;
   seasonNumber?: number;
   synopsis?: string;
   thumbnail?: string;
@@ -235,6 +236,8 @@ export interface Link {
     titleKey?: string;
     titleParams?: I18nParams;
     episodeNumber?: number;
+    sourceEpisodeNumber?: number;
+    sourceEpisodeEndNumber?: number;
     seasonNumber?: number;
     link: string;
     type?: 'movie' | 'series';

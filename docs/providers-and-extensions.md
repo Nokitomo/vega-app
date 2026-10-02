@@ -76,10 +76,12 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 
 - I provider possono valorizzare su `EpisodeLink` e `Link.directLinks[]`:
   - `episodeNumber`: numero episodio strutturato
+  - `sourceEpisodeNumber` e `sourceEpisodeEndNumber`: estremi della numerazione del provider; quando l'estremo finale e maggiore di quello iniziale l'interfaccia mostra un intervallo, per esempio `Episodi 171-172`, mantenendo un solo elemento riproducibile
   - `seasonNumber`: numero stagione reale (quando applicabile)
 - La UI usa questi campi per:
   - badge episodio in "Continua a guardare"
   - etichetta del bottone resume (`Sx-Epy` per stagioni reali, `Epy` negli altri casi)
+  - ricerca nella lista episodi per numero sorgente, compresi gli intervalli come `171-172`
 - Fallback retrocompatibile: se i campi mancano, la UI prova a estrarre il numero dal titolo episodio.
 
 ## Priorita metadati (sinossi)

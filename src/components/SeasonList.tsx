@@ -829,9 +829,29 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
     // Apply search filter
     if (searchText.trim()) {
-      episodes = episodes.filter(episode =>
-        episode?.title?.toLowerCase().includes(searchText.toLowerCase()),
-      );
+      const query = searchText.trim().toLowerCase();
+      episodes = episodes.filter(episode => {
+        const sourceStart = normalizeNumericValue(
+          episode?.sourceEpisodeNumber,
+        );
+        const sourceEnd = normalizeNumericValue(
+          episode?.sourceEpisodeEndNumber,
+        );
+        const episodeNumber = normalizeNumericValue(episode?.episodeNumber);
+        const searchable = [
+          episode?.title,
+          sourceStart,
+          sourceEnd,
+          sourceStart != null && sourceEnd != null
+            ? `${sourceStart}-${sourceEnd}`
+            : undefined,
+          episodeNumber,
+        ]
+          .filter(value => value != null)
+          .join(' ')
+          .toLowerCase();
+        return searchable.includes(query);
+      });
     }
 
     // Apply sorting
@@ -848,9 +868,19 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
     // Apply search filter
     if (searchText.trim()) {
-      links = links.filter(link =>
-        link?.title?.toLowerCase().includes(searchText.toLowerCase()),
-      );
+      const query = searchText.trim().toLowerCase();
+      links = links.filter(link => {
+        const searchable = [
+          link?.title,
+          link?.sourceEpisodeNumber,
+          link?.sourceEpisodeEndNumber,
+          link?.episodeNumber,
+        ]
+          .filter(value => value != null)
+          .join(' ')
+          .toLowerCase();
+        return searchable.includes(query);
+      });
     }
 
     // Apply sorting
@@ -2342,8 +2372,21 @@ const SeasonList: React.FC<SeasonListProps> = ({
       const episodeTitle = item.titleKey
         ? t(item.titleKey, item.titleParams)
         : item.title;
+      const sourceEpisodeStart = normalizeNumericValue(
+        item.sourceEpisodeNumber,
+      );
+      const sourceEpisodeEnd = normalizeNumericValue(
+        item.sourceEpisodeEndNumber,
+      );
       const episodeLabel =
-        !item.titleKey && item.episodeNumber != null
+        sourceEpisodeStart != null &&
+        sourceEpisodeEnd != null &&
+        sourceEpisodeEnd > sourceEpisodeStart
+          ? t('Episodes {{start}}-{{end}}', {
+              start: sourceEpisodeStart,
+              end: sourceEpisodeEnd,
+            })
+          : !item.titleKey && item.episodeNumber != null
           ? t('Episode {{number}}', {number: item.episodeNumber})
           : undefined;
       const fillerEpisodeNumber =
