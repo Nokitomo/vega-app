@@ -4,7 +4,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -310,7 +309,7 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         className="flex-1 justify-end bg-black/70">
         <Pressable className="flex-1" onPress={onClose} />
         <View
