@@ -30,6 +30,7 @@ npm test
 - Nella ricerca globale digitare almeno due caratteri e verificare la comparsa dei suggerimenti IMDb.
 - Selezionare un suggerimento e verificare che `SearchResults` interroghi tutti i provider installati.
 - Dalla Home aprire la ricerca, selezionare un suggerimento e verificare che `ScrollList` usi solo il provider attivo.
+- Con AnimeUnity, aprire la Home con poster preferiti gia in cache, chiudere e riaprire l'app: le card devono mostrare il poster preferito senza passare dal poster del catalogo. Scorrere le sezioni in orizzontale e verticale e tornare sulle card: nessun lampeggio dovuto a rimontaggi forzati per URL invariati; verificare anche una card con immagine non disponibile e la griglia `ScrollList`.
 - Verificare che cancellazione, back Android, invio manuale e assenza di rete non blocchino la ricerca.
 - Con `EXPO_PUBLIC_OMDB_API_KEY` configurata, simulare una risposta IMDb vuota e verificare che i suggerimenti provengano da OMDb; senza chiave non deve partire alcuna richiesta OMDb.
 

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Image, ImageProps} from 'react-native';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {
@@ -10,6 +10,19 @@ import type {Post} from '../lib/providers/types';
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
 const ANIMEUNITY_PROVIDER = 'animeunity';
+
+const getInitialSourceUri = (
+  uri?: string,
+  link?: string,
+  providerValue?: string,
+): string => {
+  const fallbackUri = uri || PLACEHOLDER_IMAGE;
+  if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+    return fallbackUri;
+  }
+  const cached = getCachedProviderPoster(providerValue, link);
+  return cached ? cached.value.poster || fallbackUri : PLACEHOLDER_IMAGE;
+};
 
 type ProviderImageProps = Omit<ImageProps, 'source'> & {
   uri?: string;
@@ -29,15 +42,36 @@ const ProviderImage = ({
   ...rest
 }: ProviderImageProps): React.JSX.Element => {
   const providerCacheScope = getProviderCacheScope(providerValue || '');
-  const [sourceUri, setSourceUri] = useState(uri || PLACEHOLDER_IMAGE);
+  const sourceIdentity = JSON.stringify([
+    providerCacheScope,
+    providerValue,
+    link,
+    uri,
+  ]);
+  const initialSourceUri = useMemo(
+    () => getInitialSourceUri(uri, link, providerValue),
+    [sourceIdentity],
+  );
+  const [source, setSource] = useState(() => ({
+    identity: sourceIdentity,
+    uri: initialSourceUri,
+  }));
+  const sourceUri =
+    source.identity === sourceIdentity ? source.uri : initialSourceUri;
   const [hasTriedFallback, setHasTriedFallback] = useState(false);
-  const [imageReloadKey, setImageReloadKey] = useState(0);
+  const [errorRetryKey, setErrorRetryKey] = useState(0);
   const isMounted = useRef(true);
 
-  const updateSourceUri = useCallback((nextUri: string) => {
-    setSourceUri(nextUri);
-    setImageReloadKey(value => value + 1);
-  }, []);
+  const updateSourceUri = useCallback(
+    (nextUri: string) => {
+      setSource(previous =>
+        previous.identity === sourceIdentity && previous.uri === nextUri
+          ? previous
+          : {identity: sourceIdentity, uri: nextUri},
+      );
+    },
+    [sourceIdentity],
+  );
 
   useEffect(() => {
     isMounted.current = true;
@@ -49,20 +83,12 @@ const ProviderImage = ({
   useEffect(() => {
     const fallbackUri = uri || PLACEHOLDER_IMAGE;
     setHasTriedFallback(false);
+    updateSourceUri(getInitialSourceUri(uri, link, providerValue));
     if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
-      updateSourceUri(fallbackUri);
       return;
     }
     let cancelled = false;
     const controller = new AbortController();
-    const cached = getCachedProviderPoster(providerValue, link);
-    if (cached?.value.poster) {
-      updateSourceUri(cached.value.poster);
-    } else if (cached) {
-      updateSourceUri(fallbackUri);
-    } else {
-      updateSourceUri(PLACEHOLDER_IMAGE);
-    }
     if (!shouldResolveArtwork) {
       return () => controller.abort();
     }
@@ -120,7 +146,11 @@ const ProviderImage = ({
       });
       if (image) {
         if (isMounted.current) {
-          updateSourceUri(image);
+          if (image === sourceUri) {
+            setErrorRetryKey(value => value + 1);
+          } else {
+            updateSourceUri(image);
+          }
         }
         return;
       }
@@ -137,6 +167,7 @@ const ProviderImage = ({
     link,
     providerCacheScope,
     providerValue,
+    sourceUri,
     updateSourceUri,
   ]);
 
@@ -152,7 +183,7 @@ const ProviderImage = ({
 
   return (
     <Image
-      key={`${link || ''}:${sourceUri}:${imageReloadKey}`}
+      key={errorRetryKey}
       {...rest}
       source={{uri: sourceUri}}
       onError={handleError}

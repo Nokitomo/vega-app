@@ -23,6 +23,7 @@ Manager specifici:
 - ProvidersStorage / ExtensionStorage: provider disponibili e installati.
 - CacheStorage: cache generica.
 - cacheStorage include cache home/hero con TTL settimanale.
+- Le card AnimeUnity leggono subito il poster preferito gia salvato in `cacheStorage`; in assenza di una scelta salvata attendono la risoluzione del poster, senza mostrare temporaneamente quello del catalogo. Un URL immutato non forza il rimontaggio dell'immagine; un retry esplicito avviene solo dopo un errore di caricamento.
 - Il database filler usa `mainStorage`: la copia valida non scade e un controllo SHA settimanale scarica il file solo quando cambia.
 - La sessione AnimeSkip usa `secureStorage`; la password non viene persistita.
 
