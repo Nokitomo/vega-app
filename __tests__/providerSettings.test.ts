@@ -56,7 +56,7 @@ describe('provider settings modules', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('detects missing, stale, or incomplete provider module caches', () => {
+  it('repairs invalid modules while keeping complete older modules current', () => {
     const provider = {
       value: 'animeunity',
       display_name: 'AnimeUnity',
@@ -82,27 +82,33 @@ describe('provider settings modules', () => {
       },
     };
 
-    expect(isProviderModuleCurrent(currentModule, provider, now)).toBe(true);
+    expect(isProviderModuleCurrent(currentModule, provider)).toBe(true);
     expect(
       isProviderModuleCurrent(
         {...currentModule, cacheRevision: undefined},
         provider,
-        now,
       ),
     ).toBe(false);
     expect(
       isProviderModuleCurrent(
         {...currentModule, cachedAt: now - 25 * 60 * 60 * 1000},
         provider,
-        now,
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isProviderModuleCurrent(
         {...currentModule, modules: {...currentModule.modules, meta: ''}},
         provider,
-        now,
       ),
+    ).toBe(false);
+    expect(
+      isProviderModuleCurrent(
+        {...currentModule, sourceAuthor: 'OtherSource'},
+        provider,
+      ),
+    ).toBe(false);
+    expect(
+      isProviderModuleCurrent({...currentModule, version: '1.3.15'}, provider),
     ).toBe(false);
   });
 

@@ -29,6 +29,8 @@ File: src/screens/settings/About.tsx
 File: src/lib/services/UpdateProviders.ts
 
 - Confronta versioni provider per sorgente e avvia update automatici dopo aver refreshato i manifest delle sorgenti usate dai provider installati.
+- Ripara automaticamente moduli locali mancanti, incompleti o incompatibili anche se la versione e invariata. Una cache integra non viene riscaricata solo per la sua eta.
+- Dal Provider Manager si puo riscaricare manualmente un provider installato anche senza una nuova versione, senza cancellarne le impostazioni.
 - Scarica i moduli aggiornati prima di aggiornare il record installato, evitando di lasciare provider disinstallati se il download fallisce.
 - Mostra notifiche di progresso tramite NotificationService solo se le notifiche sono abilitate.
 - Controllo automatico ogni 6 ore; se chiamato piu volte evita timer duplicati.

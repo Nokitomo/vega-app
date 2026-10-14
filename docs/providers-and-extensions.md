@@ -134,6 +134,8 @@ File: src/lib/providers/providerContext.ts
 - ExtensionStorage gestisce sorgenti provider, cache locale per sorgente e stato installato/abilitato.
 - UpdateProvidersService verifica versioni per sorgente e aggiorna automaticamente.
 - Le cache di catalogo, metadata, episodi e stream includono sorgente, nome e versione del modulo provider. Dopo un aggiornamento l'app sincronizza subito il provider attivo e rimuove soltanto le query della vecchia versione, senza cancellare cronologia, watchlist o preferenze.
+- La data della cache dei moduli non genera da sola un aggiornamento: il download automatico avviene per una versione nuova o per riparare moduli mancanti/incompleti/incompatibili. Un riscaricamento manuale resta disponibile nella lista dei provider installati.
+- Quando cambia il codice di un provider pubblicato, incrementare la sua versione nel manifest e pubblicare i file `dist` aggiornati nello stesso commit. Se cambia un modulo condiviso, incrementare le versioni di tutti i provider i cui bundle `dist` cambiano.
 - Le notifiche di aggiornamento provider usano testi localizzati.
 
 ## Dove stanno i provider

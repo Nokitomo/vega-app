@@ -18,12 +18,9 @@ export interface UpdateInfo {
   hasUpdate: boolean;
 }
 
-const PROVIDER_MODULE_REFRESH_MS = 24 * 60 * 60 * 1000;
-
 export const isProviderModuleCurrent = (
   module: ProviderModule | undefined,
   provider: ProviderExtension,
-  now = Date.now(),
 ): boolean => {
   const sourceAuthor = provider.source?.author;
   const requiredModules: Array<keyof ProviderModule['modules']> = [
@@ -39,7 +36,6 @@ export const isProviderModuleCurrent = (
     (!sourceAuthor || module.sourceAuthor === sourceAuthor) &&
     module.cacheRevision === PROVIDER_MODULE_CACHE_REVISION &&
     Number.isFinite(module.cachedAt) &&
-    now - module.cachedAt < PROVIDER_MODULE_REFRESH_MS &&
     requiredModules.every(
       name =>
         typeof module.modules[name] === 'string' &&

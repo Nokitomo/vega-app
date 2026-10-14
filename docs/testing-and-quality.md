@@ -18,6 +18,13 @@ npm test
 - Gli info possono essere ignorati.
 - Per nuove stringhe UI, aggiornare en/it e verificare che la lingua sia consistente.
 
+## Smoke test aggiornamenti provider
+
+- Con provider installato e moduli completi, verificare che dopo 24 ore un controllo automatico o manuale non mostri aggiornamenti se il manifest ha la stessa versione.
+- Con una versione piu recente nel manifest, verificare che l'aggiornamento scarichi i nuovi moduli e mantenga impostazioni e provider attivo.
+- Con un modulo richiesto mancante o incompatibile, verificare che l'app lo riscarichi; se il download fallisce, la versione installata deve restare invariata.
+- Dal Provider Manager, usare il pulsante per riscaricare un provider gia aggiornato e verificare che restino le sue impostazioni.
+
 ## Smoke test suggerimenti di ricerca
 
 - Nella ricerca globale digitare almeno due caratteri e verificare la comparsa dei suggerimenti IMDb.

@@ -163,7 +163,10 @@ const Extensions = ({navigation}: Props) => {
     }
   };
 
-  const handleUpdateProvider = async (provider: ProviderExtension) => {
+  const handleUpdateProvider = async (
+    provider: ProviderExtension,
+    isManualRefresh = false,
+  ) => {
     if (!provider || !provider.value) {
       Alert.alert(t('Error'), t('Invalid provider data'));
       return;
@@ -186,9 +189,14 @@ const Extensions = ({navigation}: Props) => {
 
         Alert.alert(
           t('Success'),
-          t('{{provider}} has been updated successfully!', {
-            provider: provider.display_name,
-          }),
+          t(
+            isManualRefresh
+              ? '{{provider}} has been redownloaded successfully!'
+              : '{{provider}} has been updated successfully!',
+            {
+              provider: provider.display_name,
+            },
+          ),
         );
 
         // Update the active provider if it was the one being updated
@@ -198,14 +206,22 @@ const Extensions = ({navigation}: Props) => {
       } else {
         Alert.alert(
           t('Error'),
-          t('Failed to update provider. Please try again.'),
+          t(
+            isManualRefresh
+              ? 'Failed to redownload provider. Please try again.'
+              : 'Failed to update provider. Please try again.',
+          ),
         );
       }
     } catch (error) {
       console.error('Update error:', error);
       Alert.alert(
         t('Error'),
-        t('Failed to update provider. Please try again.'),
+        t(
+          isManualRefresh
+            ? 'Failed to redownload provider. Please try again.'
+            : 'Failed to update provider. Please try again.',
+        ),
       );
     } finally {
       setUpdatingProvider(null);
@@ -459,26 +475,33 @@ const Extensions = ({navigation}: Props) => {
                     color="white"
                   />
                 </TouchableOpacity>
-                {hasUpdate && (
-                  <TouchableOpacity
-                    onPress={() => handleUpdateProvider(updateInfo!.provider)}
-                    disabled={isUpdating}
-                    className="w-9 h-9 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: primary,
-                      opacity: isUpdating ? 0.7 : 1,
-                    }}>
-                    {isUpdating ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name="update"
-                        size={20}
-                        color="white"
-                      />
-                    )}
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  onPress={() =>
+                    handleUpdateProvider(
+                      hasUpdate ? updateInfo!.provider : item,
+                      !hasUpdate,
+                    )
+                  }
+                  disabled={isUpdating}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    hasUpdate ? t('Update provider') : t('Redownload provider')
+                  }
+                  className="w-9 h-9 rounded-full items-center justify-center"
+                  style={{
+                    backgroundColor: hasUpdate ? primary : '#374151',
+                    opacity: isUpdating ? 0.7 : 1,
+                  }}>
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name={hasUpdate ? 'update' : 'refresh'}
+                      size={20}
+                      color="white"
+                    />
+                  )}
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => handleUninstallProvider(item)}
                   className="w-9 h-9 rounded-full items-center justify-center bg-red-600">
