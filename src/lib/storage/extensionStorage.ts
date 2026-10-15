@@ -1,5 +1,6 @@
 import {mainStorage, providerKvStorage} from './StorageService';
 import {clearProviderKvStore} from '../providers/providerKvStore';
+import {clearAnimeUnityFileCache} from '../providers/providerFileCache';
 
 /**
  * Provider source metadata.
@@ -306,6 +307,11 @@ export class ExtensionStorage {
     clearProviderKvStore(providerValue, sourceAuthor).catch(error => {
       console.warn('Failed to clear provider settings:', error);
     });
+    if (providerValue === 'animeunity') {
+      clearAnimeUnityFileCache(sourceAuthor).catch(error => {
+        console.warn('Failed to clear AnimeUnity file cache:', error);
+      });
+    }
   }
 
   /**

@@ -431,6 +431,10 @@ export type ProviderContext = {
     setString: (key: string, value: string) => void;
     delete?: (key: string) => void;
   };
+  fileCache?: {
+    read: (key: string) => Promise<{value: string; updatedAt: number} | undefined>;
+    write: (key: string, value: string) => Promise<void>;
+  };
   extractors: {
     hubcloudExtracter: (link: string, signal: AbortSignal) => Promise<Stream[]>;
     gofileExtracter: (id: string) => Promise<{

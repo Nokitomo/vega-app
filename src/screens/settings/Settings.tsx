@@ -34,6 +34,8 @@ import Animated, {FadeInDown, FadeInUp, Layout} from 'react-native-reanimated';
 import {useNavigation} from '@react-navigation/native';
 import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
+import {clearProviderFileCache} from '../../lib/providers/providerFileCache';
+import {providerManager} from '../../lib/services/ProviderManager';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
@@ -128,6 +130,10 @@ const Settings = ({navigation}: Props) => {
       });
     }
     cacheStorageService.clearAll();
+    providerManager.clearRuntimeCaches();
+    clearProviderFileCache().catch(error => {
+      console.warn('Failed to clear provider file cache:', error);
+    });
     console.log('[Settings] Cache cleared');
   }, []);
 

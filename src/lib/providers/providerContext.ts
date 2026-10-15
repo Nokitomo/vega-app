@@ -11,6 +11,7 @@ import * as Crypto from 'expo-crypto';
 import {openWebView} from '../services/wafResolver';
 import {cacheStorage} from '../storage';
 import {createProviderKvStore} from './providerKvStore';
+import {createAnimeUnityFileCache} from './providerFileCache';
 
 /**
  * Context for provider functions.
@@ -44,6 +45,10 @@ export const createProviderContext = (
         cacheStorage.setString(`${cachePrefix}${key}`, value),
       delete: key => cacheStorage.delete(`${cachePrefix}${key}`),
     },
+    fileCache:
+      providerValue === 'animeunity'
+        ? createAnimeUnityFileCache(sourceAuthor)
+        : undefined,
     kvStore: createProviderKvStore(providerValue, sourceAuthor),
     extractors,
     openWebView,

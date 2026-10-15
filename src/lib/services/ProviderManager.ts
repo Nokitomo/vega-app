@@ -18,6 +18,14 @@ import {clearProviderKvStore} from '../providers/providerKvStore';
 export class ProviderManager {
   private readonly moduleExportsCache = new Map<string, any>();
   private readonly settingsSchemaCache = new Map<string, SettingsField[]>();
+  private readonly providerContextCache = new Map<
+    string,
+    {version?: string; metaModule?: string; context: ProviderContext}
+  >();
+
+  clearRuntimeCaches = (): void => {
+    this.providerContextCache.clear();
+  };
 
   private getProviderContext(
     providerValue: string,
@@ -27,10 +35,23 @@ export class ProviderManager {
       providerValue,
       sourceAuthor,
     );
-    return createProviderContext(
-      providerValue,
-      module?.sourceAuthor || sourceAuthor,
-    );
+    const author = module?.sourceAuthor || sourceAuthor;
+    const key = `${author || 'legacy'}:${providerValue}`;
+    const cached = this.providerContextCache.get(key);
+    if (
+      cached &&
+      cached.version === module?.version &&
+      cached.metaModule === module?.modules.meta
+    ) {
+      return cached.context;
+    }
+    const context = createProviderContext(providerValue, author);
+    this.providerContextCache.set(key, {
+      version: module?.version,
+      metaModule: module?.modules.meta,
+      context,
+    });
+    return context;
   }
 
   private getProviderErrorMessage(
