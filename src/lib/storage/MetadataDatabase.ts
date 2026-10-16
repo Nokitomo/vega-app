@@ -189,14 +189,3 @@ export const removeMetadata = (
     console.warn('Metadata database delete failed:', error);
   }
 };
-
-/** The user's explicit Clear Cache action also clears durable metadata. */
-export const clearMetadataDatabase = (): void => {
-  const db = openDatabase();
-  if (!db) {return;}
-  try {
-    db.execSync('DELETE FROM metadata_records;');
-  } catch (error) {
-    console.warn('Metadata database clear failed:', error);
-  }
-};
