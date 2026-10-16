@@ -12,6 +12,9 @@ npm run lint
 npm test
 ```
 
+Per misurare separatamente dev client e APK release locale durante i test di
+Home, Info, episodi e poster, seguire [Profilazione Home e Info](performance-profiling.md).
+
 ## Note
 
 - Gli errori bloccanti (rossi) e i warning (gialli) vanno corretti prima del commit.

@@ -46,6 +46,7 @@ import {resolveWebViewLink} from '../../lib/utils/providerLinks';
 import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
 import RemoteLogo from '../../components/RemoteLogo';
 import {useLogoFallback} from '../../lib/hooks/useLogoFallback';
+import {markPerfNavigationStage, perfTrace} from '../../lib/utils/perfTrace';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -119,6 +120,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     repairInfo,
     check,
   } = useContentDetails(activeLink, providerValue);
+  useEffect(() => {
+    markPerfNavigationStage('info_mounted');
+    perfTrace('info_opened', {provider: providerValue, cacheHit: !!info});
+  }, [activeLink, providerValue]);
+  useEffect(() => {
+    if (info) {markPerfNavigationStage('metadata_ready');}
+  }, [info]);
   const animeExternalIds = useMemo(
     () => resolveAnimeExternalIds(info?.extra?.ids),
     [info?.extra?.ids],
@@ -744,7 +752,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   return (
     <QueryErrorBoundary>
-      <View className="h-full w-full">
+      <View
+        className="h-full w-full"
+        onLayout={() => markPerfNavigationStage('first_layout')}>
         <StatusBar
           showHideTransition={'slide'}
           animated={true}

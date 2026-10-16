@@ -16,6 +16,7 @@ import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
 import {extensionStorage} from '../storage/extensionStorage';
 import {clearProviderKvStore} from '../providers/providerKvStore';
+import {measurePerfSync, perfTrace, traceAsync} from '../utils/perfTrace';
 
 export class ProviderManager {
   private readonly moduleExportsCache = new Map<string, any>();
@@ -119,26 +120,29 @@ export class ProviderManager {
     if (cached) {
       return cached;
     }
-    const context = this.createExecutionContext();
+    perfTrace('provider_module_cache_miss', {codeBytes: moduleCode.length});
+    return measurePerfSync('provider_module_eval', {}, () => {
+      const context = this.createExecutionContext();
 
-    const executeModule = new Function(
-      'context',
-      ...Array.from({length: args.length}, (_, i) => `arg${i}`),
-      `
-      const exports = context.exports;
-      const __awaiter = context.__awaiter;
-      const Object = context.Object;
-      const console = context.console;
-      const Promise = context.Promise;
-      
-      ${moduleCode}
-      
-      return exports;
-      `,
-    );
-    const moduleExports = executeModule(context, ...args);
-    this.moduleExportsCache.set(moduleCode, moduleExports);
-    return moduleExports;
+      const executeModule = new Function(
+        'context',
+        ...Array.from({length: args.length}, (_, i) => `arg${i}`),
+        `
+        const exports = context.exports;
+        const __awaiter = context.__awaiter;
+        const Object = context.Object;
+        const console = context.console;
+        const Promise = context.Promise;
+
+        ${moduleCode}
+
+        return exports;
+        `,
+      );
+      const moduleExports = executeModule(context, ...args);
+      this.moduleExportsCache.set(moduleCode, moduleExports);
+      return moduleExports;
+    });
   }
   getCatalog = ({providerValue}: {providerValue: string}): Catalog[] => {
     // Use extensionManager which now handles test mode automatically
@@ -240,13 +244,15 @@ export class ProviderManager {
       );
 
       // Call the getPosts function
-      return await moduleExports.getPosts({
-        filter,
-        page,
-        providerValue,
-        signal,
-        providerContext,
-      });
+      return await traceAsync('provider.posts', {provider: providerValue}, () =>
+        moduleExports.getPosts({
+          filter,
+          page,
+          providerValue,
+          signal,
+          providerContext,
+        }),
+      );
     } catch (error) {
       console.error('Error in posts function:', error);
       throw new Error(
@@ -339,12 +345,17 @@ export class ProviderManager {
       );
 
       // Call the getMetaData function
-      return await moduleExports.getMeta({
-        link,
-        provider,
-        purpose,
-        providerContext,
-      });
+      return await traceAsync(
+        'provider.meta',
+        {provider, purpose},
+        () =>
+          moduleExports.getMeta({
+            link,
+            provider,
+            purpose,
+            providerContext,
+          }),
+      );
     } catch (error) {
       console.error('Error in meta data function:', error);
       throw new Error(
@@ -413,14 +424,16 @@ export class ProviderManager {
         providerContext,
       );
       if (typeof moduleExports.getArtwork === 'function') {
-        return await moduleExports.getArtwork({
-          link,
-          fields,
-          failedUrls,
-          hints,
-          imageSize,
-          providerContext,
-        });
+        return await traceAsync('provider.artwork', {provider}, () =>
+          moduleExports.getArtwork({
+            link,
+            fields,
+            failedUrls,
+            hints,
+            imageSize,
+            providerContext,
+          }),
+        );
       }
       return {};
     } catch (error) {
@@ -505,11 +518,11 @@ export class ProviderManager {
       );
 
       // Call the getEpisodes function
-      return await moduleExports.getEpisodes({
-        url,
-        providerContext,
-        knownEpisodes,
-      });
+      return await traceAsync(
+        'provider.episodes',
+        {provider: providerValue},
+        () => moduleExports.getEpisodes({url, providerContext, knownEpisodes}),
+      );
     } catch (error) {
       console.error('Error in episodes function:', error);
       const errorMessage = this.getProviderErrorMessage(

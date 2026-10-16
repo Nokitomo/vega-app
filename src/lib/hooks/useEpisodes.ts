@@ -12,6 +12,7 @@ import {
   readPersistedCache,
   writePersistedCache,
 } from '../utils/persistedCache';
+import {perfTrace} from '../utils/perfTrace';
 import {
   markMetadataChecked,
   readMetadata,
@@ -242,8 +243,20 @@ export const useEpisodes = (
         return undefined;
       }
 
-      return readDurableEpisodes()?.value ||
-        readPersistedCache<EpisodeLink[]>(cacheStorage, episodesCacheKey)?.value;
+      const durable = readDurableEpisodes();
+      const cached = durable
+        ? undefined
+        : readPersistedCache<EpisodeLink[]>(cacheStorage, episodesCacheKey);
+      perfTrace('episodes_cache', {
+        provider: providerValue,
+        hit: !!durable || !!cached,
+        ageMs: durable
+          ? Math.round(Date.now() - durable.updatedAt)
+          : cached
+            ? Math.round(cached.ageMs)
+            : undefined,
+      });
+      return durable?.value || cached?.value;
     },
     initialDataUpdatedAt: () =>
       episodesCacheKey

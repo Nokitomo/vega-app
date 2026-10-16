@@ -1,6 +1,7 @@
 import {mainStorage, providerKvStorage} from './StorageService';
 import {clearProviderKvStore} from '../providers/providerKvStore';
 import {clearAnimeUnityFileCache} from '../providers/providerFileCache';
+import {measurePerfSync} from '../utils/perfTrace';
 
 /**
  * Provider source metadata.
@@ -331,47 +332,49 @@ export class ExtensionStorage {
     providerValue: string,
     sourceAuthor?: string,
   ): ProviderModule | undefined {
-    const allModules =
-      mainStorage.getArray<ProviderModule>(ExtensionKeys.PROVIDER_MODULES) ||
-      [];
-    const providerMatches = allModules.filter(m => m.value === providerValue);
+    return measurePerfSync('provider_modules.read', {provider: providerValue}, () => {
+      const allModules =
+        mainStorage.getArray<ProviderModule>(ExtensionKeys.PROVIDER_MODULES) ||
+        [];
+      const providerMatches = allModules.filter(m => m.value === providerValue);
 
-    if (providerMatches.length === 0) {
-      return undefined;
-    }
-
-    if (sourceAuthor) {
-      const exactMatch = providerMatches.find(
-        m => m.sourceAuthor === sourceAuthor,
-      );
-      if (exactMatch) {
-        return exactMatch;
+      if (providerMatches.length === 0) {
+        return undefined;
       }
 
-      return providerMatches.find(m => !m.sourceAuthor);
-    }
+      if (sourceAuthor) {
+        const exactMatch = providerMatches.find(
+          m => m.sourceAuthor === sourceAuthor,
+        );
+        if (exactMatch) {
+          return exactMatch;
+        }
 
-    const activeSourceAuthor = this.getProviderSource()?.author;
-    if (activeSourceAuthor) {
-      const activeSourceMatch = providerMatches.find(
-        m => m.sourceAuthor === activeSourceAuthor,
-      );
-      if (activeSourceMatch) {
-        return activeSourceMatch;
+        return providerMatches.find(m => !m.sourceAuthor);
       }
-    }
 
-    // Prefer source-scoped cache over legacy unscoped entries.
-    const scopedMatches = providerMatches.filter(m => !!m.sourceAuthor);
-    if (scopedMatches.length > 0) {
-      return scopedMatches.reduce((latest, current) =>
+      const activeSourceAuthor = this.getProviderSource()?.author;
+      if (activeSourceAuthor) {
+        const activeSourceMatch = providerMatches.find(
+          m => m.sourceAuthor === activeSourceAuthor,
+        );
+        if (activeSourceMatch) {
+          return activeSourceMatch;
+        }
+      }
+
+      // Prefer source-scoped cache over legacy unscoped entries.
+      const scopedMatches = providerMatches.filter(m => !!m.sourceAuthor);
+      if (scopedMatches.length > 0) {
+        return scopedMatches.reduce((latest, current) =>
+          current.cachedAt > latest.cachedAt ? current : latest,
+        );
+      }
+
+      return providerMatches.reduce((latest, current) =>
         current.cachedAt > latest.cachedAt ? current : latest,
       );
-    }
-
-    return providerMatches.reduce((latest, current) =>
-      current.cachedAt > latest.cachedAt ? current : latest,
-    );
+    });
   }
 
   /**

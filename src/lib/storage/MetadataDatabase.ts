@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import {extensionStorage} from './extensionStorage';
+import {measurePerfSync} from '../utils/perfTrace';
 
 export type MetadataRecord<T> = {
   value: T;
@@ -82,28 +83,30 @@ export const readMetadata = <T>(
   provider: string,
   identity: string,
 ): MetadataRecord<T> | undefined => {
-  const db = openDatabase();
-  if (!db || !identity) {
-    return undefined;
-  }
-  try {
-    const row = db.getFirstSync<MetadataRow>(
-      'SELECT value_json, updated_at, checked_at, provider_version FROM metadata_records WHERE kind = ? AND provider = ? AND identity = ?',
-      [kind, providerNamespace(provider), metadataIdentity(provider, identity)],
-    );
-    if (!row) {
+  return measurePerfSync('metadata.read', {kind, provider}, () => {
+    const db = openDatabase();
+    if (!db || !identity) {
       return undefined;
     }
-    return {
-      value: JSON.parse(row.value_json) as T,
-      updatedAt: row.updated_at,
-      checkedAt: row.checked_at,
-      providerVersion: row.provider_version,
-    };
-  } catch (error) {
-    console.warn('Metadata database read failed:', error);
-    return undefined;
-  }
+    try {
+      const row = db.getFirstSync<MetadataRow>(
+        'SELECT value_json, updated_at, checked_at, provider_version FROM metadata_records WHERE kind = ? AND provider = ? AND identity = ?',
+        [kind, providerNamespace(provider), metadataIdentity(provider, identity)],
+      );
+      if (!row) {
+        return undefined;
+      }
+      return {
+        value: JSON.parse(row.value_json) as T,
+        updatedAt: row.updated_at,
+        checkedAt: row.checked_at,
+        providerVersion: row.provider_version,
+      };
+    } catch (error) {
+      console.warn('Metadata database read failed:', error);
+      return undefined;
+    }
+  });
 };
 
 export const writeMetadata = <T>(
@@ -113,13 +116,14 @@ export const writeMetadata = <T>(
   value: T,
   providerVersion = '',
 ): void => {
-  const db = openDatabase();
-  if (!db || !identity) {
-    return;
-  }
-  const now = Date.now();
-  try {
-    db.runSync(
+  measurePerfSync('metadata.write', {kind, provider}, () => {
+    const db = openDatabase();
+    if (!db || !identity) {
+      return;
+    }
+    const now = Date.now();
+    try {
+      db.runSync(
       `INSERT INTO metadata_records
        (kind, provider, identity, value_json, updated_at, checked_at, provider_version)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -137,10 +141,11 @@ export const writeMetadata = <T>(
         now,
         providerVersion,
       ],
-    );
-  } catch (error) {
-    console.warn('Metadata database write failed:', error);
-  }
+      );
+    } catch (error) {
+      console.warn('Metadata database write failed:', error);
+    }
+  });
 };
 
 export const markMetadataChecked = (
@@ -149,12 +154,13 @@ export const markMetadataChecked = (
   identity: string,
   providerVersion?: string,
 ): void => {
-  const db = openDatabase();
-  if (!db || !identity) {
-    return;
-  }
-  try {
-    db.runSync(
+  measurePerfSync('metadata.check', {kind, provider}, () => {
+    const db = openDatabase();
+    if (!db || !identity) {
+      return;
+    }
+    try {
+      db.runSync(
       `UPDATE metadata_records SET checked_at = ?,
        provider_version = COALESCE(?, provider_version)
        WHERE kind = ? AND provider = ? AND identity = ?`,
@@ -165,10 +171,11 @@ export const markMetadataChecked = (
         providerNamespace(provider),
         metadataIdentity(provider, identity),
       ],
-    );
-  } catch (error) {
-    console.warn('Metadata database check timestamp update failed:', error);
-  }
+      );
+    } catch (error) {
+      console.warn('Metadata database check timestamp update failed:', error);
+    }
+  });
 };
 
 export const removeMetadata = (
@@ -176,16 +183,18 @@ export const removeMetadata = (
   provider: string,
   identity: string,
 ): void => {
-  const db = openDatabase();
-  if (!db || !identity) {
-    return;
-  }
-  try {
-    db.runSync(
+  measurePerfSync('metadata.delete', {kind, provider}, () => {
+    const db = openDatabase();
+    if (!db || !identity) {
+      return;
+    }
+    try {
+      db.runSync(
       'DELETE FROM metadata_records WHERE kind = ? AND provider = ? AND identity = ?',
       [kind, providerNamespace(provider), metadataIdentity(provider, identity)],
-    );
-  } catch (error) {
-    console.warn('Metadata database delete failed:', error);
-  }
+      );
+    } catch (error) {
+      console.warn('Metadata database delete failed:', error);
+    }
+  });
 };

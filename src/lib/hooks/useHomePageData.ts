@@ -21,6 +21,7 @@ import {
 import {fetchAniListBanner} from '../services/animeMeta';
 import {selectArtworkCandidates} from '../services/artworkSelection';
 import {resolveAnimeExternalIds} from '../providers/externalIds';
+import {measurePerfSync, traceAsync} from '../utils/perfTrace';
 import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
 
 export interface HomePageData {
@@ -125,35 +126,37 @@ export const useHomePageData = ({
     buildProviderCacheKey('homeCategoryData', providerValue, filter);
 
   const readCategoryCache = (filter: string): CategoryQueryData | undefined => {
-    const durable = readMetadata<CategoryQueryData>(
-      'homeCategoryData',
-      providerValue,
-      filter,
-    );
-    const raw = cacheStorage.getString(buildCategoryCacheKey(filter));
-    if (!raw) {
-      return durable?.value;
-    }
-    try {
-      const parsed = JSON.parse(raw) as CategoryQueryData;
-      if (!Array.isArray(parsed?.Posts)) {
-        return undefined;
+    return measurePerfSync('home_category_cache', {provider: providerValue}, () => {
+      const durable = readMetadata<CategoryQueryData>(
+        'homeCategoryData',
+        providerValue,
+        filter,
+      );
+      const raw = cacheStorage.getString(buildCategoryCacheKey(filter));
+      if (!raw) {
+        return durable?.value;
       }
-      const cached = {
-        Posts: parsed.Posts.slice(0, HOME_CATEGORY_MAX_ITEMS),
-        signature: typeof parsed.signature === 'string' ? parsed.signature : '',
-        updatedAt:
-          typeof parsed.updatedAt === 'number' &&
-          Number.isFinite(parsed.updatedAt)
-            ? parsed.updatedAt
-            : Date.now(),
-      };
-      return durable && durable.updatedAt > cached.updatedAt
-        ? durable.value
-        : cached;
-    } catch {
-      return durable?.value;
-    }
+      try {
+        const parsed = JSON.parse(raw) as CategoryQueryData;
+        if (!Array.isArray(parsed?.Posts)) {
+          return undefined;
+        }
+        const cached = {
+          Posts: parsed.Posts.slice(0, HOME_CATEGORY_MAX_ITEMS),
+          signature: typeof parsed.signature === 'string' ? parsed.signature : '',
+          updatedAt:
+            typeof parsed.updatedAt === 'number' &&
+            Number.isFinite(parsed.updatedAt)
+              ? parsed.updatedAt
+              : Date.now(),
+        };
+        return durable && durable.updatedAt > cached.updatedAt
+          ? durable.value
+          : cached;
+      } catch {
+        return durable?.value;
+      }
+    });
   };
 
   const writeCategoryCache = (filter: string, data: CategoryQueryData) => {
@@ -224,7 +227,7 @@ export const useHomePageData = ({
   };
 
   const queryResults = useQueries({
-    queries: categories.map(category => {
+    queries: categories.map((category, index) => {
       const queryKey = [
         'homeCategoryData',
         providerValue,
@@ -245,12 +248,17 @@ export const useHomePageData = ({
         refetchOnReconnect: false,
         refetchOnWindowFocus: false,
         queryFn: async ({signal}: {signal: AbortSignal}) => {
-          const posts = await providerManager.getPosts({
-            filter: category.filter,
-            page: 1,
-            providerValue,
-            signal,
-          });
+          const posts = await traceAsync(
+            'home.category',
+            {provider: providerValue, slot: index},
+            () =>
+              providerManager.getPosts({
+                filter: category.filter,
+                page: 1,
+                providerValue,
+                signal,
+              }),
+          );
           const nextPosts = Array.isArray(posts)
             ? posts.slice(0, HOME_CATEGORY_MAX_ITEMS)
             : [];

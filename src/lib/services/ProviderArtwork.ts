@@ -7,6 +7,12 @@ import {
 import {providerManager} from './ProviderManager';
 import type {Post} from '../providers/types';
 import {
+  isPerfTraceEnabled,
+  measurePerfSync,
+  perfNow,
+  perfTrace,
+} from '../utils/perfTrace';
+import {
   readMetadata,
   removeMetadata,
   writeMetadata,
@@ -33,6 +39,7 @@ type PendingLookup = {
 };
 
 const pendingByKey = new Map<string, PendingLookup>();
+const posterCacheHitsByProvider = new Map<string, number>();
 const queue: QueueTask[] = [];
 let activeLookups = 0;
 
@@ -62,22 +69,24 @@ export const getCachedProviderPoster = (
   providerValue: string,
   link: string,
 ) => {
-  const durable = readMetadata<ProviderPosterCacheValue>(
-    'preferredPosterW300V2',
-    providerValue,
-    link,
-  );
-  if (durable?.value.poster) {
-    return {
-      value: durable.value,
-      updatedAt: durable.updatedAt,
-      ageMs: Math.max(0, Date.now() - durable.updatedAt),
-    };
-  }
-  return readPersistedCache<ProviderPosterCacheValue>(
-    cacheStorage,
-    posterCacheKey(providerValue, link),
-  );
+  return measurePerfSync('poster_cache_read', {provider: providerValue}, () => {
+    const durable = readMetadata<ProviderPosterCacheValue>(
+      'preferredPosterW300V2',
+      providerValue,
+      link,
+    );
+    if (durable?.value.poster) {
+      return {
+        value: durable.value,
+        updatedAt: durable.updatedAt,
+        ageMs: Math.max(0, Date.now() - durable.updatedAt),
+      };
+    }
+    return readPersistedCache<ProviderPosterCacheValue>(
+      cacheStorage,
+      posterCacheKey(providerValue, link),
+    );
+  });
 };
 
 const attachConsumer = (
@@ -136,10 +145,19 @@ export const resolveProviderPoster = ({
     cached &&
     (durable?.value.poster || cached.ageMs <= ARTWORK_STALE_MS)
   ) {
+    // Count cache hits without flooding the JS bridge during Home rendering.
+    if (isPerfTraceEnabled) {
+      const cacheHits = (posterCacheHitsByProvider.get(providerValue) ?? 0) + 1;
+      posterCacheHitsByProvider.set(providerValue, cacheHits);
+      if (cacheHits === 1 || cacheHits % 25 === 0) {
+        perfTrace('poster_cache_hits', {provider: providerValue, count: cacheHits});
+      }
+    }
     return Promise.resolve(cached.value.poster);
   }
   const pending = pendingByKey.get(key);
   if (pending) {
+    perfTrace('poster_deduplicated', {provider: providerValue});
     attachConsumer(key, pending, signal);
     return pending.promise;
   }
@@ -158,7 +176,19 @@ export const resolveProviderPoster = ({
   };
   pendingByKey.set(key, entry);
   attachConsumer(key, entry, signal);
+  const queuedAt = isPerfTraceEnabled ? perfNow() : 0;
+  perfTrace('poster_queued', {
+    provider: providerValue,
+    queueDepth: queue.length,
+    activeLookups,
+  });
   enqueue(key, async () => {
+    if (isPerfTraceEnabled) {
+      perfTrace('poster_dequeued', {
+        provider: providerValue,
+        waitMs: Math.round(perfNow() - queuedAt),
+      });
+    }
     if (entry.consumers.size === 0) {
       pendingByKey.delete(key);
       entry.resolve(cached?.value.poster);

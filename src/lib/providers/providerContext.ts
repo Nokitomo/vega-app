@@ -12,6 +12,9 @@ import {openWebView} from '../services/wafResolver';
 import {cacheStorage} from '../storage';
 import {createProviderKvStore} from './providerKvStore';
 import {createAnimeUnityFileCache} from './providerFileCache';
+import {installPerfAxiosTrace} from '../utils/perfTrace';
+
+installPerfAxiosTrace(axios);
 
 /**
  * Context for provider functions.

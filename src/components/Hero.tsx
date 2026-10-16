@@ -29,6 +29,7 @@ import SearchSuggestions from './SearchSuggestions';
 import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
 import {useLogoFallback} from '../lib/hooks/useLogoFallback';
+import {startPerfNavigation} from '../lib/utils/perfTrace';
 
 interface HeroProps {
   isDrawerOpen: boolean;
@@ -123,6 +124,7 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
 
   const handlePlayPress = useCallback(() => {
     if (hero?.link) {
+      startPerfNavigation(provider.value);
       navigation.navigate('Info', {
         link: hero.link,
         provider: provider.value,

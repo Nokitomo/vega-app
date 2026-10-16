@@ -68,6 +68,7 @@ import {useTranslation} from 'react-i18next';
 import {applyAndroidUserOrientation} from './lib/utils/vegaOrientation';
 import WafWebViewDialog from './components/WafWebViewDialog';
 import {warpService} from './lib/services/warp';
+import {perfTrace, startPerfHeartbeat} from './lib/utils/perfTrace';
 // Lazy-load Firebase modules so app runs without google-services files
 const getAnalytics = (): any | null => {
   try {
@@ -465,6 +466,10 @@ function TabStack() {
 }
 
 const AppContent = () => {
+  useEffect(() => {
+    perfTrace('app_content_mounted');
+    return startPerfHeartbeat();
+  }, []);
   LogBox.ignoreLogs([
     'You have passed a style to FlashList',
     'new NativeEventEmitter()',

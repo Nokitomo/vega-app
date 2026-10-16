@@ -36,6 +36,7 @@ import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
 import {clearProviderFileCache} from '../../lib/providers/providerFileCache';
 import {providerManager} from '../../lib/services/ProviderManager';
+import {perfTrace} from '../../lib/utils/perfTrace';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
@@ -68,6 +69,7 @@ const Settings = ({navigation}: Props) => {
         extensionStorage.setDefaultProviderSource(item.source.author);
       }
       setProvider(item);
+      perfTrace('provider_selected', {provider: item.value});
       // Add haptic feedback
       if (settingsStorage.isHapticFeedbackEnabled()) {
         ReactNativeHapticFeedback.trigger('virtualKey', {

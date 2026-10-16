@@ -13,6 +13,7 @@ import {
 } from '../utils/providerCacheScope';
 import {readPersistedCache, writePersistedCache} from '../utils/persistedCache';
 import {shouldFetchAniListBanner} from '../services/animeArtwork';
+import {perfTrace} from '../utils/perfTrace';
 import {
   markMetadataChecked,
   readMetadata,
@@ -170,7 +171,19 @@ export const useContentInfo = (link: string, providerValue: string) => {
         return undefined;
       }
       const durable = readDurableInfo();
-      return durable?.value || readPersistedCache<any>(cacheStorage, cacheKey)?.value;
+      const cached = durable
+        ? undefined
+        : readPersistedCache<any>(cacheStorage, cacheKey);
+      perfTrace('content_info_cache', {
+        provider: providerValue,
+        hit: !!durable || !!cached,
+        ageMs: durable
+          ? Math.round(Date.now() - durable.updatedAt)
+          : cached
+            ? Math.round(cached.ageMs)
+            : undefined,
+      });
+      return durable?.value || cached?.value;
     },
     initialDataUpdatedAt: () =>
       cacheKey

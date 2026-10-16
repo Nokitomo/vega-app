@@ -1,5 +1,6 @@
 import {extensionStorage} from '../storage/extensionStorage';
 import {extensionManager} from '../services/ExtensionManager';
+import {measurePerfSync} from './perfTrace';
 
 const normalizeScopePart = (value: unknown, fallback: string): string => {
   const normalized = String(value ?? '').trim();
@@ -7,27 +8,29 @@ const normalizeScopePart = (value: unknown, fallback: string): string => {
 };
 
 export const getProviderCacheScope = (providerValue: string): string => {
-  if (!providerValue) {
-    return 'default:unknown:legacy';
-  }
-  const normalizedValue = normalizeScopePart(providerValue, 'unknown');
-  const module = extensionManager.getProviderModules(providerValue);
-  const installed = extensionStorage
-    .getInstalledProviders()
-    .find(provider => provider.value === providerValue);
-  const source = normalizeScopePart(
-    module?.sourceAuthor || installed?.source?.author,
-    'default',
-  );
-  const version = normalizeScopePart(
-    module?.version || installed?.version,
-    'legacy',
-  );
-  const revision = normalizeScopePart(
-    module?.cachedAt || installed?.lastUpdated,
-    'legacy',
-  );
-  return `${source}:${normalizedValue}:${version}:${revision}`;
+  return measurePerfSync('provider_cache_scope', {provider: providerValue}, () => {
+    if (!providerValue) {
+      return 'default:unknown:legacy';
+    }
+    const normalizedValue = normalizeScopePart(providerValue, 'unknown');
+    const module = extensionManager.getProviderModules(providerValue);
+    const installed = extensionStorage
+      .getInstalledProviders()
+      .find(provider => provider.value === providerValue);
+    const source = normalizeScopePart(
+      module?.sourceAuthor || installed?.source?.author,
+      'default',
+    );
+    const version = normalizeScopePart(
+      module?.version || installed?.version,
+      'legacy',
+    );
+    const revision = normalizeScopePart(
+      module?.cachedAt || installed?.lastUpdated,
+      'legacy',
+    );
+    return `${source}:${normalizedValue}:${version}:${revision}`;
+  });
 };
 
 export const buildProviderCacheKey = (

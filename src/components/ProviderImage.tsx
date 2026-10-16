@@ -6,6 +6,11 @@ import {
   resolveProviderPoster,
 } from '../lib/services/ProviderArtwork';
 import type {Post} from '../lib/providers/types';
+import {
+  isPerfTraceEnabled,
+  observePerfDuration,
+  perfNow,
+} from '../lib/utils/perfTrace';
 
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
@@ -39,6 +44,8 @@ const ProviderImage = ({
   artworkHints,
   shouldResolveArtwork = true,
   onError,
+  onLoad,
+  onLoadStart,
   ...rest
 }: ProviderImageProps): React.JSX.Element => {
   const providerCacheScope = getProviderCacheScope(providerValue || '');
@@ -61,6 +68,7 @@ const ProviderImage = ({
   const [hasTriedFallback, setHasTriedFallback] = useState(false);
   const [errorRetryKey, setErrorRetryKey] = useState(0);
   const isMounted = useRef(true);
+  const imageLoadStartedAt = useRef(0);
 
   const updateSourceUri = useCallback(
     (nextUri: string) => {
@@ -173,13 +181,28 @@ const ProviderImage = ({
 
   const handleError: ImageProps['onError'] = useCallback(
     (event: Parameters<NonNullable<ImageProps['onError']>>[0]) => {
+      if (isPerfTraceEnabled && imageLoadStartedAt.current) {
+        observePerfDuration('poster_image_error', {provider: providerValue}, perfNow() - imageLoadStartedAt.current);
+      }
       if (onError) {
         onError(event);
       }
       resolveFallback();
     },
-    [onError, resolveFallback],
+    [onError, providerValue, resolveFallback],
   );
+
+  const handleLoadStart: ImageProps['onLoadStart'] = useCallback(() => {
+    if (isPerfTraceEnabled) {imageLoadStartedAt.current = perfNow();}
+    onLoadStart?.();
+  }, [onLoadStart]);
+
+  const handleLoad: ImageProps['onLoad'] = useCallback((event: Parameters<NonNullable<ImageProps['onLoad']>>[0]) => {
+    if (isPerfTraceEnabled && imageLoadStartedAt.current) {
+      observePerfDuration('poster_image_load', {provider: providerValue}, perfNow() - imageLoadStartedAt.current);
+    }
+    onLoad?.(event);
+  }, [onLoad, providerValue]);
 
   return (
     <Image
@@ -187,6 +210,8 @@ const ProviderImage = ({
       {...rest}
       source={{uri: sourceUri}}
       onError={handleError}
+      onLoadStart={handleLoadStart}
+      onLoad={handleLoad}
     />
   );
 };

@@ -11,6 +11,7 @@ import SkeletonLoader from './Skeleton';
 import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from './PostBadges';
+import {startPerfNavigation} from '../lib/utils/perfTrace';
 
 // import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import useThemeStore from '../lib/zustand/themeStore';
@@ -100,6 +101,7 @@ const Slider = ({
   const handleItemPress = useCallback(
     (item: Post) => {
       setSelected('');
+      startPerfNavigation(item.provider || providerValue || provider?.value || '');
       navigation.navigate('Info', {
         link: item.link,
         provider: item.provider || providerValue || provider?.value,
