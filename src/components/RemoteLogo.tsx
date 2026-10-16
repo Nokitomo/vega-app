@@ -8,6 +8,7 @@ type RemoteLogoProps = {
   width: number;
   height: number;
   onError: () => void;
+  onLoad?: () => void;
   style?: StyleProp<ImageStyle>;
 };
 
@@ -16,6 +17,7 @@ export default function RemoteLogo({
   width,
   height,
   onError,
+  onLoad,
   style,
 }: RemoteLogoProps): React.JSX.Element {
   if (isSvgArtworkUri(uri)) {
@@ -25,6 +27,7 @@ export default function RemoteLogo({
         width={width}
         height={height}
         onError={onError}
+        onLoad={onLoad}
       />
     );
   }
@@ -33,6 +36,7 @@ export default function RemoteLogo({
     <Image
       source={{uri}}
       onError={onError}
+      onLoad={onLoad}
       style={[{width, height, resizeMode: 'contain'}, style]}
     />
   );

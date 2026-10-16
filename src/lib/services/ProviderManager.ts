@@ -383,12 +383,14 @@ export class ProviderManager {
     link,
     provider,
     fields = ['poster'],
+    failedUrls,
     hints,
     imageSize = 'original',
   }: {
     link: string;
     provider: string;
     fields?: Array<'logo' | 'poster' | 'background'>;
+    failedUrls?: string[];
     hints?: Post['artworkHints'];
     imageSize?: 'original' | 'w300' | 'w780';
   }): Promise<{
@@ -414,6 +416,7 @@ export class ProviderManager {
         return await moduleExports.getArtwork({
           link,
           fields,
+          failedUrls,
           hints,
           imageSize,
           providerContext,

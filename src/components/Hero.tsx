@@ -28,6 +28,7 @@ import type {ArtworkCandidates} from '../lib/services/artworkSelection';
 import SearchSuggestions from './SearchSuggestions';
 import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
+import {useLogoFallback} from '../lib/hooks/useLogoFallback';
 
 interface HeroProps {
   isDrawerOpen: boolean;
@@ -43,7 +44,6 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   const [searchText, setSearchText] = useState('');
   const [suggestionsSuppressed, setSuggestionsSuppressed] = useState(false);
   const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
-  const [logoCandidateIndex, setLogoCandidateIndex] = useState(0);
   const {t} = useTranslation();
   const {provider} = useContentStore(state => state);
   const {hero} = useHeroStore(state => state);
@@ -169,10 +169,6 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     lastErrorLinkRef.current = null;
   }, [hero?.link, backgroundCandidates]);
 
-  useEffect(() => {
-    setLogoCandidateIndex(0);
-  }, [hero?.link, logoCandidates]);
-
   // Memoized image source
   const currentImageUri = React.useMemo(() => {
     if (!heroData) {
@@ -240,15 +236,15 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     return heroData.title || '';
   }, [heroData, t]);
 
-  const logoUri = React.useMemo(() => {
-    return logoCandidates[logoCandidateIndex] || '';
-  }, [logoCandidates, logoCandidateIndex]);
-
-  const handleLogoError = useCallback(() => {
-    if (logoCandidateIndex < logoCandidates.length) {
-      setLogoCandidateIndex(index => index + 1);
-    }
-  }, [logoCandidateIndex, logoCandidates.length]);
+  const {
+    uri: logoUri,
+    onError: handleLogoError,
+    onLoad: handleLogoLoad,
+  } = useLogoFallback({
+    providerValue: provider.value,
+    link: hero?.link || '',
+    candidates: logoCandidates,
+  });
 
   if (error) {
     console.error('Hero metadata error:', error);
@@ -308,6 +304,7 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
                 width={200}
                 height={100}
                 onError={handleLogoError}
+                onLoad={handleLogoLoad}
               />
             ) : (
               <Text className="text-white text-center text-2xl font-bold">

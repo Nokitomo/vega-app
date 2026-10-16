@@ -45,6 +45,7 @@ import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
 import {resolveWebViewLink} from '../../lib/utils/providerLinks';
 import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
 import RemoteLogo from '../../components/RemoteLogo';
+import {useLogoFallback} from '../../lib/hooks/useLogoFallback';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -129,7 +130,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [menuPosition, setMenuPosition] = useState({top: -1000, right: 0});
   const [backgroundColor, setBackgroundColor] = useState('transparent');
   const [backgroundCandidateIndex, setBackgroundCandidateIndex] = useState(0);
-  const [logoCandidateIndex, setLogoCandidateIndex] = useState(0);
   const [infoView, setInfoView] = useState<'episodes' | 'related'>('episodes');
   const [refreshing, setRefreshing] = useState(false);
   const [episodeRefreshVersion, setEpisodeRefreshVersion] = useState(0);
@@ -387,7 +387,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return false;
   }, [providerValue, info?.extra?.flags?.dub]);
 
-  const logoImage = artworkCandidates.logo[logoCandidateIndex] || '';
   const backgroundImage =
     artworkCandidates.background[0] || PLACEHOLDER_IMAGE;
   const resolvedBackgroundImage =
@@ -397,10 +396,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   useEffect(() => {
     setBackgroundCandidateIndex(0);
   }, [activeLink, artworkCandidates.background]);
-
-  useEffect(() => {
-    setLogoCandidateIndex(0);
-  }, [activeLink, artworkCandidates.logo]);
 
   const repairBrokenArtwork = useCallback(
     (kind: 'background' | 'logo') => {
@@ -418,6 +413,17 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     },
     [activeLink, providerValue, repairInfo],
   );
+
+  const {
+    uri: logoImage,
+    onError: handleLogoError,
+    onLoad: handleLogoLoad,
+  } = useLogoFallback({
+    providerValue,
+    link: activeLink,
+    candidates: artworkCandidates.logo,
+    onExhausted: () => repairBrokenArtwork('logo'),
+  });
 
   const trailerUrl = useMemo(() => {
     const providerTrailer = info?.trailers?.find(
@@ -444,15 +450,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     },
     [backgroundCandidateIndex, artworkCandidates.background.length, repairBrokenArtwork],
   );
-
-  const handleLogoError = useCallback(() => {
-    if (logoCandidateIndex + 1 < artworkCandidates.logo.length) {
-      setLogoCandidateIndex(index => index + 1);
-    } else {
-      setLogoCandidateIndex(artworkCandidates.logo.length);
-      repairBrokenArtwork('logo');
-    }
-  }, [logoCandidateIndex, artworkCandidates.logo.length, repairBrokenArtwork]);
 
   const relatedItems = useMemo<RelatedItem[]>(
     () => (info?.related || []) as RelatedItem[],
@@ -824,6 +821,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         width={200}
                         height={100}
                         onError={handleLogoError}
+                        onLoad={handleLogoLoad}
                       />
                     ) : infoLoading ? (
                       <View style={{width: 200, height: 100}} />
