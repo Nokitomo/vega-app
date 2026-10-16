@@ -1,0 +1,13 @@
+# Database incrementale dei metadati (Android)
+
+Vega salva in `vega-metadata.db` (Expo SQLite) i risultati già ottenuti per AnimeUnity e StreamingUnity: sezioni della home, URL dei poster risolti, schede Info, metadati arricchiti, hero ed episodi con titoli, descrizioni e miniature. StreamCenter può riutilizzare le schede e gli episodi salvati dai due provider di origine; i link di riproduzione specifici di StreamCenter vengono ricostruiti al momento dell'uso. La cache precedente MMKV rimane leggibile per gli aggiornamenti da versioni precedenti.
+
+I record non hanno una scadenza che li cancella. La UI mostra immediatamente i dati salvati; una verifica leggera del catalogo o dell'inventario, quando dovuta, determina se aggiornare soltanto le parti cambiate. Gli episodi già noti conservano i metadati arricchiti e soltanto quelli nuovi passano nella catena di arricchimento. Una singola risposta incompleta non cancella episodi: la rimozione richiede due inventari completi concordi. Se la verifica fallisce, rimangono visibili i dati salvati e la riproduzione non viene bloccata.
+
+Quando cambia la versione del provider installato, la successiva apertura aggiorna integralmente la scheda o la stagione salvata una sola volta, per recepire eventuali cambiamenti nelle regole del provider. La versione di origine viene conservata anche nei record condivisi con StreamCenter.
+
+Per AnimeUnity, `Terminato` e `Droppato` non prevedono verifiche periodiche degli episodi: restano l'aggiornamento manuale e la verifica prima della riproduzione. `In corso` e `In uscita` vengono verificati non più spesso di ogni 4 ore. Per StreamingUnity, serie `ended`/`canceled` sono verificate ogni 7 giorni, le altre serie ogni 6 ore; film disponibili ogni 24 ore, film in arrivo ogni 6 ore. La home mantiene i propri intervalli di aggiornamento, soprattutto per le sezioni più dinamiche. L'utente può sempre usare l'aggiornamento manuale. Il comando **Svuota cache** elimina anche il database dei metadati, ma non la cronologia di visione.
+
+Il database conserva soltanto URL delle immagini, non i file: il caricamento e la cache fisica delle immagini rimangono gestiti dal componente immagini. Se tutti i candidati di sfondo o logo della scheda Info falliscono, Vega tenta una sola nuova lettura dal provider per riparare gli URL di quell'elemento. Non esiste ancora alcun task Android eseguito ad app chiusa; il precaricamento pianificato è una fase successiva.
+
+Le funzioni `getContentInventory` e `getEpisodeInventory` sono opzionali nel contratto provider. Provider meno recenti o di altro tipo continuano a usare il percorso completo esistente. Se SQLite non è disponibile, Vega usa la cache precedente e continua a funzionare.

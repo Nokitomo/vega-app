@@ -21,6 +21,7 @@ import {
 import {fetchAniListBanner} from '../services/animeMeta';
 import {selectArtworkCandidates} from '../services/artworkSelection';
 import {resolveAnimeExternalIds} from '../providers/externalIds';
+import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
 
 export interface HomePageData {
   title: string;
@@ -124,16 +125,21 @@ export const useHomePageData = ({
     buildProviderCacheKey('homeCategoryData', providerValue, filter);
 
   const readCategoryCache = (filter: string): CategoryQueryData | undefined => {
+    const durable = readMetadata<CategoryQueryData>(
+      'homeCategoryData',
+      providerValue,
+      filter,
+    );
     const raw = cacheStorage.getString(buildCategoryCacheKey(filter));
     if (!raw) {
-      return undefined;
+      return durable?.value;
     }
     try {
       const parsed = JSON.parse(raw) as CategoryQueryData;
       if (!Array.isArray(parsed?.Posts)) {
         return undefined;
       }
-      return {
+      const cached = {
         Posts: parsed.Posts.slice(0, HOME_CATEGORY_MAX_ITEMS),
         signature: typeof parsed.signature === 'string' ? parsed.signature : '',
         updatedAt:
@@ -142,13 +148,17 @@ export const useHomePageData = ({
             ? parsed.updatedAt
             : Date.now(),
       };
+      return durable && durable.updatedAt > cached.updatedAt
+        ? durable.value
+        : cached;
     } catch {
-      return undefined;
+      return durable?.value;
     }
   };
 
   const writeCategoryCache = (filter: string, data: CategoryQueryData) => {
     cacheStorage.setString(buildCategoryCacheKey(filter), JSON.stringify(data));
+    writeMetadata('homeCategoryData', providerValue, filter, data);
   };
 
   const getCategoryStaleTime = (
@@ -670,6 +680,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
             const merged = mergeHeroMeta(info, enhancedMeta);
             if (cacheKey) {
               writePersistedCache(cacheStorage, cacheKey, merged);
+              writeMetadata('heroMetadata', providerValue, heroLink, merged);
             }
             return merged;
           }
@@ -677,6 +688,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
           const merged = mergeHeroMeta(info, undefined);
           if (cacheKey) {
             writePersistedCache(cacheStorage, cacheKey, merged);
+            writeMetadata('heroMetadata', providerValue, heroLink, merged);
           }
           return merged;
         }
@@ -685,11 +697,17 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       const merged = mergeHeroMeta(info, undefined);
       if (cacheKey) {
         writePersistedCache(cacheStorage, cacheKey, merged);
+        writeMetadata('heroMetadata', providerValue, heroLink, merged);
       }
       return merged;
     },
     enabled: !!heroLink && !!providerValue,
-    staleTime: HERO_METADATA_STALE_MS,
+    staleTime:
+      providerValue === 'animeunity' ||
+      providerValue === 'streamingunity' ||
+      providerValue === 'streamcenter'
+        ? Infinity
+        : HERO_METADATA_STALE_MS,
     gcTime: 60 * 60 * 1000, // 1 hour
     retry: 2,
     // Use cached data as initial data
@@ -697,11 +715,16 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       if (!cacheKey) {
         return undefined;
       }
-      return readPersistedCache<any>(cacheStorage, cacheKey)?.value;
+      return (
+        readMetadata<any>('heroMetadata', providerValue, heroLink)?.value ||
+        readPersistedCache<any>(cacheStorage, cacheKey)?.value
+      );
     },
     initialDataUpdatedAt: () =>
       cacheKey
-        ? readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
+        ? readMetadata<any>('heroMetadata', providerValue, heroLink)
+            ?.updatedAt ||
+          readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
         : undefined,
   });
 };

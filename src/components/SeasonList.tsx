@@ -32,7 +32,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as IntentLauncher from 'expo-intent-launcher';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import {EpisodeLink, Link} from '../lib/providers/types';
+import {EpisodeLink, Info, Link} from '../lib/providers/types';
 import {RootStackParamList} from '../App';
 import Downloader from './Downloader';
 import {
@@ -74,6 +74,11 @@ import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 import EpisodeMetadata from './EpisodeMetadata';
 import {getFillerEpisodes} from '../lib/services/fillerDatabase';
+import {readMetadata, writeMetadata} from '../lib/storage/MetadataDatabase';
+import {
+  readPersistedCache,
+  writePersistedCache,
+} from '../lib/utils/persistedCache';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -85,6 +90,8 @@ interface SeasonListProps {
   type: string;
   metaTitle: string;
   providerValue: string;
+  contentInfo?: Info;
+  checkContent?: () => Promise<unknown>;
   aniSkipMalId?: number;
   contentIds?: {
     malId?: number;
@@ -336,6 +343,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   type,
   metaTitle,
   providerValue,
+  contentInfo,
+  checkContent,
   aniSkipMalId,
   contentIds,
   refreshing: _refreshing,
@@ -664,6 +673,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     activeSeason?.episodesLink,
     providerValue,
     shouldFetchEpisodes,
+    contentInfo,
   );
 
   useEffect(() => {
@@ -1964,6 +1974,27 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return;
       }
 
+      if (
+        providerValue === 'animeunity' ||
+        providerValue === 'streamingunity'
+      ) {
+        const verification = Promise.allSettled([
+          checkContent?.(),
+          seasonEpisodesLink ? refetchEpisodes() : undefined,
+        ]);
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            verification,
+            new Promise<void>(resolve => {
+              timeout = setTimeout(resolve, 1200);
+            }),
+          ]);
+        } finally {
+          if (timeout) {clearTimeout(timeout);}
+        }
+      }
+
       const link = episodeData[linkIndex].link;
       const file = (
         metaTitle +
@@ -2024,6 +2055,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
       handleExternalPlayer,
       navigation,
       LinkList,
+      checkContent,
+      refetchEpisodes,
     ],
   );
 
@@ -2137,7 +2170,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
         providerValue,
         episodesLink,
       );
-      if (cacheStorage.getString(cacheKey)) {
+      if (
+        readMetadata<EpisodeLink[]>('episodes', providerValue, episodesLink) ||
+        readPersistedCache<EpisodeLink[]>(cacheStorage, cacheKey)
+      ) {
         return;
       }
 
@@ -2154,7 +2190,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
         });
 
         if (episodes && episodes.length > 0) {
-          cacheStorage.setString(cacheKey, JSON.stringify(episodes));
+          writePersistedCache(cacheStorage, cacheKey, episodes);
+          writeMetadata(
+            'episodes',
+            providerValue,
+            episodesLink,
+            episodes,
+            extensionManager.getProviderModules(providerValue)?.version || '',
+          );
         }
       } catch (error) {
         console.error('Error prefetching episodes:', error);
@@ -2736,7 +2779,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   }
 
   // Show error state
-  if (episodeError) {
+  if (episodeError && episodeList.length === 0) {
     return (
       <View className="p-4">
         <Text className="text-red-500 text-center">

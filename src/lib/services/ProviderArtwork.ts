@@ -6,6 +6,11 @@ import {
 } from '../utils/persistedCache';
 import {providerManager} from './ProviderManager';
 import type {Post} from '../providers/types';
+import {
+  readMetadata,
+  removeMetadata,
+  writeMetadata,
+} from '../storage/MetadataDatabase';
 
 const ARTWORK_STALE_MS = 24 * 60 * 60 * 1000;
 const MAX_CONCURRENT_LOOKUPS = 2;
@@ -56,11 +61,24 @@ const posterCacheKey = (providerValue: string, link: string) =>
 export const getCachedProviderPoster = (
   providerValue: string,
   link: string,
-) =>
-  readPersistedCache<ProviderPosterCacheValue>(
+) => {
+  const durable = readMetadata<ProviderPosterCacheValue>(
+    'preferredPosterW300V2',
+    providerValue,
+    link,
+  );
+  if (durable?.value.poster) {
+    return {
+      value: durable.value,
+      updatedAt: durable.updatedAt,
+      ageMs: Math.max(0, Date.now() - durable.updatedAt),
+    };
+  }
+  return readPersistedCache<ProviderPosterCacheValue>(
     cacheStorage,
     posterCacheKey(providerValue, link),
   );
+};
 
 const attachConsumer = (
   key: string,
@@ -104,11 +122,20 @@ export const resolveProviderPoster = ({
   signal?: AbortSignal;
 }): Promise<string | undefined> => {
   const key = posterCacheKey(providerValue, link);
-  const cached = readPersistedCache<ProviderPosterCacheValue>(cacheStorage, key);
+  const cached = getCachedProviderPoster(providerValue, link);
   if (signal?.aborted) {
     return Promise.resolve(cached?.value.poster);
   }
-  if (!forceRefresh && cached && cached.ageMs <= ARTWORK_STALE_MS) {
+  const durable = readMetadata<ProviderPosterCacheValue>(
+    'preferredPosterW300V2',
+    providerValue,
+    link,
+  );
+  if (
+    !forceRefresh &&
+    cached &&
+    (durable?.value.poster || cached.ageMs <= ARTWORK_STALE_MS)
+  ) {
     return Promise.resolve(cached.value.poster);
   }
   const pending = pendingByKey.get(key);
@@ -149,6 +176,11 @@ export const resolveProviderPoster = ({
       const poster = artwork?.poster?.trim();
       if (artwork?.resolved === true) {
         writePersistedCache(cacheStorage, key, {poster});
+        if (poster) {
+          writeMetadata('preferredPosterW300V2', providerValue, link, {poster});
+        } else if (forceRefresh) {
+          removeMetadata('preferredPosterW300V2', providerValue, link);
+        }
       }
       entry.resolve(poster || cached?.value.poster);
     } catch (error) {

@@ -115,6 +115,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     isLoading: infoLoading,
     error,
     refetch,
+    repairInfo,
+    check,
   } = useContentDetails(activeLink, providerValue);
   const animeExternalIds = useMemo(
     () => resolveAnimeExternalIds(info?.extra?.ids),
@@ -133,6 +135,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [episodeRefreshVersion, setEpisodeRefreshVersion] = useState(0);
 
   const threeDotsRef = useRef<any | null>(null);
+  const attemptedArtworkRepairRef = useRef(new Set<string>());
 
   // Memoized values
   const [inLibrary, setInLibrary] = useState(() =>
@@ -399,6 +402,23 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     setLogoCandidateIndex(0);
   }, [activeLink, artworkCandidates.logo]);
 
+  const repairBrokenArtwork = useCallback(
+    (kind: 'background' | 'logo') => {
+      if (!['animeunity', 'streamingunity', 'streamcenter'].includes(providerValue)) {
+        return;
+      }
+      const key = `${activeLink}:${kind}`;
+      if (attemptedArtworkRepairRef.current.has(key)) {
+        return;
+      }
+      attemptedArtworkRepairRef.current.add(key);
+      repairInfo().catch(artworkError => {
+        console.warn('Failed to repair broken artwork URL:', artworkError);
+      });
+    },
+    [activeLink, providerValue, repairInfo],
+  );
+
   const trailerUrl = useMemo(() => {
     const providerTrailer = info?.trailers?.find(
       (item: string) => !!item?.trim(),
@@ -415,18 +435,24 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const handleBackgroundError = useCallback(
     (event: any) => {
       console.warn('Background image failed to load:', event);
-      if (backgroundCandidateIndex < artworkCandidates.background.length) {
+      if (backgroundCandidateIndex + 1 < artworkCandidates.background.length) {
         setBackgroundCandidateIndex(index => index + 1);
+      } else {
+        setBackgroundCandidateIndex(artworkCandidates.background.length);
+        repairBrokenArtwork('background');
       }
     },
-    [backgroundCandidateIndex, artworkCandidates.background.length],
+    [backgroundCandidateIndex, artworkCandidates.background.length, repairBrokenArtwork],
   );
 
   const handleLogoError = useCallback(() => {
-    if (logoCandidateIndex < artworkCandidates.logo.length) {
+    if (logoCandidateIndex + 1 < artworkCandidates.logo.length) {
       setLogoCandidateIndex(index => index + 1);
+    } else {
+      setLogoCandidateIndex(artworkCandidates.logo.length);
+      repairBrokenArtwork('logo');
     }
-  }, [logoCandidateIndex, artworkCandidates.logo.length]);
+  }, [logoCandidateIndex, artworkCandidates.logo.length, repairBrokenArtwork]);
 
   const relatedItems = useMemo<RelatedItem[]>(
     () => (info?.related || []) as RelatedItem[],
@@ -1141,6 +1167,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           refreshing={refreshing}
                           refreshVersion={episodeRefreshVersion}
                           providerValue={providerValue}
+                          contentInfo={info}
+                          checkContent={check}
                           aniSkipMalId={
                             animeExternalIds.malId
                           }

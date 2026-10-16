@@ -4,6 +4,8 @@ import {createProviderContext} from '../providers/providerContext';
 import {
   ArchiveFilters,
   Catalog,
+  ContentInventory,
+  EpisodeInventory,
   EpisodeLink,
   Info,
   Post,
@@ -354,6 +356,29 @@ export class ProviderManager {
       );
     }
   };
+  getContentInventory = async ({
+    link,
+    providerValue,
+  }: {
+    link: string;
+    providerValue: string;
+  }): Promise<ContentInventory | undefined> => {
+    const moduleCode =
+      extensionManager.getProviderModules(providerValue)?.modules.meta;
+    if (!moduleCode) {
+      return undefined;
+    }
+    const providerContext = this.getProviderContext(providerValue);
+    const moduleExports = this.executeModule(moduleCode);
+    if (typeof moduleExports.getContentInventory !== 'function') {
+      return undefined;
+    }
+    return moduleExports.getContentInventory({
+      link,
+      provider: providerValue,
+      providerContext,
+    });
+  };
   getArtwork = async ({
     link,
     provider,
@@ -452,9 +477,11 @@ export class ProviderManager {
   getEpisodes = async ({
     url,
     providerValue,
+    knownEpisodes,
   }: {
     url: string;
     providerValue: string;
+    knownEpisodes?: EpisodeLink[];
   }): Promise<EpisodeLink[]> => {
     const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
@@ -478,6 +505,7 @@ export class ProviderManager {
       return await moduleExports.getEpisodes({
         url,
         providerContext,
+        knownEpisodes,
       });
     } catch (error) {
       console.error('Error in episodes function:', error);
@@ -493,6 +521,25 @@ export class ProviderManager {
       }
       throw new Error(errorMessage);
     }
+  };
+  getEpisodeInventory = async ({
+    url,
+    providerValue,
+  }: {
+    url: string;
+    providerValue: string;
+  }): Promise<EpisodeInventory | undefined> => {
+    const moduleCode =
+      extensionManager.getProviderModules(providerValue)?.modules.episodes;
+    if (!moduleCode) {
+      return undefined;
+    }
+    const providerContext = this.getProviderContext(providerValue);
+    const moduleExports = this.executeModule(moduleCode);
+    if (typeof moduleExports.getEpisodeInventory !== 'function') {
+      return undefined;
+    }
+    return moduleExports.getEpisodeInventory({url, providerContext});
   };
 
   getSettingsSchema = async ({

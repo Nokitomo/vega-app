@@ -36,6 +36,7 @@ import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
 import {clearProviderFileCache} from '../../lib/providers/providerFileCache';
 import {providerManager} from '../../lib/services/ProviderManager';
+import {clearMetadataDatabase} from '../../lib/storage/MetadataDatabase';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Settings'>;
 
@@ -130,6 +131,7 @@ const Settings = ({navigation}: Props) => {
       });
     }
     cacheStorageService.clearAll();
+    clearMetadataDatabase();
     providerManager.clearRuntimeCaches();
     clearProviderFileCache().catch(error => {
       console.warn('Failed to clear provider file cache:', error);

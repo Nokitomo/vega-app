@@ -1,4 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
+import {useRef} from 'react';
 import {providerManager} from '../services/ProviderManager';
 import {cacheStorage} from '../storage';
 import i18n from '../../i18n';
@@ -12,6 +13,23 @@ import {
 } from '../utils/providerCacheScope';
 import {readPersistedCache, writePersistedCache} from '../utils/persistedCache';
 import {shouldFetchAniListBanner} from '../services/animeArtwork';
+import {
+  markMetadataChecked,
+  readMetadata,
+  removeMetadata,
+  writeMetadata,
+} from '../storage/MetadataDatabase';
+import type {ContentInventory, Info} from '../providers/types';
+import {extensionManager} from '../services/ExtensionManager';
+import {
+  getMetadataCheckInterval,
+  hasContentInventoryChanged,
+} from '../services/metadataRefreshPolicy';
+import {
+  streamCenterMetaOrigin,
+  unwrapStreamCenterInfo,
+  wrapStreamCenterInfo,
+} from '../services/streamCenterMetadata';
 
 const CONTENT_INFO_STALE_MS = 24 * 60 * 60 * 1000;
 const ENHANCED_META_STALE_MS = 24 * 60 * 60 * 1000;
@@ -27,11 +45,91 @@ const buildContentInfoCacheKey = (link: string, providerValue: string) => {
 export const useContentInfo = (link: string, providerValue: string) => {
   const cacheKey = buildContentInfoCacheKey(link, providerValue);
   const providerCacheScope = getProviderCacheScope(providerValue);
+  const providerVersion =
+    extensionManager.getProviderModules(providerValue)?.version || '';
+  const manualRefreshRef = useRef(false);
+  const origin =
+    providerValue === 'streamcenter' ? streamCenterMetaOrigin(link) : undefined;
+  const readDurableInfo = () => {
+    const own = readMetadata<Info>('contentInfo', providerValue, link);
+    if (!origin) {return own;}
+    const source = readMetadata<Info>(
+      'contentInfo',
+      origin.source,
+      origin.data.url,
+    );
+    return source && (!own || source.updatedAt > own.updatedAt)
+      ? {...source, value: wrapStreamCenterInfo(source.value, origin.source)}
+      : own;
+  };
+  const initialRecord = readDurableInfo();
+  const initialInfo = initialRecord?.value;
+  const installedRecord = readMetadata<Info>('contentInfo', providerValue, link);
+  const providerUpdated =
+    !!installedRecord && installedRecord.providerVersion !== providerVersion;
+  const targetProvider =
+    providerValue === 'animeunity' ||
+    providerValue === 'streamingunity' ||
+    !!origin;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['contentInfo', link, providerValue, providerCacheScope],
     queryFn: async () => {
       console.log('Fetching content info for:', link);
+
+      const stored = readDurableInfo();
+      if (targetProvider && stored && !manualRefreshRef.current && !providerUpdated) {
+        const inventory = await providerManager.getContentInventory({
+          link,
+          providerValue,
+        });
+        if (inventory?.complete) {
+          const previous = readMetadata<ContentInventory>(
+            'contentInventory',
+            providerValue,
+            link,
+          );
+          if (
+            !hasContentInventoryChanged(
+              stored.value,
+              inventory,
+              previous?.value,
+            )
+          ) {
+            writeMetadata(
+              'contentInventory',
+              providerValue,
+              link,
+              inventory,
+              providerVersion,
+            );
+            markMetadataChecked(
+              'contentInfo',
+              providerValue,
+              link,
+              providerVersion,
+            );
+            if (origin) {
+              markMetadataChecked(
+                'contentInfo',
+                origin.source,
+                origin.data.url,
+                extensionManager.getProviderModules(origin.source)?.version || '',
+              );
+              if (!readMetadata<Info>('contentInfo', providerValue, link)) {
+                writeMetadata(
+                  'contentInfo',
+                  providerValue,
+                  link,
+                  stored.value,
+                  providerVersion,
+                );
+              }
+            }
+            return stored.value;
+          }
+        }
+      }
 
       const data = await providerManager.getMetaData({
         link,
@@ -42,11 +140,28 @@ export const useContentInfo = (link: string, providerValue: string) => {
       }
       if (cacheKey) {
         writePersistedCache(cacheStorage, cacheKey, data);
+        writeMetadata('contentInfo', providerValue, link, data, providerVersion);
+        if (origin) {
+          writeMetadata(
+            'contentInfo',
+            origin.source,
+            origin.data.url,
+            unwrapStreamCenterInfo(data),
+            extensionManager.getProviderModules(origin.source)?.version || '',
+          );
+        }
+        // A changed full snapshot supersedes the previous inventory baseline.
+        // The next cheap check compares against the newly fetched Info.
+        removeMetadata('contentInventory', providerValue, link);
       }
       return data;
     },
     enabled: !!link && !!providerValue,
-    staleTime: CONTENT_INFO_STALE_MS,
+    staleTime: targetProvider
+      ? providerUpdated
+        ? 0
+        : getMetadataCheckInterval(origin?.source || providerValue, initialInfo)
+      : CONTENT_INFO_STALE_MS,
     gcTime: 60 * 60 * 1000, // 1 hour
     retry: 2,
     // Use cached data as initial data
@@ -54,13 +169,35 @@ export const useContentInfo = (link: string, providerValue: string) => {
       if (!cacheKey) {
         return undefined;
       }
-      return readPersistedCache<any>(cacheStorage, cacheKey)?.value;
+      const durable = readDurableInfo();
+      return durable?.value || readPersistedCache<any>(cacheStorage, cacheKey)?.value;
     },
     initialDataUpdatedAt: () =>
       cacheKey
-        ? readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
+        ? (() => {
+            const durable = readDurableInfo();
+            if (durable) {
+              return origin || durable.providerVersion === providerVersion
+                ? durable.checkedAt
+                : 0;
+            }
+            return readPersistedCache<any>(cacheStorage, cacheKey)
+              ?.updatedAt;
+          })()
         : undefined,
   });
+  return {
+    ...query,
+    check: () => query.refetch(),
+    refetch: async () => {
+      manualRefreshRef.current = true;
+      try {
+        return await query.refetch();
+      } finally {
+        manualRefreshRef.current = false;
+      }
+    },
+  };
 };
 
 // Hook for fetching enhanced metadata from Stremio
@@ -68,6 +205,7 @@ export const useEnhancedMetadata = (
   imdbId: string,
   type: string,
   animeIds?: {malId?: number; anilistId?: number},
+  providerValue?: string,
 ) => {
   const metaKey = buildEnhancedMetaKey({
     imdbId,
@@ -98,11 +236,17 @@ export const useEnhancedMetadata = (
       });
       if (metaKey) {
         writePersistedCache(cacheStorage, metaKey, data);
+        writeMetadata('enhancedMeta', '', metaKey, data);
       }
       return data;
     },
     enabled: !!metaKey,
-    staleTime: ENHANCED_META_STALE_MS,
+    staleTime:
+      providerValue === 'animeunity' ||
+      providerValue === 'streamingunity' ||
+      providerValue === 'streamcenter'
+        ? Infinity
+        : ENHANCED_META_STALE_MS,
     gcTime: 2 * 60 * 60 * 1000, // 2 hours
     retry: 1, // Don't retry too much for external API
     // Use cached data as initial data
@@ -110,11 +254,15 @@ export const useEnhancedMetadata = (
       if (!metaKey) {
         return undefined;
       }
-      return readPersistedCache<any>(cacheStorage, metaKey)?.value;
+      return (
+        readMetadata<any>('enhancedMeta', '', metaKey)?.value ||
+        readPersistedCache<any>(cacheStorage, metaKey)?.value
+      );
     },
     initialDataUpdatedAt: () =>
       metaKey
-        ? readPersistedCache<any>(cacheStorage, metaKey)?.updatedAt
+        ? readMetadata<any>('enhancedMeta', '', metaKey)?.updatedAt ||
+          readPersistedCache<any>(cacheStorage, metaKey)?.updatedAt
         : undefined,
   });
 };
@@ -127,6 +275,7 @@ export const useContentDetails = (link: string, providerValue: string) => {
     isLoading: infoLoading,
     error: infoError,
     refetch: refetchInfo,
+    check: checkInfo,
   } = useContentInfo(link, providerValue);
 
   const animeIds = info?.extra?.ids;
@@ -147,7 +296,12 @@ export const useContentDetails = (link: string, providerValue: string) => {
     isLoading: metaLoading,
     error: metaError,
     refetch: refetchMeta,
-  } = useEnhancedMetadata(externalImdbId, externalType, externalAnimeIds);
+  } = useEnhancedMetadata(
+    externalImdbId,
+    externalType,
+    externalAnimeIds,
+    providerValue,
+  );
 
   const artworkSources = info?.extra?.artworkSources;
   const animeArtworkNeedsFallback =
@@ -163,9 +317,11 @@ export const useContentDetails = (link: string, providerValue: string) => {
     meta,
     isLoading: infoLoading || (animeArtworkNeedsFallback && metaLoading),
     isMetaLoading: metaLoading,
-    error: infoError || (!info ? metaError : undefined),
+    error: !info ? infoError || metaError : undefined,
     refetch: async () => {
       await Promise.all([refetchInfo(), refetchMeta()]);
     },
+    repairInfo: refetchInfo,
+    check: checkInfo,
   };
 };

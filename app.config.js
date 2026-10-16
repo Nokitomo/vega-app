@@ -26,6 +26,7 @@ module.exports = () => {
     './plugins/with-android-signing.js',
     './plugins/with-android-okhttp.js',
     './plugins/with-android-warp.js',
+    'expo-sqlite',
     ...(hasAndroidGoogleServices || hasIosGooglePlist
       ? ['@react-native-firebase/app']
       : []),
