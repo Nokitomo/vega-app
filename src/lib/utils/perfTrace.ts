@@ -116,7 +116,7 @@ export const startPerfNavigation = (provider: string) => {
 export const markPerfNavigationStage = (stage: string) => {
   const trace = navigationTrace;
   if (!isPerfTraceEnabled || !trace || trace.stages.has(stage)) {return;}
-  if (perfNow() - trace.startedAt > 30000) {
+  if (perfNow() - trace.startedAt > 120000) {
     navigationTrace = undefined;
     return;
   }

@@ -45,13 +45,17 @@ poster. I tempi annidati, ad esempio `provider_cache_scope` e
 pausa del thread JavaScript superiore a 120 ms, escludendo timer sospesi per
 oltre 5 secondi. `info_navigation_start` e `info_navigation_stage` distinguono
 tap, mount, dati disponibili e primo layout della scheda; il primo layout non
-garantisce che tutte le immagini siano gia visibili.
+garantisce che tutte le immagini siano gia visibili. La traccia resta valida
+fino a 120 secondi, per includere anche schede fredde particolarmente lente.
 
 Per analizzare un rallentamento ripetere il percorso Home -> Info su piu card,
 poi chiudere e riaprire l'app e riprovare. Confrontare i tempi sincroni, i picchi
 `js_lag`, i tempi di rete/provider e il tempo fino al primo layout. I log JS da
 soli non misurano con certezza il ritardo tra il tocco fisico e la consegna
 dell'evento al thread JS; se necessario usare una traccia Android UI/JS.
+In una installazione pulita, installare e selezionare prima un provider. La Home
+deve restare utilizzabile anche quando l'Hero non ha ancora alcun candidato
+logo o fallback salvato.
 
 La traccia non registra URL completi, query string, header, corpi, titoli o
 identificativi dei contenuti e non carica dati automaticamente su server. Non

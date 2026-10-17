@@ -17,9 +17,13 @@ export const orderedLogoUrls = (
     .map(url => url.trim())
     .filter(Boolean);
   const preferred = available[0];
+  const workingLogo = saved?.value;
   const savedUrl =
-    saved?.value.preferredUrl === preferred && validLogoUrl(saved.value.url)
-      ? saved.value.url.trim()
+    preferred &&
+    workingLogo &&
+    workingLogo.preferredUrl === preferred &&
+    validLogoUrl(workingLogo.url)
+      ? workingLogo.url.trim()
       : undefined;
   const useSavedFirst =
     !!savedUrl && !!saved && now - saved.updatedAt < PREFERRED_RETRY_MS;

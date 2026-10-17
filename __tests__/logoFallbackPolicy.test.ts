@@ -16,6 +16,11 @@ describe('logo fallback policy', () => {
     ).toEqual([preferred, fallback, 'file:///logo']);
   });
 
+  it('keeps the Hero usable before any logo candidate or saved fallback exists', () => {
+    expect(orderedLogoUrls([], undefined, 0)).toEqual([]);
+    expect(orderedLogoUrls(['', '  '], undefined, 0)).toEqual([]);
+  });
+
   it('shows a working fallback first, then retries the preferred logo after a day', () => {
     const saved = {
       value: {url: fallback, preferredUrl: preferred},
