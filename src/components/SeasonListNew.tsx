@@ -32,6 +32,11 @@ import {
   watchHistoryStorage,
 } from '../lib/storage';
 import {ifExists} from '../lib/file/ifExists';
+import {
+  getEpisodeProgressPercent,
+  setEpisodeManuallyWatched,
+  WATCH_COMPLETION_PERCENT,
+} from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
 import {extensionManager} from '../lib/services/ExtensionManager';
 import {providerManager} from '../lib/services/ProviderManager';
@@ -424,11 +429,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   // Memoized completion checker
   const isCompleted = useCallback((link: string) => {
-    const watchProgress = JSON.parse(cacheStorage.getString(link) || '{}');
-    const percentage =
-      (watchProgress?.position / watchProgress?.duration) * 100;
-    return percentage > 85;
-  }, []);
+    return getEpisodeProgressPercent(routeParams.link, link) >= WATCH_COMPLETION_PERCENT;
+  }, [routeParams.link]);
 
   // Memoized toggle sort order
   const toggleSortOrder = useCallback(() => {
@@ -449,29 +451,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [metaTitle, providerValue],
   );
 
-  const getProgressPercent = useCallback((link: string) => {
-    if (!link) {
-      return 0;
-    }
-
-    try {
-      const cachedProgress = cacheStorage.getString(link);
-      if (!cachedProgress) {
-        return 0;
-      }
-
-      const parsed = JSON.parse(cachedProgress);
-      if (!parsed?.position || !parsed?.duration) {
-        return 0;
-      }
-
-      const percentage = (parsed.position / parsed.duration) * 100;
-      return Math.min(Math.max(percentage, 0), 100);
-    } catch (error) {
-      console.error('Error reading episode progress:', error);
-      return 0;
-    }
-  }, []);
+  const getProgressPercent = useCallback(
+    (link: string) => getEpisodeProgressPercent(routeParams.link, link),
+    [routeParams.link],
+  );
 
   const refreshProgressData = useCallback(() => {
     const progressKey = `watch_history_progress_${routeParams.link}`;
@@ -485,13 +468,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
       setResumeProgress(prev =>
         areResumeProgressEqual(prev, null) ? prev : null,
       );
-      setEpisodeProgressMap(prev =>
-        areProgressMapsEqual(prev, {}) ? prev : {},
-      );
-      return;
     }
 
-    if (!storedProgress) {
+    if (!hasHistory || !storedProgress) {
       nextResume = null;
     } else {
       try {
@@ -624,6 +603,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         title: primaryTitle,
         poster: poster?.poster,
         provider: providerValue,
+        isSeries: contentType !== 'movie',
         lastPlayed: Date.now(),
         episodeTitle: secondaryTitle,
         playbackRate: 1,
@@ -700,20 +680,23 @@ const SeasonList: React.FC<SeasonListProps> = ({
   // Memoized mark as watched handler
   const markAsWatched = useCallback(() => {
     if (stickyMenu.link) {
+      setEpisodeManuallyWatched(routeParams.link, stickyMenu.link, true);
       cacheStorage.setString(
         stickyMenu.link,
         JSON.stringify({
-          position: 10000,
+          position: 1,
           duration: 1,
         }),
       );
+      setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 100}));
       setStickyMenu({active: false});
     }
-  }, [stickyMenu.link]);
+  }, [routeParams.link, stickyMenu.link]);
 
   // Memoized mark as unwatched handler
   const markAsUnwatched = useCallback(() => {
     if (stickyMenu.link) {
+      setEpisodeManuallyWatched(routeParams.link, stickyMenu.link, false);
       cacheStorage.setString(
         stickyMenu.link,
         JSON.stringify({
@@ -721,9 +704,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration: 1,
         }),
       );
+      setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 0}));
       setStickyMenu({active: false});
     }
-  }, [stickyMenu.link]);
+  }, [routeParams.link, stickyMenu.link]);
 
   // Memoized sticky menu external player handler
   const handleStickyMenuExternalPlayer = useCallback(() => {

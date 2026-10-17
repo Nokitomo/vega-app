@@ -1,6 +1,10 @@
 import {create} from 'zustand';
 import {WatchHistoryItem, watchHistoryStorage} from '../storage';
 import {
+  clearAllManualEpisodeCompletions,
+  clearManualEpisodeCompletions,
+} from '../storage/ManualEpisodeCompletionStorage';
+import {
   resolveProviderCardTitle,
   shouldResolveProviderCardTitle,
 } from '../utils/providerCardTitleResolver';
@@ -126,6 +130,7 @@ const useWatchHistoryStore = create<History>(set => ({
         episodeTitle: item.episodeTitle,
         episodeNumber: item.episodeNumber,
         seasonNumber: item.seasonNumber,
+        isSeries: item.isSeries,
         cachedInfoData: item.cachedInfoData,
       };
 
@@ -171,6 +176,7 @@ const useWatchHistoryStore = create<History>(set => ({
   removeItem: item => {
     watchHistoryStorage.removeFromWatchHistory(item.link);
     watchHistoryStorage.clearProgressForLink(item.link);
+    clearManualEpisodeCompletions(item.link);
     refreshHistoryState(set);
   },
 
@@ -181,6 +187,7 @@ const useWatchHistoryStore = create<History>(set => ({
       watchHistoryStorage.clearProgressForLink(item.link);
     });
     watchHistoryStorage.clearProgressKeys();
+    clearAllManualEpisodeCompletions();
     set({history: []});
   },
 

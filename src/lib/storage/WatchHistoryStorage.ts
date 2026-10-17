@@ -77,7 +77,7 @@ export class WatchHistoryStorage {
 
     if (existingIndex !== -1) {
       // Update existing item
-      history[existingIndex] = {
+      const updatedItem = {
         ...history[existingIndex],
         ...item,
         displayTitle:
@@ -86,6 +86,8 @@ export class WatchHistoryStorage {
           history[existingIndex].title,
         timestamp: Date.now(), // Always update timestamp
       };
+      history.splice(existingIndex, 1);
+      history.unshift(updatedItem);
     } else {
       // Add new item
       history.unshift({

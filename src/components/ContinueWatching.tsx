@@ -19,6 +19,7 @@ import {MaterialCommunityIcons} from '@expo/vector-icons';
 import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../lib/utils/helpers';
+import {selectContinueWatchingItems} from '../lib/utils/continueWatching';
 
 type EpisodeMeta = {
   episodeTitle?: string;
@@ -86,20 +87,9 @@ const ContinueWatching = ({
     return t('Ep. {{number}}', {number: parsedEpisodeNumber});
   };
 
-  // Filter out duplicates and get the most recent items
+  // Exclude completed movies before applying the Home limit.
   const recentItems = React.useMemo(() => {
-    const seen = new Set();
-    const items = history
-      .filter(item => {
-        if (seen.has(item.link)) {
-          return false;
-        }
-        seen.add(item.link);
-        return true;
-      })
-      .slice(0, CONTINUE_WATCHING_LIMIT);
-
-    return items;
+    return selectContinueWatchingItems(history, CONTINUE_WATCHING_LIMIT);
   }, [history]);
 
   // Load progress data

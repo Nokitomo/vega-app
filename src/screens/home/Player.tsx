@@ -1840,6 +1840,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           poster:
             route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
+          isSeries: route.params?.type !== 'movie',
           lastPlayed: Date.now(),
           currentTime,
           duration,
@@ -2011,6 +2012,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           poster:
             route.params?.poster?.poster || route.params?.poster?.background,
           provider: route.params?.providerValue || providerValue,
+          isSeries: route.params?.type !== 'movie',
           lastPlayed: Date.now(),
           currentTime: latestEntry.currentTime,
           duration: latestEntry.duration,
@@ -2680,6 +2682,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           route.params.poster?.poster || route.params.poster?.background || '',
         link: route.params.infoUrl || '',
         provider: route.params?.providerValue || provider.value,
+        isSeries: route.params?.type !== 'movie',
         lastPlayed: Date.now(),
         duration: 0,
         currentTime: 0,
