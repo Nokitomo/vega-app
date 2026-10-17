@@ -67,6 +67,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - Quando una stagione/film e `upcoming` e non ci sono episodi/link, la UI mostra uno stato "In arrivo" con data (se disponibile) invece di una lista vuota.
 - Implementato attualmente per: `streamingunity`, `altadefinizionez`, `animeunity`.
 - Per StreamingUnity e attiva una reconciliation mirata per evitare falsi upcoming: se un titolo/stagione risulta `upcoming` ma con data non futura (es. data passata), il provider verifica la disponibilita reale.
+- StreamingUnity e StreamCenter includono le stagioni speciali numerate `0` nelle liste, nell'inventario e nei metadati degli episodi. Il player prova prima i server VixCloud del provider usando l'ID episodio; VixSrc resta il fallback e riceve anche la stagione `0` quando disponibile.
 - Film StreamingUnity: probe su `watch/iframe`; se viene rilevato un embed/playlist VixCloud valido (`/embed/<id>` o `/playlist/<id>`), il contenuto viene marcato `available`.
 - Stagioni StreamingUnity: probe sulla pagina stagione; se `loadedSeason.episodes` contiene episodi, la stagione viene marcata `available`.
 - Fail-safe: se la probe fallisce (timeout/rete/parsing), lo stato resta `upcoming` per non introdurre false disponibilita.

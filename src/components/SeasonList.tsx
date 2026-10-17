@@ -275,7 +275,7 @@ const resolveSeasonNumber = (item?: Link): number | undefined => {
   const parsedSeasonNumber = normalizeNumericValue(
     item.seasonNumber ?? item.titleParams?.number,
   );
-  if (!parsedSeasonNumber || parsedSeasonNumber <= 0) {
+  if (parsedSeasonNumber == null || parsedSeasonNumber < 0) {
     return undefined;
   }
   if (item.titleKey === 'Season {{number}}') {
@@ -295,7 +295,7 @@ const resolveSeasonValue = (item?: Link): string | null => {
   }
 
   const seasonNumber = resolveSeasonNumber(item);
-  if (seasonNumber) {
+  if (seasonNumber != null) {
     return `season:${seasonNumber}`;
   }
 
@@ -429,7 +429,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return undefined;
       }
       const parsedSeasonNumber = normalizeNumericValue(seasonNumber);
-      if (parsedSeasonNumber && parsedSeasonNumber > 0) {
+      if (parsedSeasonNumber != null && parsedSeasonNumber >= 0) {
         return t('S{{season}}-Ep. {{episode}}', {
           season: parsedSeasonNumber,
           episode: parsedEpisodeNumber,
@@ -516,7 +516,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           }
 
           const linkSeasonNumber = resolveSeasonNumber(link);
-          if (parsedSeasonNumber && linkSeasonNumber) {
+          if (parsedSeasonNumber != null && linkSeasonNumber != null) {
             return parsedSeasonNumber === linkSeasonNumber;
           }
 
@@ -2336,7 +2336,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }
       }
 
-      if (!targetSeason && resumeProgress?.seasonNumber) {
+      if (!targetSeason && resumeProgress?.seasonNumber != null) {
         targetSeason = LinkList.find(
           item =>
             resolveSeasonNumber(item) ===

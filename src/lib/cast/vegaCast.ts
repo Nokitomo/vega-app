@@ -104,7 +104,10 @@ const normalizeEpisodeProgressEntry = (
   };
 
   const episodeNumber = parsePositive(candidate.episodeNumber);
-  const seasonNumber = parsePositive(candidate.seasonNumber);
+  const seasonNumber =
+    candidate.seasonNumber == null
+      ? undefined
+      : parseNonNegative(candidate.seasonNumber);
   const queueIndexRaw = parseInteger(candidate.queueIndex);
   const queueIndex =
     typeof queueIndexRaw === 'number' && queueIndexRaw >= 0

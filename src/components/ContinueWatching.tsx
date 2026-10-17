@@ -77,7 +77,7 @@ const ContinueWatching = ({
       return undefined;
     }
     const parsedSeasonNumber = normalizeNumericValue(seasonNumber);
-    if (parsedSeasonNumber && parsedSeasonNumber > 0) {
+    if (parsedSeasonNumber != null && parsedSeasonNumber >= 0) {
       return t('SeasonBadge {{season}}-Ep. {{episode}}', {
         season: parsedSeasonNumber,
         episode: parsedEpisodeNumber,

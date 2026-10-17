@@ -59,6 +59,18 @@ describe('incremental metadata policy', () => {
     ).toBe(true);
   });
 
+  it('refreshes cached series metadata when season zero appears', () => {
+    const current = {...info('Returning Series'), linkList: [
+      {title: 'Season 1', seasonNumber: 1},
+    ]};
+    expect(hasContentInventoryChanged(current, {
+      complete: true,
+      status: 'Returning Series',
+      episodesCount: 3,
+      seasonsSignature: '[{"number":0,"count":1},{"number":1,"count":2}]',
+    })).toBe(true);
+  });
+
   it('preserves removed episodes until a second matching complete inventory', () => {
     const stored = [
       {link: '1', title: 'One', thumbnail: 'https://image/1'},

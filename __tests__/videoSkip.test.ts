@@ -3,6 +3,7 @@ import {cacheStorage, secureStorage} from '../src/lib/storage';
 import {
   getVideoSkipStamps,
   resolveAnimeSkip,
+  resolveTheIntroDb,
 } from '../src/lib/services/videoSkip';
 import {
   getAnimeSkipSession,
@@ -71,6 +72,26 @@ describe('video skip resolvers', () => {
       }),
     ).resolves.toEqual([]);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('passes season zero to TheIntroDB for specials', async () => {
+    (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({intro: [], credits: [], recap: [], preview: []}),
+    } as Response);
+
+    await resolveTheIntroDb({
+      title: 'Special fixture',
+      type: 'series',
+      tmdbId: 289892,
+      seasonNumber: 0,
+      episodeNumber: 10,
+      duration: 1200,
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(String((global.fetch as jest.MockedFunction<typeof fetch>).mock.calls[0][0]))
+      .toContain('season=0&episode=10');
   });
 
   it('stores AnimeSkip session data in secure storage and logs out', async () => {

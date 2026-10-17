@@ -132,7 +132,7 @@ export const resolveTheIntroDb = async (
     : context.imdbId
       ? `imdb_id=${encodeURIComponent(context.imdbId)}`
       : '';
-  if (!id || (!isMovie(context.type) && (!context.seasonNumber || !context.episodeNumber))) {
+  if (!id || (!isMovie(context.type) && (context.seasonNumber == null || !context.episodeNumber))) {
     return [];
   }
   const episodeQuery = isMovie(context.type)
@@ -170,7 +170,7 @@ export const resolveIntroDb = async (
     !isSeries(context) ||
     isAnime(context) ||
     !context.imdbId ||
-    !context.seasonNumber ||
+    context.seasonNumber == null ||
     !context.episodeNumber
   ) {
     return [];
@@ -246,7 +246,7 @@ export const resolveAnimeSkip = async (
     show?.episodes?.find(
       item =>
         item.number === episodeNumber &&
-        (!context.seasonNumber || !item.season || item.season === String(context.seasonNumber)),
+        (context.seasonNumber == null || !item.season || item.season === String(context.seasonNumber)),
     );
   const timestamps = episode?.timestamps || [];
   const typeMap: Record<string, VideoSkipType> = {
