@@ -8,18 +8,20 @@ import {
   Pressable,
 } from 'react-native';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
-import {mainStorage as MMKV} from '../lib/storage/StorageService';
 import {useNavigation} from '@react-navigation/native';
 import useThemeStore from '../lib/zustand/themeStore';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {TabStackParamList} from '../App';
+import {HomeStackParamList} from '../App';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../lib/utils/helpers';
-import {selectContinueWatchingItems} from '../lib/utils/continueWatching';
+import {
+  getContinueWatchingPresentation,
+  selectContinueWatchingItems,
+} from '../lib/utils/continueWatching';
 
 type EpisodeMeta = {
   episodeTitle?: string;
@@ -44,17 +46,13 @@ const ContinueWatching = ({
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const navigation =
-    useNavigation<NativeStackNavigationProp<TabStackParamList>>();
+    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const {history, hiddenFromContinueWatching, hideContinueWatchingItem, migrateDisplayTitles} = useWatchHistoryStore(
     state => state,
   );
   const showRecentlyWatched = useUiSettingsStore(
     state => state.showRecentlyWatched,
   );
-  const [progressData, setProgressData] = useState<Record<string, number>>({});
-  const [episodeMetaData, setEpisodeMetaData] = useState<
-    Record<string, EpisodeMeta>
-  >({});
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
 
@@ -92,54 +90,6 @@ const ContinueWatching = ({
     return selectContinueWatchingItems(history, CONTINUE_WATCHING_LIMIT, hiddenFromContinueWatching);
   }, [history, hiddenFromContinueWatching]);
 
-  // Load progress data
-  useEffect(() => {
-    const loadProgressData = () => {
-      const progressMap: Record<string, number> = {};
-      const episodeMetaMap: Record<string, EpisodeMeta> = {};
-
-      recentItems.forEach(item => {
-        try {
-          // Try to get dedicated watch history progress
-          const historyKey = item.link;
-          const historyProgressKey = `watch_history_progress_${historyKey}`;
-          const storedProgress = MMKV.getString(historyProgressKey);
-
-          if (storedProgress) {
-            const parsed = JSON.parse(storedProgress);
-            if (parsed.percentage) {
-              progressMap[item.link] = Math.min(
-                Math.max(parsed.percentage, 0),
-                100,
-              );
-            } else if (parsed.currentTime && parsed.duration) {
-              const percentage = (parsed.currentTime / parsed.duration) * 100;
-              progressMap[item.link] = Math.min(Math.max(percentage, 0), 100);
-            }
-
-            if (parsed.episodeTitle || parsed.episodeNumber != null) {
-              episodeMetaMap[item.link] = {
-                episodeTitle: parsed.episodeTitle,
-                episodeNumber: normalizeNumericValue(parsed.episodeNumber),
-                seasonNumber: normalizeNumericValue(parsed.seasonNumber),
-              };
-            }
-          } else if (item.currentTime && item.duration) {
-            const percentage = (item.currentTime / item.duration) * 100;
-            progressMap[item.link] = Math.min(Math.max(percentage, 0), 100);
-          }
-        } catch (e) {
-          console.error('Error processing progress for item:', item.title, e);
-        }
-      });
-
-      setProgressData(progressMap);
-      setEpisodeMetaData(episodeMetaMap);
-    };
-
-    loadProgressData();
-  }, [recentItems]);
-
   const handleNavigateToInfo = (item: any) => {
     try {
       // Parse the link if it's a JSON string
@@ -151,16 +101,13 @@ const ContinueWatching = ({
           console.error('Failed to parse link:', e);
         }
       }
-      console.log('linkData', item.poster);
       // Navigate to Info screen
-      navigation.navigate('HomeStack', {
-        screen: 'Info',
-        params: {
-          link: linkData,
-          provider: item.provider,
-          poster: item.poster,
-        },
-      } as any);
+      navigation.navigate('Info', {
+        link: linkData,
+        provider: item.provider,
+        poster: item.poster,
+        continueWatchingTarget: getContinueWatchingPresentation(item).target,
+      });
     } catch (error) {
       console.error('Navigation error:', error);
     }
@@ -207,7 +154,7 @@ const ContinueWatching = ({
   };
 
   const handleSeeAllPress = () => {
-    navigation.navigate('HomeStack', {screen: 'ContinueWatchingAll'} as any);
+    navigation.navigate('ContinueWatchingAll');
   };
 
   const deleteSelectedItems = () => {
@@ -279,16 +226,17 @@ const ContinueWatching = ({
         keyExtractor={item => item.link}
         contentContainerStyle={{paddingHorizontal: 12}}
         renderItem={({item}) => {
-          const progress = progressData[item.link] || 0;
+          const presentation = getContinueWatchingPresentation(item);
+          const progress = presentation.progressPercent;
           const isSelected = selectedItems.has(item.link);
           const displayTitle = item.displayTitle || item.title;
           const episodeLabel = getEpisodeLabel({
             episodeTitle:
-              episodeMetaData[item.link]?.episodeTitle || item.episodeTitle,
+              presentation.target ? presentation.target.title : item.episodeTitle,
             episodeNumber:
-              episodeMetaData[item.link]?.episodeNumber ?? item.episodeNumber,
+              presentation.target ? presentation.target.episodeNumber : item.episodeNumber,
             seasonNumber:
-              episodeMetaData[item.link]?.seasonNumber ?? item.seasonNumber,
+              presentation.target ? presentation.target.seasonNumber : item.seasonNumber,
           });
           const showItaBadge = hasItaBadge(displayTitle);
 
@@ -328,6 +276,15 @@ const ContinueWatching = ({
                     style={{backgroundColor: primary}}>
                     <Text className="text-black text-[10px] font-semibold">
                       {episodeLabel}
+                    </Text>
+                  </View>
+                ) : null}
+                {presentation.hasNewEpisodes ? (
+                  <View
+                    className="absolute bottom-3 left-1 rounded px-1 py-0.5"
+                    style={{backgroundColor: primary}}>
+                    <Text className="text-black text-[9px] font-semibold">
+                      {t('New episodes')}
                     </Text>
                   </View>
                 ) : null}

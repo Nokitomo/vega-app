@@ -5,11 +5,22 @@ import {
   WATCH_COMPLETION_PERCENT,
 } from './ManualEpisodeCompletionStorage';
 
-type SeriesCatalog = {
+export type SeriesCatalogEpisode = {
+  link: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+  seasonEpisodesLink?: string;
+  title?: string;
+};
+
+export type SeriesCatalog = {
   episodeLinks: string[];
+  episodes?: SeriesCatalogEpisode[];
   complete: boolean;
   fullyWatched: boolean;
   updatedAt: number;
+  newEpisodeLinks?: string[];
+  newEpisodesDetectedAt?: number;
 };
 
 type EpisodeProgress = Record<string, number>;
@@ -21,6 +32,9 @@ const CATALOG_KEYS = 'seriesCatalogContentLinks';
 
 const readCatalog = (contentLink: string): SeriesCatalog | undefined =>
   mainStorage.getObject<SeriesCatalog>(catalogKey(contentLink));
+
+export const getSeriesCatalog = (contentLink: string): SeriesCatalog | undefined =>
+  readCatalog(contentLink);
 
 const readProgress = (contentLink: string): EpisodeProgress =>
   mainStorage.getObject<EpisodeProgress>(progressKey(contentLink)) || {};
@@ -60,8 +74,19 @@ export const recomputeSeriesCompletion = (contentLink: string): boolean => {
         (progress[episodeLink] ?? percentageFromCache(episodeLink)) >=
           WATCH_COMPLETION_PERCENT,
     );
-  if (catalog.fullyWatched !== fullyWatched) {
-    mainStorage.setObject(catalogKey(contentLink), {...catalog, fullyWatched});
+  const newEpisodeStarted = catalog.newEpisodeLinks?.some(
+    link => isEpisodeManuallyWatched(contentLink, link) ||
+      (progress[link] ?? percentageFromCache(link)) > 0,
+  );
+  if (catalog.fullyWatched !== fullyWatched || newEpisodeStarted) {
+    mainStorage.setObject(catalogKey(contentLink), {
+      ...catalog,
+      fullyWatched,
+      newEpisodeLinks: newEpisodeStarted ? [] : catalog.newEpisodeLinks,
+      newEpisodesDetectedAt: newEpisodeStarted
+        ? undefined
+        : catalog.newEpisodesDetectedAt,
+    });
   }
   return fullyWatched;
 };
@@ -71,26 +96,60 @@ export const isSeriesComplete = (contentLink: string): boolean =>
 
 export const setSeriesCatalog = (
   contentLink: string,
-  episodeLinks: string[],
+  episodeLinks: Array<string | SeriesCatalogEpisode>,
   complete: boolean,
 ): void => {
   if (!contentLink) {
     return;
   }
-  const uniqueLinks = [...new Set(episodeLinks.filter(Boolean))];
+  const seen = new Set<string>();
+  const episodes = episodeLinks
+    .map(episode => typeof episode === 'string' ? {link: episode} : episode)
+    .filter(episode => {
+      if (!episode?.link || seen.has(episode.link)) {
+        return false;
+      }
+      seen.add(episode.link);
+      return true;
+    });
+  const uniqueLinks = episodes.map(episode => episode.link);
   const previous = readCatalog(contentLink);
+  const unchangedEpisodes = previous?.episodes?.length === episodes.length &&
+    previous.episodes.every((episode, index) =>
+      episode.link === episodes[index].link &&
+      episode.episodeNumber === episodes[index].episodeNumber &&
+      episode.seasonNumber === episodes[index].seasonNumber &&
+      episode.seasonEpisodesLink === episodes[index].seasonEpisodesLink &&
+      episode.title === episodes[index].title,
+    );
   if (
     previous?.complete === complete &&
     previous.episodeLinks.length === uniqueLinks.length &&
-    previous.episodeLinks.every((link, index) => link === uniqueLinks[index])
+    previous.episodeLinks.every((link, index) => link === uniqueLinks[index]) &&
+    unchangedEpisodes
   ) {
     return;
   }
+  const previousLinks = new Set(previous?.episodeLinks || []);
+  const added = previous?.complete && complete && previousLinks.size > 0
+    ? uniqueLinks.filter(link => !previousLinks.has(link))
+    : [];
+  const newEpisodeLinks = [
+    ...(previous?.newEpisodeLinks || []).filter(link => seen.has(link)),
+    ...added,
+  ];
   mainStorage.setObject(catalogKey(contentLink), {
     episodeLinks: uniqueLinks,
+    episodes,
     complete,
     fullyWatched: false,
     updatedAt: Date.now(),
+    newEpisodeLinks: [...new Set(newEpisodeLinks)],
+    newEpisodesDetectedAt: added.length > 0
+      ? Date.now()
+      : newEpisodeLinks.length > 0
+        ? previous?.newEpisodesDetectedAt
+        : undefined,
   } satisfies SeriesCatalog);
   trackContent(contentLink);
   recomputeSeriesCompletion(contentLink);

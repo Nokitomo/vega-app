@@ -70,6 +70,7 @@ import {applyAndroidUserOrientation} from './lib/utils/vegaOrientation';
 import WafWebViewDialog from './components/WafWebViewDialog';
 import {warpService} from './lib/services/warp';
 import {perfTrace, startPerfHeartbeat} from './lib/utils/perfTrace';
+import type {ContinueWatchingTarget} from './lib/utils/continueWatching';
 // Lazy-load Firebase modules so app runs without google-services files
 const getAnalytics = (): any | null => {
   try {
@@ -95,6 +96,7 @@ const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type InfoRouteParams = {
   link: string;
+  continueWatchingTarget?: ContinueWatchingTarget;
   provider?: string;
   poster?: string;
   variants?: PostVariant[];

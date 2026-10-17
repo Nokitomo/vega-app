@@ -1,6 +1,9 @@
 import {EpisodeLink, Link} from '../providers/types';
 import {readMetadata} from '../storage/MetadataDatabase';
-import {setSeriesCatalog} from '../storage/SeriesCompletionStorage';
+import {
+  SeriesCatalogEpisode,
+  setSeriesCatalog,
+} from '../storage/SeriesCompletionStorage';
 import {providerManager} from './ProviderManager';
 
 const EPISODE_CACHE_FRESH_MS = 4 * 60 * 60 * 1000;
@@ -21,14 +24,14 @@ export const syncSeriesCatalog = async ({
 }): Promise<void> => {
   const generation = (syncGenerations.get(contentLink) || 0) + 1;
   syncGenerations.set(contentLink, generation);
-  const episodeLinks: string[] = [];
+  const episodesInCatalog: SeriesCatalogEpisode[] = [];
   let complete = true;
 
   for (const group of groups) {
     if (group.availabilityStatus === 'upcoming') {
       continue;
     }
-    let episodes: Array<{link: string}> = [];
+    let episodes: EpisodeLink[] = [];
     if (group.episodesLink) {
       if (group.episodesLink === activeSeasonLink && activeEpisodes?.length) {
         episodes = activeEpisodes;
@@ -62,10 +65,16 @@ export const syncSeriesCatalog = async ({
     if (playable.length === 0) {
       complete = false;
     }
-    episodeLinks.push(...playable.map(episode => episode.link));
+    episodesInCatalog.push(...playable.map(episode => ({
+      link: episode.link,
+      title: episode.title,
+      episodeNumber: episode.episodeNumber,
+      seasonNumber: episode.seasonNumber ?? group.seasonNumber,
+      seasonEpisodesLink: group.episodesLink,
+    })));
   }
 
   if (syncGenerations.get(contentLink) === generation) {
-    setSeriesCatalog(contentLink, episodeLinks, complete);
+    setSeriesCatalog(contentLink, episodesInCatalog, complete);
   }
 };

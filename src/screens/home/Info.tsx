@@ -97,7 +97,14 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   );
   const activePoster = routeSelectedVariant?.image || route.params.poster;
   const activeRouteParams = useMemo(
-    () => ({...route.params, link: activeLink, poster: activePoster}),
+    () => ({
+      ...route.params,
+      link: activeLink,
+      poster: activePoster,
+      continueWatchingTarget: activeLink === route.params.link
+        ? route.params.continueWatchingTarget
+        : undefined,
+    }),
     [activeLink, activePoster, route.params],
   );
   const infoHeaderHeight = useMemo(() => {

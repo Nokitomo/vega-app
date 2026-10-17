@@ -5,6 +5,7 @@ import {
   View,
   Text,
   PanResponder,
+  AppState,
 } from 'react-native';
 import Slider from '../../components/Slider';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -27,6 +28,8 @@ import {Drawer} from 'react-native-drawer-layout';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {useIsFocused} from '@react-navigation/native';
 import ContinueWatching from '../../components/ContinueWatching';
+import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
+import {checkContinueWatchingSeries} from '../../lib/services/continueWatchingRefresh';
 import {providerManager} from '../../lib/services/ProviderManager';
 import Tutorial from '../../components/Touturial';
 import {QueryErrorBoundary} from '../../components/ErrorBoundary';
@@ -159,6 +162,31 @@ const Home = ({}: Props) => {
   const {setHero} = useHeroStore(state => state);
   const isHomeFocused = useIsFocused();
   const heroCacheTtlMs = HERO_CACHE_TTL_MS;
+
+  const checkSeries = useCallback(() => {
+    const state = useWatchHistoryStore.getState();
+    checkContinueWatchingSeries(
+      state.history,
+      state.hiddenFromContinueWatching,
+    ).then(changed => {
+      if (changed) {
+        useWatchHistoryStore.getState().refreshHistory();
+      }
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!isHomeFocused || !installedProviders?.length) {
+      return;
+    }
+    checkSeries();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        checkSeries();
+      }
+    });
+    return () => subscription.remove();
+  }, [checkSeries, installedProviders?.length, isHomeFocused]);
 
   const resolveCatalogTitle = useCallback(
     (item: {title: string; titleKey?: string; titleParams?: Record<string, string | number>}) =>

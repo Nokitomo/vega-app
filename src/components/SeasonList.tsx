@@ -1,4 +1,4 @@
-import React, {useState, useMemo, useCallback, useEffect} from 'react';
+import React, {useState, useMemo, useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -90,6 +90,7 @@ import {
   readPersistedCache,
   writePersistedCache,
 } from '../lib/utils/persistedCache';
+import type {ContinueWatchingTarget} from '../lib/utils/continueWatching';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -116,8 +117,11 @@ interface SeasonListProps {
     link: string;
     provider?: string;
     poster?: string;
+    continueWatchingTarget?: ContinueWatchingTarget;
   }>;
 }
+
+const EMPTY_EPISODES: EpisodeLink[] = [];
 
 interface PlayHandlerProps {
   linkIndex: number;
@@ -293,6 +297,22 @@ const resolveSeasonNumber = (item?: Link): number | undefined => {
     return parsedSeasonNumber;
   }
   return undefined;
+};
+
+const findContinueTargetSeason = (
+  groups: Link[],
+  target?: ContinueWatchingTarget,
+): Link | undefined => {
+  if (!target) {return undefined;}
+  return (target.seasonEpisodesLink
+    ? groups.find(group => group.episodesLink === target.seasonEpisodesLink)
+    : undefined) ||
+    (target.seasonNumber != null
+      ? groups.find(group =>
+          normalizeNumericValue(group.seasonNumber) === target.seasonNumber ||
+          resolveSeasonNumber(group) === target.seasonNumber,
+        )
+      : undefined);
 };
 
 const resolveSeasonValue = (item?: Link): string | null => {
@@ -511,6 +531,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
       return {} as Link;
     }
 
+    const target = routeParams.continueWatchingTarget;
+    const targetSeason = findContinueTargetSeason(LinkList, target);
+    if (targetSeason) {
+      return targetSeason;
+    }
+
     const cached = cacheStorage.getString(
       `ActiveSeason${metaTitle + providerValue}`,
     );
@@ -546,6 +572,18 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
     return LinkList[0];
   });
+  const targetSeasonAppliedRef = useRef(false);
+  useEffect(() => {
+    const target = routeParams.continueWatchingTarget;
+    if (!target || targetSeasonAppliedRef.current) {
+      return;
+    }
+    const targetSeason = findContinueTargetSeason(LinkList, target);
+    if (targetSeason) {
+      targetSeasonAppliedRef.current = true;
+      setActiveSeason(targetSeason);
+    }
+  }, [LinkList, routeParams.continueWatchingTarget]);
   const linkListWithDisplayTitle = useMemo<LinkWithDisplayTitle[]>(
     () =>
       LinkList.map((item, index) => ({
@@ -679,7 +717,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   }, [activeSeasonValue?.availabilityStatus, t]);
   // React Query for episodes
   const {
-    data: episodeList = [],
+    data: episodeList = EMPTY_EPISODES,
     isLoading: episodeLoading,
     error: episodeError,
     refetch: refetchEpisodes,
@@ -816,6 +854,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
     );
   }, [activeSeason?.directLinks, normalizedEpisodes.length]);
   const resumeEpisodeLabel = useMemo(() => {
+    const continueTarget = routeParams.continueWatchingTarget;
+    if (continueTarget) {
+      return getEpisodeLabel({
+        episodeTitle: continueTarget.title,
+        episodeNumber: continueTarget.episodeNumber,
+        seasonNumber: continueTarget.seasonNumber,
+      });
+    }
     if (!resumeProgress) {
       return undefined;
     }
@@ -860,6 +906,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     normalizedDirectLinks,
     normalizedEpisodes,
     resumeProgress,
+    routeParams.continueWatchingTarget,
   ]);
 
   // Memoized filtering and sorting logic for episodes
@@ -2321,23 +2368,31 @@ const SeasonList: React.FC<SeasonListProps> = ({
   ]);
 
   const handleResume = useCallback(() => {
-    const isResume = !!resumeProgress;
+    const continueTarget = routeParams.continueWatchingTarget;
+    const isResume = !!resumeProgress &&
+      (!continueTarget || (
+        resumeProgress.episodeLink === continueTarget.link &&
+        getEpisodeProgressPercent(routeParams.link, continueTarget.link) <
+          WATCH_COMPLETION_PERCENT
+      ));
     const targetEpisodeNumber = isResume
       ? normalizeNumericValue(resumeProgress?.episodeNumber) ??
         getEpisodeNumber(resumeProgress?.episodeTitle)
-      : 1;
+      : continueTarget?.episodeNumber ?? 1;
 
     const target: PendingPlay = {
       isResume,
       episodeNumber: targetEpisodeNumber,
-      episodeTitle: resumeProgress?.episodeTitle,
-      episodeLink: resumeProgress?.episodeLink,
-      seasonNumber: resumeProgress?.seasonNumber,
+      episodeTitle: continueTarget?.title || resumeProgress?.episodeTitle,
+      episodeLink: continueTarget?.link || resumeProgress?.episodeLink,
+      seasonNumber: continueTarget?.seasonNumber ?? resumeProgress?.seasonNumber,
     };
 
     let targetSeason: Link | undefined;
 
-    if (isResume) {
+    if (continueTarget) {
+      targetSeason = findContinueTargetSeason(LinkList, continueTarget);
+    } else if (isResume) {
       if (resumeProgress?.seasonEpisodesLink) {
         targetSeason = LinkList.find(
           item => item.episodesLink === resumeProgress.seasonEpisodesLink,
@@ -2410,6 +2465,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     });
   }, [
     resumeProgress,
+    routeParams.continueWatchingTarget,
     LinkList,
     getPlayableList,
     resolveEpisodeIndex,
@@ -2917,7 +2973,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 color={primary}
               />
               <Text className="text-white font-semibold">
-                {resumeProgress?.currentTime ? t('Resume') : t('Play')}
+                {resumeProgress?.currentTime &&
+                (!routeParams.continueWatchingTarget ||
+                  routeParams.continueWatchingTarget.link === resumeProgress.episodeLink &&
+                  getEpisodeProgressPercent(
+                    routeParams.link,
+                    routeParams.continueWatchingTarget.link,
+                  ) < WATCH_COMPLETION_PERCENT)
+                  ? t('Resume') : t('Play')}
               </Text>
               {resumeEpisodeLabel ? (
                 <Text className="text-white/80 text-xs">
@@ -2926,7 +2989,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
               ) : null}
             </View>
             <Text className="text-white/80 text-xs">
-              {formatResumeTime(resumeProgress?.currentTime ?? 0)}
+              {routeParams.continueWatchingTarget &&
+              routeParams.continueWatchingTarget.link !== resumeProgress?.episodeLink
+                ? null
+                : formatResumeTime(resumeProgress?.currentTime ?? 0)}
             </Text>
           </TouchableOpacity>
         </View>

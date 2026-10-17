@@ -494,10 +494,12 @@ export class ProviderManager {
     url,
     providerValue,
     knownEpisodes,
+    silent = false,
   }: {
     url: string;
     providerValue: string;
     knownEpisodes?: EpisodeLink[];
+    silent?: boolean;
   }): Promise<EpisodeLink[]> => {
     const providerContext = this.getProviderContext(providerValue);
     // Use extensionManager which now handles test mode automatically
@@ -530,10 +532,12 @@ export class ProviderManager {
         'Failed to get episodes from provider: {{provider}}',
         {provider: providerValue},
       );
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(errorMessage, ToastAndroid.LONG);
-      } else {
-        Alert.alert(i18n.t('Error'), errorMessage);
+      if (!silent) {
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+        } else {
+          Alert.alert(i18n.t('Error'), errorMessage);
+        }
       }
       throw new Error(errorMessage);
     }

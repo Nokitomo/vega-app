@@ -6,7 +6,10 @@ import {
   setEpisodeManuallyWatched,
   clearAllManualEpisodeCompletions,
 } from '../src/lib/storage/ManualEpisodeCompletionStorage';
-import {selectContinueWatchingItems} from '../src/lib/utils/continueWatching';
+import {
+  getContinueWatchingPresentation,
+  selectContinueWatchingItems,
+} from '../src/lib/utils/continueWatching';
 import {
   getHiddenContinueWatchingLinks,
   hideFromContinueWatching,
@@ -14,6 +17,7 @@ import {
 } from '../src/lib/storage/ContinueWatchingStorage';
 import {
   isSeriesComplete,
+  getSeriesCatalog,
   recomputeSeriesCompletion,
   recordEpisodePlaybackProgress,
   setSeriesCatalog,
@@ -138,4 +142,73 @@ it('uses durable playback progress after the temporary cache is cleared', () => 
   cacheStorage.clearAll();
   expect(getEpisodeProgressPercent('show', 's1e1')).toBe(95);
   expect(isSeriesComplete('show')).toBe(true);
+});
+
+it('shows the next episode with zero progress after the previous one is complete', () => {
+  const show = {...item('show', true), episodeNumber: 1, seasonNumber: 1};
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+  ], true);
+  recordEpisodePlaybackProgress('show', 's1e1', 95, 100);
+  mainStorage.setString('watch_history_progress_show', JSON.stringify({
+    episodeLink: 's1e1', percentage: 95,
+  }));
+
+  expect(getContinueWatchingPresentation(show)).toMatchObject({
+    target: {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+    progressPercent: 0,
+    hasNewEpisodes: false,
+  });
+});
+
+it('keeps legacy episode progress when the saved summary has no episode link', () => {
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+  ], true);
+  mainStorage.setString('watch_history_progress_show', JSON.stringify({
+    percentage: 40,
+  }));
+  expect(getContinueWatchingPresentation({
+    ...item('show', true), episodeNumber: 1, seasonNumber: 1,
+  })).toMatchObject({
+    target: {link: 's1e1'}, progressPercent: 40,
+  });
+});
+
+it('restores a completed show when a season appears and targets its first episode', () => {
+  const storage = new WatchHistoryStorage();
+  storage.addToWatchHistory({...item('show', true), episodeNumber: 3, seasonNumber: 3});
+  const oldEpisodes = [1, 2, 3].map(seasonNumber => ({
+    link: `s${seasonNumber}e1`, seasonNumber, episodeNumber: 1,
+    seasonEpisodesLink: `season-${seasonNumber}`,
+  }));
+  setSeriesCatalog('show', oldEpisodes, true);
+  oldEpisodes.forEach(episode =>
+    setEpisodeManuallyWatched('show', episode.link, true),
+  );
+  recomputeSeriesCompletion('show');
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toEqual([]);
+
+  setSeriesCatalog('show', [...oldEpisodes, {
+    link: 's4e1', seasonNumber: 4, episodeNumber: 1,
+    seasonEpisodesLink: 'season-4',
+  }], true);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toHaveLength(1);
+  expect(getContinueWatchingPresentation(storage.getWatchHistory()[0])).toMatchObject({
+    target: {
+      link: 's4e1', seasonNumber: 4, episodeNumber: 1,
+      seasonEpisodesLink: 'season-4',
+    },
+    progressPercent: 0,
+    hasNewEpisodes: true,
+  });
+  expect(getSeriesCatalog('show')?.newEpisodeLinks).toEqual(['s4e1']);
+  expect(storage.getWatchHistory()).toHaveLength(1);
+
+  recordEpisodePlaybackProgress('show', 's4e1', 20, 100);
+  expect(getContinueWatchingPresentation(storage.getWatchHistory()[0])).toMatchObject({
+    target: {link: 's4e1'}, progressPercent: 20, hasNewEpisodes: false,
+  });
 });

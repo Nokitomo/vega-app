@@ -16,7 +16,7 @@ import {HomeStackParamList} from '../App';
 import useThemeStore from '../lib/zustand/themeStore';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {
-  getHistoryProgressPercent,
+  getContinueWatchingPresentation,
   selectContinueWatchingItems,
 } from '../lib/utils/continueWatching';
 
@@ -67,7 +67,8 @@ const ContinueWatchingAll = ({navigation}: Props) => {
           </View>
         )}
         renderItem={({item}) => {
-          const progress = getHistoryProgressPercent(item);
+          const presentation = getContinueWatchingPresentation(item);
+          const progress = presentation.progressPercent;
           let infoLink: typeof item.link | Record<string, unknown> = item.link;
           if (item.link.startsWith('{')) {
             try {
@@ -85,6 +86,7 @@ const ContinueWatchingAll = ({navigation}: Props) => {
                     link: infoLink as typeof item.link,
                     provider: item.provider,
                     poster: item.poster,
+                    continueWatchingTarget: presentation.target,
                   })
                 }>
                 <View className="relative">
@@ -92,6 +94,15 @@ const ContinueWatchingAll = ({navigation}: Props) => {
                     source={{uri: item.poster}}
                     className="w-full aspect-[2/3] rounded-lg"
                   />
+                  {presentation.hasNewEpisodes ? (
+                    <View
+                      className="absolute bottom-3 left-1 rounded px-1 py-0.5"
+                      style={{backgroundColor: primary}}>
+                      <Text className="text-black text-[9px] font-semibold">
+                        {t('New episodes')}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
                     <View
                       style={{width: `${progress}%`, height: '100%', backgroundColor: primary}}
@@ -101,9 +112,19 @@ const ContinueWatchingAll = ({navigation}: Props) => {
                 <Text className="text-white text-sm mt-1" numberOfLines={2}>
                   {item.displayTitle || item.title}
                 </Text>
-                {item.episodeTitle ? (
+                {(presentation.target
+                  ? presentation.target.episodeNumber != null
+                  : !!item.episodeTitle) ? (
                   <Text className="text-white/60 text-xs" numberOfLines={1}>
-                    {item.episodeTitle}
+                    {presentation.target?.seasonNumber != null &&
+                    presentation.target?.episodeNumber != null
+                      ? t('SeasonBadge {{season}}-Ep. {{episode}}', {
+                          season: presentation.target.seasonNumber,
+                          episode: presentation.target.episodeNumber,
+                        })
+                      : presentation.target?.episodeNumber != null
+                        ? t('Ep. {{number}}', {number: presentation.target.episodeNumber})
+                        : item.episodeTitle}
                   </Text>
                 ) : null}
               </TouchableOpacity>
