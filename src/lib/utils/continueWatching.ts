@@ -1,6 +1,7 @@
 import {mainStorage} from '../storage/StorageService';
 import {WatchHistoryItem} from '../storage/WatchHistoryStorage';
 import {WATCH_COMPLETION_PERCENT} from '../storage/ManualEpisodeCompletionStorage';
+import {isSeriesComplete} from '../storage/SeriesCompletionStorage';
 
 export const getHistoryProgressPercent = (item: WatchHistoryItem): number => {
   try {
@@ -32,11 +33,13 @@ export const getHistoryProgressPercent = (item: WatchHistoryItem): number => {
 export const selectContinueWatchingItems = (
   history: WatchHistoryItem[],
   limit: number,
+  hiddenLinks: readonly string[] = [],
 ): WatchHistoryItem[] => {
   const seen = new Set<string>();
+  const hidden = new Set(hiddenLinks);
   return history
     .filter(item => {
-      if (seen.has(item.link)) {
+      if (seen.has(item.link) || hidden.has(item.link)) {
         return false;
       }
       seen.add(item.link);
@@ -44,8 +47,11 @@ export const selectContinueWatchingItems = (
     })
     .filter(
       item =>
-        item.isSeries !== false ||
-        getHistoryProgressPercent(item) < WATCH_COMPLETION_PERCENT,
+        item.isSeries === true
+          ? !isSeriesComplete(item.link)
+          : item.isSeries === false
+            ? getHistoryProgressPercent(item) < WATCH_COMPLETION_PERCENT
+            : true,
     )
     .slice(0, limit);
 };

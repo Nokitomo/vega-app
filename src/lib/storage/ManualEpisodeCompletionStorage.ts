@@ -1,6 +1,7 @@
 import {cacheStorage, mainStorage} from './StorageService';
 
 export const WATCH_COMPLETION_PERCENT = 95;
+export const SERIES_EPISODE_PROGRESS_PREFIX = 'seriesEpisodeProgress_';
 
 const keyForContent = (contentLink: string) =>
   `manualWatchedEpisodes_${contentLink}`;
@@ -20,6 +21,12 @@ export const getEpisodeProgressPercent = (
 ): number => {
   if (isEpisodeManuallyWatched(contentLink, episodeLink)) {
     return 100;
+  }
+  const recorded = mainStorage.getObject<Record<string, number>>(
+    `${SERIES_EPISODE_PROGRESS_PREFIX}${contentLink}`,
+  )?.[episodeLink];
+  if (Number.isFinite(recorded)) {
+    return Math.min(Math.max(recorded!, 0), 100);
   }
   try {
     const progress = JSON.parse(cacheStorage.getString(episodeLink) || '{}');

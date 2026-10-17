@@ -48,6 +48,12 @@ import {
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
+import {syncSeriesCatalog} from '../lib/services/seriesCatalogSync';
+import {
+  clearEpisodePlaybackProgress,
+  recomputeSeriesCompletion,
+  recordEpisodePlaybackProgress,
+} from '../lib/storage/SeriesCompletionStorage';
 import {extensionManager} from '../lib/services/ExtensionManager';
 import {providerManager} from '../lib/services/ProviderManager';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -408,7 +414,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
     showFillerLabels,
     type,
   ]);
-  const {addItem, updatePlaybackInfo} = useWatchHistoryStore(state => state);
+  const {addItem, updatePlaybackInfo, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
+  useEffect(() => {
+    classifyHistoryItem(routeParams.link, type !== 'movie');
+  }, [classifyHistoryItem, routeParams.link, type]);
   const {fetchStreams} = useStreamData();
   const resolveTitle = useCallback(
     (item?: {
@@ -680,6 +689,21 @@ const SeasonList: React.FC<SeasonListProps> = ({
     shouldFetchEpisodes,
     contentInfo,
   );
+
+  useEffect(() => {
+    if (type === 'movie' || !routeParams.link || !providerValue) {
+      return;
+    }
+    syncSeriesCatalog({
+      contentLink: routeParams.link,
+      providerValue,
+      groups: LinkList,
+      activeSeasonLink: activeSeason?.episodesLink,
+      activeEpisodes: episodeList,
+    })
+      .then(refreshHistory)
+      .catch(error => console.warn('Failed to sync series catalog:', error));
+  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, routeParams.link, type]);
 
   useEffect(() => {
     if (!refreshVersion || !activeSeason?.episodesLink || !shouldFetchEpisodes) {
@@ -1578,6 +1602,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           title: metaTitle || '',
           poster: poster?.poster || poster?.background,
           provider: providerValue,
+          isSeries: type !== 'movie',
           lastPlayed: Date.now(),
           currentTime,
           duration,
@@ -1600,6 +1625,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration,
         }),
       );
+      recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
 
       const progressData = {
         currentTime,
@@ -1680,6 +1706,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
             duration,
           }),
         );
+        recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
         watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
 
         const progressData = {
@@ -1737,6 +1764,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
           title: metaTitle || '',
           poster: poster?.poster || poster?.background,
           provider: providerValue,
+          isSeries: type !== 'movie',
           lastPlayed: Date.now(),
           currentTime: latestEntry.currentTime,
           duration: latestEntry.duration,
@@ -2065,10 +2093,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration: 1,
         }),
       );
+      recomputeSeriesCompletion(routeParams.link);
+      refreshHistory();
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 100}));
       setStickyMenu({active: false});
     }
-  }, [routeParams.link, stickyMenu.link]);
+  }, [refreshHistory, routeParams.link, stickyMenu.link]);
 
   // Memoized mark as unwatched handler
   const markAsUnwatched = useCallback(() => {
@@ -2081,10 +2111,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration: 1,
         }),
       );
+      clearEpisodePlaybackProgress(routeParams.link, stickyMenu.link);
+      recomputeSeriesCompletion(routeParams.link);
+      refreshHistory();
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 0}));
       setStickyMenu({active: false});
     }
-  }, [routeParams.link, stickyMenu.link]);
+  }, [refreshHistory, routeParams.link, stickyMenu.link]);
 
   const getPlayableList = useCallback(() => {
     if (sortedEpisodes.length > 0) {

@@ -45,7 +45,7 @@ const ContinueWatching = ({
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
-  const {history, removeItem, migrateDisplayTitles} = useWatchHistoryStore(
+  const {history, hiddenFromContinueWatching, hideContinueWatchingItem, migrateDisplayTitles} = useWatchHistoryStore(
     state => state,
   );
   const showRecentlyWatched = useUiSettingsStore(
@@ -89,8 +89,8 @@ const ContinueWatching = ({
 
   // Exclude completed movies before applying the Home limit.
   const recentItems = React.useMemo(() => {
-    return selectContinueWatchingItems(history, CONTINUE_WATCHING_LIMIT);
-  }, [history]);
+    return selectContinueWatchingItems(history, CONTINUE_WATCHING_LIMIT, hiddenFromContinueWatching);
+  }, [history, hiddenFromContinueWatching]);
 
   // Load progress data
   useEffect(() => {
@@ -207,21 +207,13 @@ const ContinueWatching = ({
   };
 
   const handleSeeAllPress = () => {
-    navigation.navigate(
-      'SettingsStack',
-      {
-        screen: 'WatchHistoryStack',
-        params: {
-          screen: 'WatchHistory',
-        },
-      } as any,
-    );
+    navigation.navigate('HomeStack', {screen: 'ContinueWatchingAll'} as any);
   };
 
   const deleteSelectedItems = () => {
     recentItems.forEach(item => {
       if (selectedItems.has(item.link)) {
-        removeItem(item);
+        hideContinueWatchingItem(item.link);
       }
     });
     setSelectedItems(new Set());

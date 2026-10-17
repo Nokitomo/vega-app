@@ -79,9 +79,9 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 5. Watchlist e Cronologia
 
 - Salva e consulta elementi preferiti e gia visti.
-- La sezione Continue Watching mostra il badge episodio quando disponibile, fino a 30 elementi unici recenti. I film con progresso almeno al 95% vengono esclusi prima di applicare il limite; le serie rimangono visibili finche non sara disponibile il completamento dell'intera serie. I titoli completati restano in WatchHistory. I contenuti precedenti privi del tipo salvato rimangono visibili per evitare di nascondere serie per errore.
+- La sezione Continue Watching mostra il badge episodio quando disponibile, fino a 30 elementi unici recenti. I film con progresso almeno al 95% vengono esclusi prima di applicare il limite. Una serie esce dalla sezione solo quando il catalogo di tutte le stagioni disponibili e completo e ogni episodio raggiunge il 95% (anche tramite "Segna come visto"). Un catalogo incompleto mantiene la serie visibile. I titoli completati restano in WatchHistory. I contenuti precedenti privi del tipo salvato rimangono visibili per evitare di nascondere serie per errore.
 - Riprendere un contenuto gia presente nella cronologia lo riporta in cima all'ordine recente. "Segna come visto" mostra subito la barra completa dell'episodio e conserva il segno manuale anche dopo "Svuota cache"; "Segna come non visto" lo annulla.
-- In Home, Continue Watching espone il comando "Altro" che apre la schermata WatchHistory.
+- In Home, Continue Watching espone il comando "Altro" che apre una schermata dedicata con tutti i titoli idonei. Rimuovere un titolo da qui o dalla riga Home lo nasconde fino alla prossima riproduzione senza cancellarlo dalla WatchHistory o perdere i progressi.
 - Per i provider animeunity, streamingunity/streamingcommunity e altadefinizionez il titolo mostrato segue la sorgente provider (coerente con le altre sezioni).
 - WatchHistory e Continue Watching applicano una migrazione dei titoli gia salvati per riallinearli alle card provider, e mantengono il riallineamento anche per i nuovi elementi.
 - La pulizia della cronologia rimuove anche i progressi salvati.

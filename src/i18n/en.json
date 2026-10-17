@@ -359,6 +359,8 @@
   "Bitrate {{bitrate}} | Codec {{codec}}": "Bitrate {{bitrate}} | Codec {{codec}}",
   "Playback Speed": "Playback Speed",
   "Continue Watching": "Continue Watching",
+  "No items to continue watching": "No items to continue watching",
+  "Remove from Continue Watching": "Remove from Continue Watching",
   "{{count}} selected": "{{count}} selected",
   "Ep. {{number}}": "Ep. {{number}}",
   "SeasonBadge {{season}}-Ep. {{episode}}": "S{{season}}-Ep. {{episode}}",

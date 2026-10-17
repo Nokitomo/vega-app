@@ -50,6 +50,7 @@ import Animated from 'react-native-reanimated';
 import Downloads from './screens/settings/Downloads';
 import SeriesEpisodes from './screens/settings/SeriesEpisodes';
 import WatchHistory from './screens/WatchHistory';
+import ContinueWatchingAll from './screens/ContinueWatchingAll';
 import SubtitlePreference from './screens/settings/SubtitleSettings';
 import Extensions from './screens/settings/Extensions';
 import Account from './screens/settings/Account';
@@ -111,6 +112,7 @@ export type InfoRouteParams = {
 
 export type HomeStackParamList = {
   Home: undefined;
+  ContinueWatchingAll: undefined;
   Info: InfoRouteParams;
   ScrollList: {
     filter: string;
@@ -225,6 +227,7 @@ function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <HomeStack.Screen name="Home" component={Home} />
+      <HomeStack.Screen name="ContinueWatchingAll" component={ContinueWatchingAll} />
       <HomeStack.Screen name="Info" component={Info} />
       <HomeStack.Screen name="ScrollList" component={ScrollList} />
       <HomeStack.Screen name="Webview" component={WebView} />

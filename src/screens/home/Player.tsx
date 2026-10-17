@@ -62,6 +62,7 @@ import SearchSubtitles from '../../components/SearchSubtitles';
 import PlayerEpisodeSidebar from '../../components/PlayerEpisodeSidebar';
 import PlayerMenuRow from '../../components/PlayerMenuRow';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
+import {recordEpisodePlaybackProgress} from '../../lib/storage/SeriesCompletionStorage';
 import {useStream, useVideoSettings} from '../../lib/hooks/useStream';
 import {useContentInfo} from '../../lib/hooks/useContentInfo';
 import {
@@ -1863,6 +1864,9 @@ const Player = ({route}: Props): React.JSX.Element => {
           duration,
         }),
       );
+      if (route.params?.type !== 'movie') {
+        recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
+      }
 
       const progressData = {
         currentTime,
@@ -1952,6 +1956,9 @@ const Player = ({route}: Props): React.JSX.Element => {
             duration,
           }),
         );
+        if (route.params?.type !== 'movie') {
+          recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
+        }
         watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
 
         const progressData = {

@@ -7,6 +7,18 @@ import {
   clearAllManualEpisodeCompletions,
 } from '../src/lib/storage/ManualEpisodeCompletionStorage';
 import {selectContinueWatchingItems} from '../src/lib/utils/continueWatching';
+import {
+  getHiddenContinueWatchingLinks,
+  hideFromContinueWatching,
+  showInContinueWatching,
+} from '../src/lib/storage/ContinueWatchingStorage';
+import {
+  isSeriesComplete,
+  recomputeSeriesCompletion,
+  recordEpisodePlaybackProgress,
+  setSeriesCatalog,
+} from '../src/lib/storage/SeriesCompletionStorage';
+import {syncSeriesCatalog} from '../src/lib/services/seriesCatalogSync';
 
 const item = (link: string, isSeries = false) => ({
   id: link,
@@ -69,4 +81,61 @@ it('excludes completed movies before the Home limit and retains history', () => 
     ),
   ).toEqual(['series', 'movie-active']);
   expect(storage.getWatchHistory()).toHaveLength(3);
+});
+
+it('hides a title only from Continue Watching until playback resumes', () => {
+  const storage = new WatchHistoryStorage();
+  storage.addToWatchHistory(item('show', true));
+  const hidden = hideFromContinueWatching('show');
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30, hidden)).toEqual([]);
+  expect(storage.getWatchHistory()).toHaveLength(1);
+  expect(getHiddenContinueWatchingLinks()).toEqual(['show']);
+
+  expect(showInContinueWatching('show')).toEqual([]);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toHaveLength(1);
+});
+
+it('completes a whole series only when every known episode reaches 95%', () => {
+  const storage = new WatchHistoryStorage();
+  storage.addToWatchHistory(item('show', true));
+  setSeriesCatalog('show', ['s1e1', 's2e1'], true);
+  recordEpisodePlaybackProgress('show', 's1e1', 95, 100);
+  expect(isSeriesComplete('show')).toBe(false);
+
+  setEpisodeManuallyWatched('show', 's2e1', true);
+  setSeriesCatalog('show', ['s1e1', 's2e1'], true);
+  // The user action recalculates completion after the manual mark.
+  recomputeSeriesCompletion('show');
+  expect(isSeriesComplete('show')).toBe(true);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toEqual([]);
+  expect(storage.getWatchHistory()).toHaveLength(1);
+
+  setSeriesCatalog('show', ['s1e1', 's2e1', 's2e2'], true);
+  expect(isSeriesComplete('show')).toBe(false);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toHaveLength(1);
+});
+
+it('keeps a series visible when an available season has no episode list', async () => {
+  const storage = new WatchHistoryStorage();
+  storage.addToWatchHistory(item('show', true));
+  await syncSeriesCatalog({
+    contentLink: 'show',
+    providerValue: 'fixture',
+    groups: [
+      {title: 'Season 1', directLinks: [{title: 'Episode 1', link: 's1e1'}]},
+      {title: 'Season 2'},
+      {title: 'Season 3', availabilityStatus: 'upcoming'},
+    ],
+  });
+  recordEpisodePlaybackProgress('show', 's1e1', 100, 100);
+  expect(isSeriesComplete('show')).toBe(false);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toHaveLength(1);
+});
+
+it('uses durable playback progress after the temporary cache is cleared', () => {
+  setSeriesCatalog('show', ['s1e1'], true);
+  recordEpisodePlaybackProgress('show', 's1e1', 95, 100);
+  cacheStorage.clearAll();
+  expect(getEpisodeProgressPercent('show', 's1e1')).toBe(95);
+  expect(isSeriesComplete('show')).toBe(true);
 });

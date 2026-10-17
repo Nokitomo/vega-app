@@ -59,5 +59,5 @@ Nota: lo stack WatchHistory e raggiungibile da Settings.
   - lock landscape finche il provider resta in fullscreen.
 - In Info, il pulsante X torna alla schermata precedente senza reset dello stack.
 - Preferenze: "Show Tab Bar Labels" controlla la visibilita delle etichette nella tab bar; "Show Recently Watched" abilita/disabilita la sezione Continue Watching in Home (attivo di default).
-- Da Home, il pulsante "Altro" della sezione Continue Watching apre `SettingsStack -> WatchHistoryStack -> WatchHistory`.
+- Da Home, il pulsante "Altro" della sezione Continue Watching apre `HomeStack -> ContinueWatchingAll`. La rimozione da questa sezione nasconde il titolo fino alla prossima riproduzione senza cancellare WatchHistory o progressi.
 - Etichette tab e titoli schermata usano i18n (`t(...)`) per supportare inglese/italiano.

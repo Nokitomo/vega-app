@@ -1,5 +1,6 @@
 import {useCallback, useRef, useState} from 'react';
 import {cacheStorage, mainStorage, watchHistoryStorage} from '../storage';
+import {recordEpisodePlaybackProgress} from '../storage/SeriesCompletionStorage';
 
 interface UsePlayerProgressOptions {
   activeEpisode: any;
@@ -132,6 +133,9 @@ export const usePlayerProgress = ({
             historyProgressKey,
             JSON.stringify(progressData),
           );
+          if (routeParams?.type !== 'movie') {
+            recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
+          }
           watchHistoryStorage.addProgressKey(historyProgressKey);
 
           // Also store with episodeTitle-specific key for series episodes

@@ -1,9 +1,19 @@
 import {create} from 'zustand';
 import {WatchHistoryItem, watchHistoryStorage} from '../storage';
 import {
+  clearHiddenContinueWatchingLinks,
+  getHiddenContinueWatchingLinks,
+  hideFromContinueWatching,
+  showInContinueWatching,
+} from '../storage/ContinueWatchingStorage';
+import {
   clearAllManualEpisodeCompletions,
   clearManualEpisodeCompletions,
 } from '../storage/ManualEpisodeCompletionStorage';
+import {
+  clearAllSeriesCompletions,
+  clearSeriesCompletion,
+} from '../storage/SeriesCompletionStorage';
 import {
   resolveProviderCardTitle,
   shouldResolveProviderCardTitle,
@@ -11,6 +21,10 @@ import {
 
 export interface History {
   history: WatchHistoryItem[];
+  hiddenFromContinueWatching: string[];
+  hideContinueWatchingItem: (link: string) => void;
+  refreshHistory: () => void;
+  classifyHistoryItem: (link: string, isSeries: boolean) => void;
   addItem: (item: WatchHistoryItem) => void;
   updatePlaybackInfo: (
     link: string,
@@ -113,6 +127,22 @@ const syncDisplayTitleForLink = async ({
 const useWatchHistoryStore = create<History>(set => ({
   // Initialize from our storage service
   history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
+  hiddenFromContinueWatching: getHiddenContinueWatchingLinks(),
+  hideContinueWatchingItem: link => {
+    set({hiddenFromContinueWatching: hideFromContinueWatching(link)});
+  },
+  refreshHistory: () => refreshHistoryState(set),
+  classifyHistoryItem: (link, isSeries) => {
+    const history = watchHistoryStorage.getWatchHistory();
+    const existing = history.find(item => item.link === link);
+    if (!existing || existing.isSeries === isSeries) {
+      return;
+    }
+    watchHistoryStorage.setWatchHistory(
+      history.map(item => item.link === link ? {...item, isSeries} : item),
+    );
+    refreshHistoryState(set);
+  },
 
   addItem: item => {
     try {
@@ -136,9 +166,13 @@ const useWatchHistoryStore = create<History>(set => ({
 
       // Add to storage
       watchHistoryStorage.addToWatchHistory(storageItem);
+      const hiddenFromContinueWatching = showInContinueWatching(storageItem.link);
 
       // Update UI state
-      refreshHistoryState(set);
+      set({
+        hiddenFromContinueWatching,
+        history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
+      });
 
       syncDisplayTitleForLink({
         link: storageItem.link,
@@ -177,6 +211,7 @@ const useWatchHistoryStore = create<History>(set => ({
     watchHistoryStorage.removeFromWatchHistory(item.link);
     watchHistoryStorage.clearProgressForLink(item.link);
     clearManualEpisodeCompletions(item.link);
+    clearSeriesCompletion(item.link);
     refreshHistoryState(set);
   },
 
@@ -188,7 +223,9 @@ const useWatchHistoryStore = create<History>(set => ({
     });
     watchHistoryStorage.clearProgressKeys();
     clearAllManualEpisodeCompletions();
-    set({history: []});
+    clearAllSeriesCompletions();
+    clearHiddenContinueWatchingLinks();
+    set({history: [], hiddenFromContinueWatching: []});
   },
 
   updateItemWithInfo: (link, infoData) => {

@@ -38,6 +38,11 @@ import {
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
+import {syncSeriesCatalog} from '../lib/services/seriesCatalogSync';
+import {
+  clearEpisodePlaybackProgress,
+  recomputeSeriesCompletion,
+} from '../lib/storage/SeriesCompletionStorage';
 import {extensionManager} from '../lib/services/ExtensionManager';
 import {providerManager} from '../lib/services/ProviderManager';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -210,7 +215,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const {addItem} = useWatchHistoryStore(state => state);
+  const {addItem, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
+  useEffect(() => {
+    classifyHistoryItem(routeParams.link, type !== 'movie');
+  }, [classifyHistoryItem, routeParams.link, type]);
   const {fetchStreams} = useStreamData();
   const resolveTitle = useCallback(
     (item?: {
@@ -322,6 +330,21 @@ const SeasonList: React.FC<SeasonListProps> = ({
     providerValue,
     !!activeSeason?.episodesLink,
   );
+
+  useEffect(() => {
+    if (type === 'movie' || !routeParams.link || !providerValue) {
+      return;
+    }
+    syncSeriesCatalog({
+      contentLink: routeParams.link,
+      providerValue,
+      groups: LinkList,
+      activeSeasonLink: activeSeason?.episodesLink,
+      activeEpisodes: episodeList,
+    })
+      .then(refreshHistory)
+      .catch(error => console.warn('Failed to sync series catalog:', error));
+  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, routeParams.link, type]);
 
   // UI state
   const [vlcLoading, setVlcLoading] = useState<boolean>(false);
@@ -688,10 +711,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration: 1,
         }),
       );
+      recomputeSeriesCompletion(routeParams.link);
+      refreshHistory();
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 100}));
       setStickyMenu({active: false});
     }
-  }, [routeParams.link, stickyMenu.link]);
+  }, [refreshHistory, routeParams.link, stickyMenu.link]);
 
   // Memoized mark as unwatched handler
   const markAsUnwatched = useCallback(() => {
@@ -704,10 +729,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
           duration: 1,
         }),
       );
+      clearEpisodePlaybackProgress(routeParams.link, stickyMenu.link);
+      recomputeSeriesCompletion(routeParams.link);
+      refreshHistory();
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 0}));
       setStickyMenu({active: false});
     }
-  }, [routeParams.link, stickyMenu.link]);
+  }, [refreshHistory, routeParams.link, stickyMenu.link]);
 
   // Memoized sticky menu external player handler
   const handleStickyMenuExternalPlayer = useCallback(() => {
