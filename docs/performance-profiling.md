@@ -48,6 +48,16 @@ tap, mount, dati disponibili e primo layout della scheda; il primo layout non
 garantisce che tutte le immagini siano gia visibili. La traccia resta valida
 fino a 120 secondi, per includere anche schede fredde particolarmente lente.
 
+Lo scope delle cache del provider viene riutilizzato in memoria finche non
+cambiano moduli installati, elenco provider o sorgenti. Ogni scrittura o
+cancellazione di queste chiavi lo invalida, anche se lo storage viene svuotato
+direttamente. Le sezioni Home persistite vengono lette una volta per montaggio
+e scope; gli aggiornamenti successivi passano dai risultati React Query, senza
+rileggere SQLite e MMKV a ogni render. Durate, refresh manuale e priorita delle
+sezioni restano invariati. Nei confronti prima/dopo controllare specialmente i
+conteggi `provider_modules.read` e `home_category_cache`, oltre ai picchi
+`js_lag`; non sommare tempi annidati.
+
 Per analizzare un rallentamento ripetere il percorso Home -> Info su piu card,
 poi chiudere e riaprire l'app e riprovare. Confrontare i tempi sincroni, i picchi
 `js_lag`, i tempi di rete/provider e il tempo fino al primo layout. I log JS da

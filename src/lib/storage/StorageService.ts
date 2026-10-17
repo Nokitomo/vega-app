@@ -18,6 +18,7 @@ export interface IStorageService {
   contains(key: string): boolean;
   clearAll(): void;
   getKeys(): Promise<string[]>;
+  getKeyRevision(key: string): number;
 }
 
 /**
@@ -26,6 +27,9 @@ export interface IStorageService {
 export class StorageService implements IStorageService {
   // Define storage variable with proper typing
   private storage;
+  private revision = 0;
+  private clearRevision = 0;
+  private readonly keyRevisions = new Map<string, number>();
 
   constructor(instanceId?: string, encrypted = false) {
     const loader = new MMKVLoader();
@@ -44,6 +48,7 @@ export class StorageService implements IStorageService {
 
   setString(key: string, value: string): void {
     this.storage.setString(key, value);
+    this.keyRevisions.set(key, ++this.revision);
   }
 
   // Boolean operations
@@ -54,6 +59,7 @@ export class StorageService implements IStorageService {
 
   setBool(key: string, value: boolean): void {
     this.storage.setBool(key, value);
+    this.keyRevisions.set(key, ++this.revision);
   }
 
   // Number operations
@@ -65,6 +71,7 @@ export class StorageService implements IStorageService {
   setNumber(key: string, value: number): void {
     // Use setInt for number values
     this.storage.setInt(key, value);
+    this.keyRevisions.set(key, ++this.revision);
   }
 
   // Object operations
@@ -82,7 +89,7 @@ export class StorageService implements IStorageService {
   }
 
   setObject<T>(key: string, value: T): void {
-    this.storage.setString(key, JSON.stringify(value));
+    this.setString(key, JSON.stringify(value));
   }
 
   // Array operations
@@ -97,6 +104,7 @@ export class StorageService implements IStorageService {
   // Delete operations
   delete(key: string): void {
     this.storage.removeItem(key);
+    this.keyRevisions.set(key, ++this.revision);
   }
 
   // Check if key exists
@@ -111,6 +119,12 @@ export class StorageService implements IStorageService {
   // Clear all storage
   clearAll(): void {
     this.storage.clearStore();
+    this.keyRevisions.clear();
+    this.clearRevision = ++this.revision;
+  }
+
+  getKeyRevision(key: string): number {
+    return this.keyRevisions.get(key) || this.clearRevision;
   }
 
   async getKeys(): Promise<string[]> {

@@ -1,6 +1,18 @@
-import {extensionStorage} from '../storage/extensionStorage';
+import {extensionStorage, ExtensionKeys} from '../storage/extensionStorage';
 import {extensionManager} from '../services/ExtensionManager';
 import {measurePerfSync} from './perfTrace';
+import {mainStorage} from '../storage/StorageService';
+
+const scopeCache = new Map<string, {revision: string; scope: string}>();
+
+const getScopeRevision = (): string =>
+  [
+    ExtensionKeys.PROVIDER_MODULES,
+    ExtensionKeys.INSTALLED_PROVIDERS,
+    ExtensionKeys.PROVIDER_SOURCES,
+  ]
+    .map(key => mainStorage.getKeyRevision(key))
+    .join(':');
 
 const normalizeScopePart = (value: unknown, fallback: string): string => {
   const normalized = String(value ?? '').trim();
@@ -11,6 +23,15 @@ export const getProviderCacheScope = (providerValue: string): string => {
   return measurePerfSync('provider_cache_scope', {provider: providerValue}, () => {
     if (!providerValue) {
       return 'default:unknown:legacy';
+    }
+    const storageRevision = getScopeRevision();
+    const testMode = extensionManager.isTestModeEnabled();
+    if (testMode) {
+      scopeCache.delete(providerValue);
+    }
+    const cached = scopeCache.get(providerValue);
+    if (!testMode && cached?.revision === storageRevision) {
+      return cached.scope;
     }
     const normalizedValue = normalizeScopePart(providerValue, 'unknown');
     const module = extensionManager.getProviderModules(providerValue);
@@ -29,7 +50,11 @@ export const getProviderCacheScope = (providerValue: string): string => {
       module?.cachedAt || installed?.lastUpdated,
       'legacy',
     );
-    return `${source}:${normalizedValue}:${version}:${revision}`;
+    const scope = `${source}:${normalizedValue}:${version}:${revision}`;
+    if (!testMode) {
+      scopeCache.set(providerValue, {revision: storageRevision, scope});
+    }
+    return scope;
   });
 };
 

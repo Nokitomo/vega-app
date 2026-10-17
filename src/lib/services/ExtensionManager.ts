@@ -528,6 +528,10 @@ export class ExtensionManager {
     console.log(`Test mode ${enabled ? 'enabled' : 'disabled'}`);
   }
 
+  isTestModeEnabled(): boolean {
+    return this.testMode;
+  }
+
   /**
    * Check if test module cache is expired
    */

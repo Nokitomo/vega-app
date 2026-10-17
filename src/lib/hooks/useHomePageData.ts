@@ -164,6 +164,13 @@ export const useHomePageData = ({
     writeMetadata('homeCategoryData', providerValue, filter, data);
   };
 
+  // Persisted sections are a mount/scope snapshot. Query results own subsequent
+  // updates, so rendering cards does not deserialize the same sections again.
+  const persistedCategories = useMemo(
+    () => categories.map(category => readCategoryCache(category.filter)),
+    [categories, providerCacheScope],
+  );
+
   const getCategoryStaleTime = (
     filter: string,
     catalogStaleTimeMs?: number,
@@ -234,7 +241,7 @@ export const useHomePageData = ({
         providerCacheScope,
         category.filter,
       ] as const;
-      const cached = readCategoryCache(category.filter);
+      const cached = persistedCategories[index];
       const staleTime = getCategoryStaleTime(
         category.filter,
         category.staleTimeMs,
@@ -311,7 +318,9 @@ export const useHomePageData = ({
     () =>
       categories
         .map((category, index) => {
-          const cached = readCategoryCache(category.filter);
+          const cached =
+            (queryResults[index]?.data as CategoryQueryData | undefined) ||
+            persistedCategories[index];
           const staleTime = getCategoryStaleTime(
             category.filter,
             category.staleTimeMs,
@@ -320,7 +329,7 @@ export const useHomePageData = ({
           return isStale ? index : -1;
         })
         .filter(index => index >= 0),
-    [categories, categoryDataFingerprint, staleCheckTick],
+    [categories, categoryDataFingerprint, persistedCategories, staleCheckTick],
   );
 
   const eligibleStaleCategoryIndexes = useMemo(

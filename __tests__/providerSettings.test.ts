@@ -1,4 +1,4 @@
-import {beforeEach, describe, expect, it} from '@jest/globals';
+import {beforeEach, describe, expect, it, jest} from '@jest/globals';
 import {providerManager} from '../src/lib/services/ProviderManager';
 import {
   extensionStorage,
@@ -133,5 +133,75 @@ describe('provider settings modules', () => {
     });
 
     expect(getProviderCacheScope('animeunity')).not.toBe(before);
+  });
+
+  it('reuses an unchanged scope without reading provider modules again', () => {
+    extensionStorage.cacheProviderModules({
+      value: 'animeunity',
+      sourceAuthor: 'Nokitomo',
+      version: '1.0.0',
+      cachedAt: 100,
+      modules: {meta: 'm'},
+    });
+    const readArray = jest.spyOn(mainStorage, 'getArray');
+    try {
+      const first = getProviderCacheScope('animeunity');
+      const readsAfterFirst = readArray.mock.calls.length;
+      expect(readsAfterFirst).toBeGreaterThan(0);
+      expect(getProviderCacheScope('animeunity')).toBe(first);
+      expect(readArray).toHaveBeenCalledTimes(readsAfterFirst);
+    } finally {
+      readArray.mockRestore();
+    }
+  });
+
+  it('invalidates the scope on source changes and direct storage clearing', () => {
+    extensionStorage.addProviderSources('First', 'https://first.test');
+    extensionStorage.addProviderSources('Second', 'https://second.test');
+    extensionStorage.cacheProviderModules({
+      value: 'animeunity',
+      sourceAuthor: 'First',
+      version: '1.0.0',
+      cachedAt: 100,
+      modules: {meta: 'first'},
+    });
+    extensionStorage.cacheProviderModules({
+      value: 'animeunity',
+      sourceAuthor: 'Second',
+      version: '2.0.0',
+      cachedAt: 200,
+      modules: {meta: 'second'},
+    });
+
+    expect(getProviderCacheScope('animeunity')).toBe('First:animeunity:1.0.0:100');
+    extensionStorage.setDefaultProviderSource('Second');
+    expect(getProviderCacheScope('animeunity')).toBe('Second:animeunity:2.0.0:200');
+
+    mainStorage.clearAll();
+    expect(getProviderCacheScope('animeunity')).toBe('default:animeunity:legacy:legacy');
+  });
+
+  it('updates the scope when an installed provider changes without modules', () => {
+    const provider = {
+      value: 'streamingunity',
+      display_name: 'StreamingUnity',
+      source: {author: 'Nokitomo', url: 'https://providers.test'},
+      version: '1.0.0',
+      icon: '',
+      disabled: false,
+      type: 'italy' as const,
+      installed: true,
+      lastUpdated: 100,
+    };
+    extensionStorage.setInstalledProviders([provider]);
+    expect(getProviderCacheScope('streamingunity')).toBe(
+      'Nokitomo:streamingunity:1.0.0:100',
+    );
+    extensionStorage.setInstalledProviders([
+      {...provider, version: '1.0.1', lastUpdated: 200},
+    ]);
+    expect(getProviderCacheScope('streamingunity')).toBe(
+      'Nokitomo:streamingunity:1.0.1:200',
+    );
   });
 });
