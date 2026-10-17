@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {Dropdown} from 'react-native-element-dropdown';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
 import type {
   ArchiveFilterOption,
@@ -43,6 +44,7 @@ const ArchiveFilterModal = ({
   onClose,
 }: ArchiveFilterModalProps): React.ReactElement => {
   const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<ArchiveFilterSelection>(value);
 
   useEffect(() => {
@@ -132,7 +134,9 @@ const ArchiveFilterModal = ({
       animationType="fade"
       onRequestClose={onClose}>
       <View className="flex-1 bg-black/80 justify-end">
-        <View className="bg-[#171717] rounded-t-3xl max-h-[90%] px-5 pt-5 pb-8">
+        <View
+          className="bg-[#171717] rounded-t-3xl max-h-[90%] px-5 pt-5"
+          style={{paddingBottom: Math.max(32, insets.bottom + 12)}}>
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-white text-xl font-bold">{t('Filters')}</Text>
             <TouchableOpacity onPress={onClose} className="p-2">
