@@ -1,4 +1,5 @@
 import {cacheStorage, mainStorage} from './StorageService';
+import {watchHistoryStorage} from './WatchHistoryStorage';
 
 export const WATCH_COMPLETION_PERCENT = 95;
 export const SERIES_EPISODE_PROGRESS_PREFIX = 'seriesEpisodeProgress_';
@@ -28,6 +29,11 @@ export const getEpisodeProgressPercent = (
   if (Number.isFinite(recorded)) {
     return Math.min(Math.max(recorded!, 0), 100);
   }
+  // Legacy manual marks wrote an untracked 1/1 cache entry. After clearing
+  // history that entry must never make the episode appear watched again.
+  if (!watchHistoryStorage.getEpisodeKeys(contentLink).includes(episodeLink)) {
+    return 0;
+  }
   try {
     const progress = JSON.parse(cacheStorage.getString(episodeLink) || '{}');
     const position = Number(progress.position);
@@ -38,6 +44,27 @@ export const getEpisodeProgressPercent = (
     return Math.min(Math.max((position / duration) * 100, 0), 100);
   } catch {
     return 0;
+  }
+};
+
+export const getManuallyWatchedEpisodeLinks = (contentLink: string): string[] =>
+  mainStorage.getArray<string>(keyForContent(contentLink)) || [];
+
+export const markEpisodesManuallyWatched = (
+  contentLink: string,
+  episodeLinks: readonly string[],
+): void => {
+  if (!contentLink || episodeLinks.length === 0) {
+    return;
+  }
+  const next = [...new Set([
+    ...getManuallyWatchedEpisodeLinks(contentLink),
+    ...episodeLinks.filter(Boolean),
+  ])];
+  mainStorage.setArray(keyForContent(contentLink), next);
+  const contents = mainStorage.getArray<string>(CONTENT_KEYS) || [];
+  if (!contents.includes(contentLink)) {
+    mainStorage.setArray(CONTENT_KEYS, [...contents, contentLink]);
   }
 };
 

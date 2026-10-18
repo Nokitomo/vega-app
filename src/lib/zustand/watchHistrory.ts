@@ -1,5 +1,5 @@
 import {create} from 'zustand';
-import {WatchHistoryItem, watchHistoryStorage} from '../storage';
+import {cacheStorage, WatchHistoryItem, watchHistoryStorage} from '../storage';
 import {
   clearHiddenContinueWatchingLinks,
   getHiddenContinueWatchingLinks,
@@ -9,10 +9,12 @@ import {
 import {
   clearAllManualEpisodeCompletions,
   clearManualEpisodeCompletions,
+  getManuallyWatchedEpisodeLinks,
 } from '../storage/ManualEpisodeCompletionStorage';
 import {
   clearAllSeriesCompletions,
   clearSeriesCompletion,
+  getSeriesCatalog,
 } from '../storage/SeriesCompletionStorage';
 import {
   resolveProviderCardTitle,
@@ -53,6 +55,16 @@ const refreshHistoryState = (set: (partial: Partial<History>) => void) => {
   set({
     history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
   });
+};
+
+const clearContentProgress = (link: string): void => {
+  const episodeLinks = new Set([
+    ...watchHistoryStorage.getEpisodeKeys(link),
+    ...getManuallyWatchedEpisodeLinks(link),
+    ...(getSeriesCatalog(link)?.episodeLinks || []),
+  ]);
+  episodeLinks.forEach(episodeLink => cacheStorage.delete(episodeLink));
+  watchHistoryStorage.clearProgressForLink(link);
 };
 
 const getDisplayTitle = (item: WatchHistoryItem): string =>
@@ -219,7 +231,7 @@ const useWatchHistoryStore = create<History>(set => ({
       return;
     }
     selected.forEach(link => {
-      watchHistoryStorage.clearProgressForLink(link);
+      clearContentProgress(link);
       clearManualEpisodeCompletions(link);
       clearSeriesCompletion(link);
     });
@@ -231,7 +243,7 @@ const useWatchHistoryStore = create<History>(set => ({
     const items = watchHistoryStorage.getWatchHistory();
     watchHistoryStorage.clearWatchHistory();
     items.forEach(item => {
-      watchHistoryStorage.clearProgressForLink(item.link);
+      clearContentProgress(item.link);
     });
     watchHistoryStorage.clearProgressKeys();
     clearAllManualEpisodeCompletions();

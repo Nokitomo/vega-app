@@ -1,6 +1,6 @@
-import {cacheStorage, mainStorage} from './StorageService';
+import {mainStorage} from './StorageService';
 import {
-  isEpisodeManuallyWatched,
+  getEpisodeProgressPercent,
   SERIES_EPISODE_PROGRESS_PREFIX,
   WATCH_COMPLETION_PERCENT,
 } from './ManualEpisodeCompletionStorage';
@@ -46,37 +46,20 @@ const trackContent = (contentLink: string): void => {
   }
 };
 
-const percentageFromCache = (episodeLink: string): number => {
-  try {
-    const value = JSON.parse(cacheStorage.getString(episodeLink) || '{}');
-    const position = Number(value.position);
-    const duration = Number(value.duration);
-    return Number.isFinite(position) && Number.isFinite(duration) && duration > 0
-      ? Math.min(Math.max((position / duration) * 100, 0), 100)
-      : 0;
-  } catch {
-    return 0;
-  }
-};
-
 export const recomputeSeriesCompletion = (contentLink: string): boolean => {
   const catalog = readCatalog(contentLink);
   if (!catalog) {
     return false;
   }
-  const progress = readProgress(contentLink);
   const fullyWatched =
     catalog.complete &&
     catalog.episodeLinks.length > 0 &&
     catalog.episodeLinks.every(
-      episodeLink =>
-        isEpisodeManuallyWatched(contentLink, episodeLink) ||
-        (progress[episodeLink] ?? percentageFromCache(episodeLink)) >=
-          WATCH_COMPLETION_PERCENT,
+      episodeLink => getEpisodeProgressPercent(contentLink, episodeLink) >=
+        WATCH_COMPLETION_PERCENT,
     );
   const newEpisodeStarted = catalog.newEpisodeLinks?.some(
-    link => isEpisodeManuallyWatched(contentLink, link) ||
-      (progress[link] ?? percentageFromCache(link)) > 0,
+    link => getEpisodeProgressPercent(contentLink, link) > 0,
   );
   if (catalog.fullyWatched !== fullyWatched || newEpisodeStarted) {
     mainStorage.setObject(catalogKey(contentLink), {
