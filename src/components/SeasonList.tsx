@@ -44,6 +44,7 @@ import {
 import {ifExists} from '../lib/file/ifExists';
 import {
   getEpisodeProgressPercent,
+  markEpisodesManuallyWatched,
   setEpisodeManuallyWatched,
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
@@ -51,6 +52,7 @@ import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
 import {syncSeriesCatalog} from '../lib/services/seriesCatalogSync';
 import {
   clearEpisodePlaybackProgress,
+  getSeriesCatalog,
   recomputeSeriesCompletion,
   recordEpisodePlaybackProgress,
 } from '../lib/storage/SeriesCompletionStorage';
@@ -91,6 +93,7 @@ import {
   writePersistedCache,
 } from '../lib/utils/persistedCache';
 import type {ContinueWatchingTarget} from '../lib/utils/continueWatching';
+import {getEpisodesThroughTarget} from '../lib/utils/episodesThroughTarget';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -2133,6 +2136,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const markAsWatched = useCallback(() => {
     if (stickyMenu.link) {
       setEpisodeManuallyWatched(routeParams.link, stickyMenu.link, true);
+      watchHistoryStorage.addEpisodeKey(routeParams.link, stickyMenu.link);
       cacheStorage.setString(
         stickyMenu.link,
         JSON.stringify({
@@ -2146,6 +2150,53 @@ const SeasonList: React.FC<SeasonListProps> = ({
       setStickyMenu({active: false});
     }
   }, [refreshHistory, routeParams.link, stickyMenu.link]);
+
+  const markWatchedThroughEpisode = useCallback(async () => {
+    const targetLink = stickyMenu.link;
+    if (!targetLink) {
+      return;
+    }
+    setStickyMenu({active: false});
+    try {
+      await syncSeriesCatalog({
+        contentLink: routeParams.link,
+        providerValue,
+        groups: LinkList,
+        activeSeasonLink: activeSeason?.episodesLink,
+        activeEpisodes: episodeList,
+      });
+      const episodes = getEpisodesThroughTarget(
+        getSeriesCatalog(routeParams.link), targetLink,
+      );
+      if (!episodes) {
+        Alert.alert(t('Episodes unavailable'), t('Unable to load complete series episodes'));
+        return;
+      }
+      const remaining = episodes.filter(episode =>
+        getEpisodeProgressPercent(routeParams.link, episode.link) < WATCH_COMPLETION_PERCENT,
+      );
+      if (remaining.length === 0) {
+        return;
+      }
+      Alert.alert(
+        t('Mark watched through this episode'),
+        remaining.length === 1
+          ? t('Mark 1 episode as watched through this episode?')
+          : t('Mark {{count}} episodes as watched through this episode?', {count: remaining.length}),
+        [
+          {text: t('Cancel'), style: 'cancel'},
+          {text: t('Mark as Watched'), onPress: () => {
+            markEpisodesManuallyWatched(routeParams.link, remaining.map(episode => episode.link));
+            recomputeSeriesCompletion(routeParams.link);
+            refreshProgressData();
+            refreshHistory();
+          }},
+        ],
+      );
+    } catch {
+      Alert.alert(t('Episodes unavailable'), t('Unable to load complete series episodes'));
+    }
+  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, refreshProgressData, routeParams.link, stickyMenu.link, t]);
 
   // Memoized mark as unwatched handler
   const markAsUnwatched = useCallback(() => {
@@ -2869,6 +2920,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
     );
   }
 
+  const selectedMenuEpisode = sortedEpisodes.find(item => item.link === stickyMenu.link) ||
+    sortedDirectLinks.find(item => item.link === stickyMenu.link);
+  const selectedMenuTitle = selectedMenuEpisode?.titleKey
+    ? t(selectedMenuEpisode.titleKey, selectedMenuEpisode.titleParams)
+    : selectedMenuEpisode?.title;
+  const selectedMenuNumber = selectedMenuEpisode?.episodeNumber;
+
   return (
     <View>
       {castProvider === 'native' && (
@@ -3113,37 +3171,66 @@ const SeasonList: React.FC<SeasonListProps> = ({
         visible={stickyMenu.active}
         transparent={true}
         onRequestClose={() => setStickyMenu({active: false})}>
-        <Pressable
-          className="flex-1 justify-end items-center"
-          onPress={() => setStickyMenu({active: false})}>
+        <View className="flex-1 justify-end">
+          <Pressable
+            className="absolute inset-0 bg-black/60"
+            onPress={() => setStickyMenu({active: false})}
+          />
           <View
-            className="w-full bg-quaternary flex-row justify-evenly items-center pt-2"
-            style={{paddingBottom: Math.max(insets.bottom, 8), height: 56 + Math.max(insets.bottom, 8)}}>
+            className="w-full rounded-t-3xl bg-quaternary px-5 pt-3"
+            style={{paddingBottom: Math.max(insets.bottom, 20)}}>
+            <View className="h-1 w-10 self-center rounded-full bg-white/40 mb-5" />
+            <View className="flex-row items-start justify-between mb-4">
+              <View className="flex-1 pr-4">
+                <Text className="text-white text-lg font-bold" numberOfLines={2}>
+                  {selectedMenuNumber != null
+                    ? `${t('Episode {{number}}', {number: selectedMenuNumber})} · ${selectedMenuTitle || t('Episode actions')}`
+                    : selectedMenuTitle || t('Episode actions')}
+                </Text>
+                <Text className="text-white/60 mt-1" numberOfLines={1}>
+                  {activeSeasonValue?.displayTitle || activeSeasonValue?.title}
+                </Text>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('Close')}
+                onPress={() => setStickyMenu({active: false})}
+                className="p-2">
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
             {isCompleted(stickyMenu.link || '') ? (
               <TouchableOpacity
-                className="flex-row justify-center items-center gap-2 p-2"
+                className="flex-row items-center min-h-16 border-t border-white/10"
                 onPress={markAsUnwatched}>
-                <Text className="text-white">{t('Marked as Unwatched')}</Text>
-                <Ionicons name="checkmark-done" size={30} color={primary} />
+                <Ionicons name="checkmark-done" size={25} color={primary} />
+                <Text className="text-white text-base ml-4">{t('Marked as Unwatched')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                className="flex-row justify-center items-center gap-2 pt-0 pb-2 px-2 bg-tertiary rounded-md"
+                className="flex-row items-center min-h-16 border-t border-white/10"
                 onPress={markAsWatched}>
-                <Text className="text-white">{t('Mark as Watched')}</Text>
                 <Ionicons name="checkmark" size={25} color={primary} />
+                <Text className="text-white text-base ml-4">{t('Mark as Watched')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              className="flex-row justify-center bg-tertiary rounded-md items-center pt-0 pb-2 px-2 gap-2"
+              className="flex-row items-center min-h-20 border-t border-white/10"
+              onPress={markWatchedThroughEpisode}>
+              <Ionicons name="checkmark-done-outline" size={25} color={primary} />
+              <View className="ml-4 flex-1">
+                <Text className="text-white text-base">{t('Mark watched through this episode')}</Text>
+                <Text className="text-white/60 text-sm mt-1">{t('Includes previous seasons')}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-row items-center min-h-16 border-t border-white/10"
               onPress={handleStickyMenuExternalPlayer}>
-              <Text className="text-white font-bold text-base">
-                {t('External Player')}
-              </Text>
-              <Feather name="external-link" size={20} color={primary} />
+              <Feather name="external-link" size={24} color={primary} />
+              <Text className="text-white text-base ml-4">{t('External Player')}</Text>
             </TouchableOpacity>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </View>
   );

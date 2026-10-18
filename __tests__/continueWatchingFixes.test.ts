@@ -3,6 +3,7 @@ import {cacheStorage, mainStorage} from '../src/lib/storage/StorageService';
 import {WatchHistoryStorage} from '../src/lib/storage/WatchHistoryStorage';
 import {
   getEpisodeProgressPercent,
+  markEpisodesManuallyWatched,
   setEpisodeManuallyWatched,
   clearAllManualEpisodeCompletions,
 } from '../src/lib/storage/ManualEpisodeCompletionStorage';
@@ -24,6 +25,7 @@ import {
 } from '../src/lib/storage/SeriesCompletionStorage';
 import {syncSeriesCatalog} from '../src/lib/services/seriesCatalogSync';
 import useWatchHistoryStore from '../src/lib/zustand/watchHistrory';
+import {getEpisodesThroughTarget} from '../src/lib/utils/episodesThroughTarget';
 
 const item = (link: string, isSeries = false) => ({
   id: link,
@@ -109,6 +111,59 @@ it('deletes only selected history titles and their progress, including legacy ID
   expect(getEpisodeProgressPercent('show_more', 'episode-2')).toBe(100);
   expect(selectContinueWatchingItems(storage.getWatchHistory(), 30).map(entry => entry.link))
     .toEqual(['show_more']);
+});
+
+it('clears legacy untracked manual progress with selected history', () => {
+  const storage = new WatchHistoryStorage();
+  storage.setWatchHistory([item('show', true), item('other', true)]);
+  setSeriesCatalog('show', ['show-episode'], true);
+  setEpisodeManuallyWatched('show', 'show-episode', true);
+  cacheStorage.setString('show-episode', JSON.stringify({position: 1, duration: 1}));
+  cacheStorage.setString('other-episode', JSON.stringify({position: 1, duration: 1}));
+  storage.addEpisodeKey('other', 'other-episode');
+
+  useWatchHistoryStore.getState().removeItemsByLinks(['show']);
+
+  expect(cacheStorage.getString('show-episode')).toBeUndefined();
+  expect(getEpisodeProgressPercent('show', 'show-episode')).toBe(0);
+  expect(getEpisodeProgressPercent('other', 'other-episode')).toBe(100);
+});
+
+it('ignores an orphaned legacy manual cache entry after clearing all history', () => {
+  const storage = new WatchHistoryStorage();
+  storage.setWatchHistory([item('show', true)]);
+  cacheStorage.setString('episode-1', JSON.stringify({position: 1, duration: 1}));
+  useWatchHistoryStore.getState().clearHistory();
+  expect(getEpisodeProgressPercent('show', 'episode-1')).toBe(0);
+  expect(cacheStorage.getString('episode-1')).toBeDefined();
+});
+
+it('marks through the selected episode across seasons without marking later episodes', () => {
+  setSeriesCatalog('show', [
+    {link: 's2e2', seasonNumber: 2, episodeNumber: 2},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+    {link: 's2e1', seasonNumber: 2, episodeNumber: 1},
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 'special', seasonNumber: 0, episodeNumber: 1},
+    {link: 's2e3', seasonNumber: 2, episodeNumber: 3},
+  ], true);
+  const selected = getEpisodesThroughTarget(getSeriesCatalog('show'), 's2e2');
+  expect(selected?.map(episode => episode.link)).toEqual([
+    's1e1', 's1e2', 's2e1', 's2e2',
+  ]);
+  markEpisodesManuallyWatched('show', selected!.map(episode => episode.link));
+  expect(getEpisodeProgressPercent('show', 's1e1')).toBe(100);
+  expect(getEpisodeProgressPercent('show', 's2e2')).toBe(100);
+  expect(getEpisodeProgressPercent('show', 's2e3')).toBe(0);
+  expect(getEpisodeProgressPercent('show', 'special')).toBe(0);
+  expect(isSeriesComplete('show')).toBe(false);
+});
+
+it('rejects incomplete catalogs and unordered specials for bulk marking', () => {
+  setSeriesCatalog('show', [{link: 's1e1', seasonNumber: 1}], false);
+  expect(getEpisodesThroughTarget(getSeriesCatalog('show'), 's1e1')).toBeNull();
+  setSeriesCatalog('show', [{link: 'special', seasonNumber: 0}], true);
+  expect(getEpisodesThroughTarget(getSeriesCatalog('show'), 'special')).toBeNull();
 });
 
 it('keeps a manually watched episode complete after cache is cleared', () => {
