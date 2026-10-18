@@ -5,8 +5,10 @@ import {
   Image,
   StatusBar,
   Platform,
+  Alert,
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {FlashList} from '@shopify/flash-list';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -21,10 +23,13 @@ type Props = NativeStackScreenProps<WatchHistoryStackParamList, 'WatchHistory'>;
 const WatchHistory = ({navigation}: Props) => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
-  const {history, clearHistory, migrateDisplayTitles} = useWatchHistoryStore(
+  const insets = useSafeAreaInsets();
+  const {history, clearHistory, removeItemsByLinks, migrateDisplayTitles} = useWatchHistoryStore(
     state => state,
   );
   const [progressData, setProgressData] = useState<Record<string, number>>({});
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedLinks, setSelectedLinks] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     migrateDisplayTitles().catch(error => {
@@ -43,6 +48,61 @@ const WatchHistory = ({navigation}: Props) => {
       return true;
     });
   }, [history]);
+  const selectedCount = uniqueHistory.filter(item => selectedLinks.has(item.link)).length;
+
+  const toggleSelection = (link: string) => {
+    setSelectedLinks(current => {
+      const next = new Set(current);
+      if (next.has(link)) {
+        next.delete(link);
+      } else {
+        next.add(link);
+      }
+      return next;
+    });
+  };
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelectedLinks(new Set());
+  };
+
+  const confirmDeleteSelected = () => {
+    const links = uniqueHistory
+      .filter(item => selectedLinks.has(item.link))
+      .map(item => item.link);
+    if (links.length === 0) {
+      return;
+    }
+    Alert.alert(
+      t('Delete selected'),
+      links.length === 1
+        ? t('Delete the selected title? This also removes it from Continue Watching and deletes its progress.')
+        : t('Delete {{count}} selected titles? This also removes them from Continue Watching and deletes their progress.', {count: links.length}),
+      [
+        {text: t('Cancel'), style: 'cancel'},
+        {
+          text: t('Delete selected'),
+          style: 'destructive',
+          onPress: () => {
+            removeItemsByLinks(links);
+            exitSelection();
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmClearHistory = () => {
+    Alert.alert(
+      t('Clear Watch History'),
+      t('Delete all watch history? This also clears Continue Watching and all saved progress.'),
+      [
+        {text: t('Cancel'), style: 'cancel'},
+        {text: t('Clear All'), style: 'destructive', onPress: clearHistory},
+      ],
+    );
+  };
   // Load all progress data when component mounts
   useEffect(() => {
     const loadProgressData = () => {
@@ -169,17 +229,29 @@ const WatchHistory = ({navigation}: Props) => {
         <Text className="text-white text-2xl font-bold">
           {t('Watch History')}
         </Text>
-        {uniqueHistory.length > 0 && (
-          <TouchableOpacity
-            onPress={() => clearHistory()}
-            className="bg-white/10 px-3 py-1 rounded-full">
-            <Text className="text-white">{t('Clear')}</Text>
-          </TouchableOpacity>
-        )}
+        {uniqueHistory.length > 0 ? (
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity
+              onPress={selectionMode ? exitSelection : () => setSelectionMode(true)}
+              className="bg-white/10 px-3 py-1 rounded-full">
+              <Text className="text-white">
+                {selectionMode ? t('Cancel') : t('Select')}
+              </Text>
+            </TouchableOpacity>
+            {!selectionMode ? (
+              <TouchableOpacity
+                onPress={confirmClearHistory}
+                className="bg-white/10 px-3 py-1 rounded-full">
+                <Text className="text-white">{t('Clear')}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
       </View>
 
       <FlashList
         data={uniqueHistory}
+        extraData={{selectionMode, selectedLinks}}
         estimatedItemSize={150}
         numColumns={3}
         ListEmptyComponent={() => (
@@ -199,13 +271,40 @@ const WatchHistory = ({navigation}: Props) => {
           return (
             <View className="flex-1 m-1">
               <TouchableOpacity
-                onPress={() => handleNavigateToInfo(item)}
+                onPress={() => selectionMode
+                  ? toggleSelection(item.link)
+                  : handleNavigateToInfo(item)}
+                onLongPress={() => {
+                  if (!selectionMode) {
+                    setSelectionMode(true);
+                    setSelectedLinks(new Set([item.link]));
+                  }
+                }}
+                accessibilityLabel={selectionMode
+                  ? t('Select {{title}}', {title: displayTitle})
+                  : displayTitle}
+                accessibilityState={selectionMode
+                  ? {selected: selectedLinks.has(item.link)}
+                  : undefined}
                 activeOpacity={0.8}>
                 <View className="relative overflow-hidden">
                   <Image
                     source={{uri: item.poster}}
                     className="w-full aspect-[2/3] rounded-lg"
                   />
+                  {selectionMode ? (
+                    <View
+                      className="absolute top-2 right-2 rounded-full bg-black/75 p-1"
+                      style={{zIndex: 30}}>
+                      <MaterialCommunityIcons
+                        name={selectedLinks.has(item.link)
+                          ? 'checkbox-marked-circle'
+                          : 'checkbox-blank-circle-outline'}
+                        size={24}
+                        color={selectedLinks.has(item.link) ? primary : 'white'}
+                      />
+                    </View>
+                  ) : null}
                   {showItaBadge ? (
                     <View
                       className="absolute top-2 left-2 rounded-full px-2 py-0.5"
@@ -331,6 +430,24 @@ const WatchHistory = ({navigation}: Props) => {
           );
         }}
       />
+      {selectionMode ? (
+        <View
+          className="flex-row items-center justify-between border-t border-white/15 bg-black px-4 pt-3"
+          style={{paddingBottom: Math.max(12, insets.bottom), marginBottom: 55}}>
+          <Text className="text-white">
+            {selectedCount === 1
+              ? t('One selected')
+              : t('{{count}} selected', {count: selectedCount})}
+          </Text>
+          <TouchableOpacity
+            onPress={confirmDeleteSelected}
+            disabled={selectedCount === 0}
+            className="rounded-lg px-4 py-2"
+            style={{backgroundColor: selectedCount > 0 ? primary : '#404040'}}>
+            <Text className="font-semibold text-black">{t('Delete selected')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };

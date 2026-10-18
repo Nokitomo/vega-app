@@ -23,6 +23,7 @@ import {
   setSeriesCatalog,
 } from '../src/lib/storage/SeriesCompletionStorage';
 import {syncSeriesCatalog} from '../src/lib/services/seriesCatalogSync';
+import useWatchHistoryStore from '../src/lib/zustand/watchHistrory';
 
 const item = (link: string, isSeries = false) => ({
   id: link,
@@ -47,6 +48,37 @@ it('moves a resumed title to the front without duplicating it', () => {
     'second',
   ]);
   expect(storage.getWatchHistory()[0].progress).toBe(12);
+});
+
+it('deletes only selected history titles and their progress, including legacy IDs', () => {
+  const storage = new WatchHistoryStorage();
+  storage.setWatchHistory([
+    {...item('show'), id: 'legacy-show-id'},
+    {...item('show_more'), id: 'legacy-other-id'},
+    {...item('movie'), id: 'legacy-movie-id'},
+  ]);
+  setSeriesCatalog('show', ['episode-1'], true);
+  setSeriesCatalog('show_more', ['episode-2'], true);
+  setEpisodeManuallyWatched('show', 'episode-1', true);
+  setEpisodeManuallyWatched('show_more', 'episode-2', true);
+  mainStorage.setString('watch_history_progress_show', '{}');
+  mainStorage.setString('watch_history_progress_show_episode_1', '{}');
+  mainStorage.setString('watch_history_progress_show_more', '{}');
+  storage.addProgressKey('watch_history_progress_show_episode_1');
+  storage.addProgressKey('watch_history_progress_show_more');
+
+  useWatchHistoryStore.getState().removeItemsByLinks(['show', 'movie', 'show']);
+
+  expect(storage.getWatchHistory().map(entry => entry.link)).toEqual(['show_more']);
+  expect(mainStorage.getString('watch_history_progress_show')).toBeUndefined();
+  expect(mainStorage.getString('watch_history_progress_show_episode_1')).toBeUndefined();
+  expect(mainStorage.getString('watch_history_progress_show_more')).toBe('{}');
+  expect(getSeriesCatalog('show')).toBeUndefined();
+  expect(getSeriesCatalog('show_more')).toBeDefined();
+  expect(getEpisodeProgressPercent('show', 'episode-1')).toBe(0);
+  expect(getEpisodeProgressPercent('show_more', 'episode-2')).toBe(100);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30).map(entry => entry.link))
+    .toEqual(['show_more']);
 });
 
 it('keeps a manually watched episode complete after cache is cleared', () => {

@@ -109,6 +109,17 @@ export class WatchHistoryStorage {
     mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, filteredHistory);
   }
 
+  /** Remove every saved entry for the selected content links, including legacy IDs. */
+  removeFromWatchHistoryLinks(links: readonly string[]): void {
+    const selected = new Set(links);
+    if (selected.size === 0) {
+      return;
+    }
+    this.setWatchHistory(
+      this.getWatchHistory().filter(item => !selected.has(item.link)),
+    );
+  }
+
   /**
    * Clear all watch history
    */
@@ -201,10 +212,17 @@ export class WatchHistoryStorage {
       return;
     }
     const prefix = `watch_history_progress_${link}`;
+    const otherPrefixes = this.getWatchHistory()
+      .filter(item => item.link && item.link !== link)
+      .map(item => `watch_history_progress_${item.link}`);
     const keys = this.getProgressKeys();
     const remaining: string[] = [];
     keys.forEach(key => {
-      if (key.startsWith(prefix)) {
+      const belongsToAnotherTitle = otherPrefixes.some(other =>
+        key === other || key.startsWith(`${other}_`),
+      );
+      if (!belongsToAnotherTitle &&
+          (key === prefix || key.startsWith(`${prefix}_`))) {
         mainStorage.delete(key);
         return;
       }

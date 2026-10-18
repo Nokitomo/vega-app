@@ -6,6 +6,7 @@ import {
   TouchableNativeFeedback,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import React, {useCallback, useMemo} from 'react';
 import {
@@ -147,9 +148,15 @@ const Settings = ({navigation}: Props) => {
         ignoreAndroidSystemSettings: false,
       });
     }
-    clearHistory();
-    console.log('[Settings] Watch history cleared');
-  }, [clearHistory]);
+    Alert.alert(
+      t('Clear Watch History'),
+      t('Delete all watch history? This also clears Continue Watching and all saved progress.'),
+      [
+        {text: t('Cancel'), style: 'cancel'},
+        {text: t('Clear All'), style: 'destructive', onPress: clearHistory},
+      ],
+    );
+  }, [clearHistory, t]);
 
   const AnimatedSection = ({
     delay,

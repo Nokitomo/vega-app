@@ -60,6 +60,7 @@ Nota: lo stack WatchHistory e raggiungibile da Settings.
 - In Info, il pulsante X torna alla schermata precedente senza reset dello stack.
 - Preferenze: "Show Tab Bar Labels" controlla la visibilita delle etichette nella tab bar; "Show Recently Watched" abilita/disabilita la sezione Continue Watching in Home (attivo di default).
 - Da Home, il pulsante "Altro" della sezione Continue Watching apre `HomeStack -> ContinueWatchingAll`. La rimozione da questa sezione nasconde il titolo fino alla prossima riproduzione senza cancellare WatchHistory o progressi.
+- La schermata WatchHistory consente selezione multipla con "Seleziona" o pressione prolungata, conferma la rimozione dei soli titoli scelti e conferma anche "Cancella" per tutta la cronologia. La rimozione dalla cronologia elimina anche le rispettive card Continue Watching e i progressi.
 - La card di una serie in Continue Watching passa a `Info` la stagione e l'episodio suggeriti. La scheda apre quella stagione e il pulsante Riproduci/Riprendi usa l'episodio suggerito; se e gia iniziato, mantiene la ripresa. Questo vale anche nella schermata "Altro".
 - Il pannello Filtri dell'Archivio usa il margine inferiore della safe area per tenere Ripristina e Applica sopra la barra di navigazione Android, anche con i tre pulsanti.
 - Etichette tab e titoli schermata usano i18n (`t(...)`) per supportare inglese/italiano.

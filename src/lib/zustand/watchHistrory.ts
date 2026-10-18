@@ -33,6 +33,7 @@ export interface History {
   clearHistory: () => void;
   updateItemWithInfo: (link: string, infoData: any) => void;
   removeItem: (item: WatchHistoryItem) => void;
+  removeItemsByLinks: (links: readonly string[]) => void;
   migrateDisplayTitles: () => Promise<void>;
 }
 
@@ -208,10 +209,21 @@ const useWatchHistoryStore = create<History>(set => ({
   },
 
   removeItem: item => {
-    watchHistoryStorage.removeFromWatchHistory(item.link);
-    watchHistoryStorage.clearProgressForLink(item.link);
-    clearManualEpisodeCompletions(item.link);
-    clearSeriesCompletion(item.link);
+    useWatchHistoryStore.getState().removeItemsByLinks([item.link]);
+  },
+
+  removeItemsByLinks: links => {
+    const existing = new Set(watchHistoryStorage.getWatchHistory().map(item => item.link));
+    const selected = [...new Set(links)].filter(link => existing.has(link));
+    if (selected.length === 0) {
+      return;
+    }
+    selected.forEach(link => {
+      watchHistoryStorage.clearProgressForLink(link);
+      clearManualEpisodeCompletions(link);
+      clearSeriesCompletion(link);
+    });
+    watchHistoryStorage.removeFromWatchHistoryLinks(selected);
     refreshHistoryState(set);
   },
 
