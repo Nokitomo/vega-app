@@ -128,12 +128,11 @@ export const selectContinueWatchingItems = (
             : true,
     )
     .sort((left, right) => {
-      const leftNew = getSeriesCatalog(left.link)?.newEpisodesDetectedAt || 0;
-      const rightNew = getSeriesCatalog(right.link)?.newEpisodesDetectedAt || 0;
-      if (leftNew || rightNew) {
-        return rightNew - leftNew;
-      }
-      return 0;
+      const activityAt = (item: WatchHistoryItem) => Math.max(
+        item.timestamp ?? item.lastPlayed ?? 0,
+        getSeriesCatalog(item.link)?.newEpisodesDetectedAt ?? 0,
+      );
+      return activityAt(right) - activityAt(left);
     })
     .slice(0, limit);
 };

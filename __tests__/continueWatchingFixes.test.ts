@@ -50,6 +50,36 @@ it('moves a resumed title to the front without duplicating it', () => {
   expect(storage.getWatchHistory()[0].progress).toBe(12);
 });
 
+it('orders new episodes and playback by the most recent activity', () => {
+  const storage = new WatchHistoryStorage();
+  const base = Date.now() - 10_000;
+  setSeriesCatalog('blue', ['episode-1', 'episode-2'], true);
+  const catalog = getSeriesCatalog('blue')!;
+  const onePiece = {...item('one-piece', true), timestamp: base + 3_000};
+  const blue = {...item('blue', true), timestamp: base + 1_000};
+  storage.setWatchHistory([onePiece, blue]);
+
+  mainStorage.setObject('seriesCatalog_blue', {
+    ...catalog,
+    newEpisodeLinks: ['episode-2'],
+    newEpisodesDetectedAt: base + 2_000,
+  });
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 1)[0].link)
+    .toBe('one-piece');
+
+  mainStorage.setObject('seriesCatalog_blue', {
+    ...catalog,
+    newEpisodeLinks: ['episode-2'],
+    newEpisodesDetectedAt: base + 4_000,
+  });
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 1)[0].link)
+    .toBe('blue');
+
+  storage.addToWatchHistory(onePiece);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 1)[0].link)
+    .toBe('one-piece');
+});
+
 it('deletes only selected history titles and their progress, including legacy IDs', () => {
   const storage = new WatchHistoryStorage();
   storage.setWatchHistory([
