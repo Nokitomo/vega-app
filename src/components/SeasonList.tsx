@@ -44,15 +44,16 @@ import {
 import {ifExists} from '../lib/file/ifExists';
 import {
   getEpisodeProgressPercent,
+  getEpisodeProgressSnapshot,
   markEpisodesManuallyWatched,
   setEpisodeManuallyWatched,
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
 import {syncSeriesCatalog} from '../lib/services/seriesCatalogSync';
+import {resolveEpisodesThroughTarget} from '../lib/services/episodesThroughTarget';
 import {
   clearEpisodePlaybackProgress,
-  getSeriesCatalog,
   recomputeSeriesCompletion,
   recordEpisodePlaybackProgress,
 } from '../lib/storage/SeriesCompletionStorage';
@@ -93,7 +94,6 @@ import {
   writePersistedCache,
 } from '../lib/utils/persistedCache';
 import type {ContinueWatchingTarget} from '../lib/utils/continueWatching';
-import {getEpisodesThroughTarget} from '../lib/utils/episodesThroughTarget';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -763,6 +763,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   // UI state
   const [vlcLoading, setVlcLoading] = useState<boolean>(false);
+  const [markingThrough, setMarkingThrough] = useState(false);
+  const markingThroughRef = useRef(false);
   const [stickyMenu, setStickyMenu] = useState<StickyMenuState>({
     active: false,
   });
@@ -1018,11 +1020,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [metaTitle, providerValue],
   );
 
-  const getProgressPercent = useCallback(
-    (link: string) => getEpisodeProgressPercent(routeParams.link, link),
-    [routeParams.link],
-  );
-
   const refreshProgressData = useCallback(() => {
     const progressKey = `watch_history_progress_${routeParams.link}`;
     const storedProgress = mainStorage.getString(progressKey);
@@ -1072,12 +1069,16 @@ const SeasonList: React.FC<SeasonListProps> = ({
       ? activeSeason?.directLinks
       : [];
 
-    [...allEpisodes, ...allDirectLinks].forEach(item => {
+    const displayedEpisodes = [...allEpisodes, ...allDirectLinks];
+    const snapshot = getEpisodeProgressSnapshot(
+      routeParams.link, displayedEpisodes.map(item => item?.link).filter(Boolean),
+    );
+    displayedEpisodes.forEach(item => {
       if (!item?.link) {
         return;
       }
 
-      const percentage = getProgressPercent(item.link);
+      const percentage = snapshot.get(item.link) || 0;
       if (percentage > 0) {
         progressMap[item.link] = percentage;
       }
@@ -1086,7 +1087,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     setEpisodeProgressMap(prev =>
       areProgressMapsEqual(prev, progressMap) ? prev : progressMap,
     );
-  }, [routeParams.link, episodeList, activeSeason?.directLinks, getProgressPercent]);
+  }, [routeParams.link, episodeList, activeSeason?.directLinks]);
 
   useEffect(() => {
     refreshProgressData();
@@ -2153,48 +2154,42 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const markWatchedThroughEpisode = useCallback(async () => {
     const targetLink = stickyMenu.link;
-    if (!targetLink) {
+    if (!targetLink || markingThroughRef.current) {
       return;
     }
+    markingThroughRef.current = true;
+    setMarkingThrough(true);
     setStickyMenu({active: false});
     try {
-      await syncSeriesCatalog({
+      const episodes = await resolveEpisodesThroughTarget({
         contentLink: routeParams.link,
         providerValue,
         groups: LinkList,
         activeSeasonLink: activeSeason?.episodesLink,
         activeEpisodes: episodeList,
+        targetLink,
       });
-      const episodes = getEpisodesThroughTarget(
-        getSeriesCatalog(routeParams.link), targetLink,
-      );
       if (!episodes) {
         Alert.alert(t('Episodes unavailable'), t('Unable to load complete series episodes'));
         return;
       }
+      const progress = getEpisodeProgressSnapshot(
+        routeParams.link, episodes.map(episode => episode.link),
+      );
       const remaining = episodes.filter(episode =>
-        getEpisodeProgressPercent(routeParams.link, episode.link) < WATCH_COMPLETION_PERCENT,
+        (progress.get(episode.link) || 0) < WATCH_COMPLETION_PERCENT,
       );
-      if (remaining.length === 0) {
-        return;
+      if (remaining.length > 0) {
+        markEpisodesManuallyWatched(routeParams.link, remaining.map(episode => episode.link));
+        recomputeSeriesCompletion(routeParams.link);
+        refreshProgressData();
+        refreshHistory();
       }
-      Alert.alert(
-        t('Mark watched through this episode'),
-        remaining.length === 1
-          ? t('Mark 1 episode as watched through this episode?')
-          : t('Mark {{count}} episodes as watched through this episode?', {count: remaining.length}),
-        [
-          {text: t('Cancel'), style: 'cancel'},
-          {text: t('Mark as Watched'), onPress: () => {
-            markEpisodesManuallyWatched(routeParams.link, remaining.map(episode => episode.link));
-            recomputeSeriesCompletion(routeParams.link);
-            refreshProgressData();
-            refreshHistory();
-          }},
-        ],
-      );
     } catch {
       Alert.alert(t('Episodes unavailable'), t('Unable to load complete series episodes'));
+    } finally {
+      markingThroughRef.current = false;
+      setMarkingThrough(false);
     }
   }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, refreshProgressData, routeParams.link, stickyMenu.link, t]);
 
@@ -2929,6 +2924,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   return (
     <View>
+      {markingThrough && (
+        <View className="flex-row items-center justify-center py-2" accessibilityLiveRegion="polite">
+          <ActivityIndicator color={primary} size="small" />
+          <Text className="text-white ml-2">{t('Marking episodes as watched')}</Text>
+        </View>
+      )}
       {castProvider === 'native' && (
         <CastButton
           style={{

@@ -47,6 +47,40 @@ export const getEpisodeProgressPercent = (
   }
 };
 
+/** Read the shared progress records once when checking a whole season or series. */
+export const getEpisodeProgressSnapshot = (
+  contentLink: string,
+  episodeLinks: readonly string[],
+): Map<string, number> => {
+  const manual = new Set(getManuallyWatchedEpisodeLinks(contentLink));
+  const recorded = mainStorage.getObject<Record<string, number>>(
+    `${SERIES_EPISODE_PROGRESS_PREFIX}${contentLink}`,
+  ) || {};
+  const tracked = new Set(watchHistoryStorage.getEpisodeKeys(contentLink));
+  const result = new Map<string, number>();
+  for (const link of episodeLinks) {
+    if (manual.has(link)) {
+      result.set(link, 100);
+    } else if (Number.isFinite(recorded[link])) {
+      result.set(link, Math.min(Math.max(recorded[link], 0), 100));
+    } else if (!tracked.has(link)) {
+      result.set(link, 0);
+    } else {
+      try {
+        const progress = JSON.parse(cacheStorage.getString(link) || '{}');
+        const position = Number(progress.position);
+        const duration = Number(progress.duration);
+        result.set(link, Number.isFinite(position) && Number.isFinite(duration) && duration > 0
+          ? Math.min(Math.max((position / duration) * 100, 0), 100)
+          : 0);
+      } catch {
+        result.set(link, 0);
+      }
+    }
+  }
+  return result;
+};
+
 export const getManuallyWatchedEpisodeLinks = (contentLink: string): string[] =>
   mainStorage.getArray<string>(keyForContent(contentLink)) || [];
 

@@ -1,6 +1,6 @@
 import {mainStorage} from './StorageService';
 import {
-  getEpisodeProgressPercent,
+  getEpisodeProgressSnapshot,
   SERIES_EPISODE_PROGRESS_PREFIX,
   WATCH_COMPLETION_PERCENT,
 } from './ManualEpisodeCompletionStorage';
@@ -51,15 +51,17 @@ export const recomputeSeriesCompletion = (contentLink: string): boolean => {
   if (!catalog) {
     return false;
   }
+  const progress = getEpisodeProgressSnapshot(contentLink, [
+    ...catalog.episodeLinks,
+    ...(catalog.newEpisodeLinks || []),
+  ]);
   const fullyWatched =
     catalog.complete &&
     catalog.episodeLinks.length > 0 &&
-    catalog.episodeLinks.every(
-      episodeLink => getEpisodeProgressPercent(contentLink, episodeLink) >=
-        WATCH_COMPLETION_PERCENT,
-    );
+    catalog.episodeLinks.every(episodeLink =>
+      (progress.get(episodeLink) || 0) >= WATCH_COMPLETION_PERCENT);
   const newEpisodeStarted = catalog.newEpisodeLinks?.some(
-    link => getEpisodeProgressPercent(contentLink, link) > 0,
+    link => (progress.get(link) || 0) > 0,
   );
   if (catalog.fullyWatched !== fullyWatched || newEpisodeStarted) {
     mainStorage.setObject(catalogKey(contentLink), {

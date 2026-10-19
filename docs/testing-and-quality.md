@@ -15,10 +15,11 @@ npm test
 ## Cronologia ed episodi visti
 
 - `Svuota cronologia` e `Elimina selezionati` rimuovono anche il progresso degli episodi dei titoli eliminati. Gli altri titoli conservano il proprio stato.
-- Il menu di pressione prolungata su un episodio offre l'azione per segnare come visti tutti gli episodi disponibili fino a quello selezionato, incluso, anche nelle stagioni precedenti. Prima dell'azione viene mostrato il numero di episodi ancora da segnare.
-- L'azione richiede un catalogo completo del provider; se non e disponibile, non modifica alcun episodio. Gli speciali in stagione 0 non vengono inclusi automaticamente.
+- Il menu di pressione prolungata su un episodio offre l'azione per segnare come visti tutti gli episodi disponibili fino a quello selezionato, incluso, anche nelle stagioni precedenti. Il comando si applica subito, senza conferma, e mostra un indicatore durante il caricamento.
+- L'azione riusa il catalogo completo quando disponibile; altrimenti carica solo le stagioni necessarie, fino a tre alla volta. Se manca una stagione necessaria, non modifica alcun episodio. Gli speciali in stagione 0 non vengono inclusi automaticamente.
 - Smoke test: segnare due episodi manualmente, svuotare la cronologia e riaprire la serie; le barre arancioni devono essere scomparse. Ripetere eliminando un solo titolo dalla Watch History e verificare che un secondo titolo mantenga le barre.
 - Smoke test: su una serie con almeno due stagioni, segnare come visti fino a un episodio della seconda stagione. Verificare barra arancione per tutti gli episodi precedenti, assenza della barra per quelli successivi, comportamento identico con ordinamento inverso e corretto stato di `Continua a guardare`.
+- Smoke test: ripetere su una stagione avanzata di una serie lunga dopo riavvio dell'app. Verificare assenza di richiesta di conferma, indicatore di caricamento, completamento coerente e nessun episodio segnato parzialmente se il provider non risponde.
 
 Per misurare separatamente dev client e APK release locale durante i test di
 Home, Info, episodi e poster, seguire [Profilazione Home e Info](performance-profiling.md).
