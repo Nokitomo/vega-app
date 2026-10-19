@@ -200,6 +200,12 @@ dependencies {
         implementation "org.mozilla.geckoview:geckoview:144.0.20251027123126"
     }
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '21.4.0')}"
+    constraints {
+        implementation('androidx.mediarouter:mediarouter') {
+            version { strictly '1.8.1' }
+            because 'MediaRouter 1.9.0-beta01 requires compileSdk 37 and Android Gradle Plugin 9.1'
+        }
+    }
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

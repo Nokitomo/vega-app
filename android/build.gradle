@@ -16,6 +16,10 @@ buildscript {
   }
 }
 
+// Keep the native Cast module on the same tested framework version as the app.
+// Its default '+' would otherwise resolve a different version on fresh CI runners.
+ext.castFrameworkVersion = '22.3.1'
+
 allprojects {
   repositories {
     google()

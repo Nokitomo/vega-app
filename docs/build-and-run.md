@@ -24,6 +24,7 @@ npx expo run:android --device "Medium_phone_API_35"
 ```
 Nota: non usare l'emulatore Pixel_6_Pro_API_35.
 Nota: il wrapper Gradle usa 8.14.3; se vedi errori di versione minima, verifica `android/gradle/wrapper/gradle-wrapper.properties`.
+Nota: le build Android usano Cast Framework `22.3.1` e MediaRouter `1.8.1` per mantenere riproducibile la risoluzione Gradle su CI. Prima di aggiornare queste versioni, verificare i requisiti di `compileSdk`/Android Gradle Plugin e provare il Cast nativo su un dispositivo reale. Per controllare le versioni risolte: `cd android` e `./gradlew :app:dependencyInsight --configuration releaseRuntimeClasspath --dependency androidx.mediarouter:mediarouter` (su Windows usare `gradlew.bat`).
 Nota: la New Architecture e' disattivata.
 Nota (cast nativo custom receiver): puoi impostare l'App ID con variabile ambiente prima della build:
 ```powershell
