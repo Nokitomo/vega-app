@@ -2,11 +2,13 @@ export const PASTEBIN_URL = 'https://pastebin.com/raw/KgQ4jTy6';
 
 export type PastebinProviderConfig = {
   match: RegExp;
+  fallback?: string;
 };
 
 export const PASTEBIN_PROVIDERS: Record<string, PastebinProviderConfig> = {
   animeunity: {
     match: /(?:^|\.)animeunity\./i,
+    fallback: 'https://www.animeunity.to',
   },
   streamingunity: {
     match: /(?:^|\.)streamingunity\./i,

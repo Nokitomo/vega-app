@@ -6,12 +6,45 @@ const expireTime = 60 * 60 * 1000;
 
 const BASE_URL_CACHE_REVISIONS: Record<string, string> = {
   altadefinizionez: '2',
+  animeunity: '2',
 };
 
 const getBaseUrlCacheRevision = (providerValue: string) =>
   BASE_URL_CACHE_REVISIONS[providerValue] || '1';
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+
+const ANIMEUNITY_HOST = /^(?:[a-z0-9-]+\.)*animeunity\.[a-z]{2,}$/i;
+const pendingBaseUrls = new Map<string, Promise<string>>();
+
+const resolveAnimeUnityBaseUrl = async (value: string): Promise<string> => {
+  let candidate: URL;
+  try {
+    candidate = new URL(value);
+  } catch (_) {
+    return '';
+  }
+  if (candidate.protocol !== 'https:' || !ANIMEUNITY_HOST.test(candidate.hostname)) {
+    return '';
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    // Resolve the home page first: redirects from API paths can discard the path.
+    const response = await fetch(`${candidate.origin}/`, {
+      signal: controller.signal,
+    });
+    const finalUrl = new URL(response.url || candidate.origin);
+    if (finalUrl.protocol !== 'https:' || !ANIMEUNITY_HOST.test(finalUrl.hostname)) {
+      return '';
+    }
+    return finalUrl.origin;
+  } catch (_) {
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const getPastebinBaseUrl = async (
   providerValue: string,
@@ -43,7 +76,7 @@ const getPastebinBaseUrl = async (
   }
 };
 
-export const getBaseUrl = async (providerValue: string) => {
+const resolveBaseUrl = async (providerValue: string) => {
   try {
     let baseUrl = '';
     const cacheRevision = getBaseUrlCacheRevision(providerValue);
@@ -59,12 +92,33 @@ export const getBaseUrl = async (providerValue: string) => {
     } else {
       const pastebinUrl = await getPastebinBaseUrl(providerValue);
       if (pastebinUrl) {
-        baseUrl = pastebinUrl;
+        baseUrl = providerValue === 'animeunity'
+          ? await resolveAnimeUnityBaseUrl(pastebinUrl)
+          : pastebinUrl;
+        if (!baseUrl && providerValue === 'animeunity') {
+          baseUrl = await resolveAnimeUnityBaseUrl(
+            PASTEBIN_PROVIDERS.animeunity.fallback || '',
+          );
+        }
+        if (!baseUrl) {
+          return '';
+        }
         console.log(`[baseUrl] pastebin ${providerValue}`);
         cacheStorageService.setString(cacheKey, baseUrl);
         cacheStorageService.setObject(timeKey, Date.now());
       } else {
         if (PASTEBIN_PROVIDERS[providerValue]) {
+          if (providerValue === 'animeunity') {
+            baseUrl = await resolveAnimeUnityBaseUrl(
+              PASTEBIN_PROVIDERS.animeunity.fallback || '',
+            );
+            if (!baseUrl) {
+              return '';
+            }
+            cacheStorageService.setString(cacheKey, baseUrl);
+            cacheStorageService.setObject(timeKey, Date.now());
+            return baseUrl;
+          }
           console.log(`[baseUrl] pastebin missing ${providerValue}`);
           return '';
         }
@@ -83,4 +137,19 @@ export const getBaseUrl = async (providerValue: string) => {
     console.error(`Error fetching baseUrl: ${providerValue}`, error);
     return '';
   }
+};
+
+export const getBaseUrl = (providerValue: string): Promise<string> => {
+  if (providerValue !== 'animeunity') {
+    return resolveBaseUrl(providerValue);
+  }
+  const pending = pendingBaseUrls.get(providerValue);
+  if (pending) {
+    return pending;
+  }
+  const request = resolveBaseUrl(providerValue).finally(() => {
+    pendingBaseUrls.delete(providerValue);
+  });
+  pendingBaseUrls.set(providerValue, request);
+  return request;
 };
