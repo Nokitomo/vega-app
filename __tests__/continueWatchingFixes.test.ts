@@ -26,6 +26,7 @@ import {
 import {syncSeriesCatalog} from '../src/lib/services/seriesCatalogSync';
 import useWatchHistoryStore from '../src/lib/zustand/watchHistrory';
 import {getEpisodesThroughTarget} from '../src/lib/utils/episodesThroughTarget';
+import {getWatchHistoryCardProgress} from '../src/lib/utils/watchHistoryCardProgress';
 
 const item = (link: string, isSeries = false) => ({
   id: link,
@@ -50,6 +51,127 @@ it('moves a resumed title to the front without duplicating it', () => {
     'second',
   ]);
   expect(storage.getWatchHistory()[0].progress).toBe(12);
+});
+
+it('retains more than 100 history titles while Home still shows only 30', () => {
+  const storage = new WatchHistoryStorage();
+  for (let index = 0; index < 150; index++) {
+    storage.addToWatchHistory(item(`movie-${index}`));
+  }
+  expect(storage.getWatchHistory()).toHaveLength(150);
+  expect(storage.getWatchHistory().at(-1)?.link).toBe('movie-0');
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toHaveLength(30);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), Number.MAX_SAFE_INTEGER))
+    .toHaveLength(150);
+  storage.addToWatchHistory(item('movie-0'));
+  expect(storage.getWatchHistory()).toHaveLength(150);
+  expect(storage.getWatchHistory()[0].link).toBe('movie-0');
+});
+
+it('keeps the oldest title after a thousand entries and a later update', () => {
+  const storage = new WatchHistoryStorage();
+  storage.setWatchHistory(Array.from({length: 1000}, (_, index) => item(`title-${index}`)));
+  storage.addToWatchHistory(item('new-title'));
+  expect(storage.getWatchHistory()).toHaveLength(1001);
+  expect(storage.getWatchHistory().at(-1)?.link).toBe('title-999');
+  storage.addToWatchHistory(item('title-999'));
+  expect(storage.getWatchHistory()).toHaveLength(1001);
+  expect(storage.getWatchHistory()[0].link).toBe('title-999');
+});
+
+it('shows a manually marked series in history and targets the next episode', () => {
+  const storage = new WatchHistoryStorage();
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+    {link: 's1e3', seasonNumber: 1, episodeNumber: 3},
+  ], true);
+  setEpisodeManuallyWatched('show', 's1e1', true);
+  useWatchHistoryStore.getState().recordManualEpisode({
+    ...item('show', true), manualEpisodeLink: 's1e1',
+    episodeNumber: 1, seasonNumber: 1, provider: 'fixture', poster: 'poster',
+  });
+
+  expect(storage.getWatchHistory()).toHaveLength(1);
+  expect(storage.getWatchHistory()[0]).toMatchObject({
+    link: 'show', manualEpisodeLink: 's1e1', provider: 'fixture', poster: 'poster',
+  });
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30).map(entry => entry.link))
+    .toEqual(['show']);
+  expect(getContinueWatchingPresentation(storage.getWatchHistory()[0])).toMatchObject({
+    target: {link: 's1e2'}, progressPercent: 0,
+  });
+  expect(getWatchHistoryCardProgress(storage.getWatchHistory()[0])).toBe(100);
+});
+
+it('updates one existing history card and prefers the latest manual episode', () => {
+  const storage = new WatchHistoryStorage();
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+    {link: 's1e3', seasonNumber: 1, episodeNumber: 3},
+  ], true);
+  storage.setWatchHistory([{...item('show', true), id: 'legacy-id', poster: 'original'}]);
+  mainStorage.setString('watch_history_progress_show', JSON.stringify({
+    episodeLink: 's1e1', percentage: 50, updatedAt: Date.now() - 1000,
+  }));
+  markEpisodesManuallyWatched('show', ['s1e1', 's1e2']);
+  useWatchHistoryStore.getState().recordManualEpisode({
+    ...item('show', true), manualEpisodeLink: 's1e2',
+    episodeNumber: 2, seasonNumber: 1,
+  });
+  const entry = storage.getWatchHistory()[0];
+  expect(storage.getWatchHistory()).toHaveLength(1);
+  expect(entry.poster).toBe('original');
+  expect(getContinueWatchingPresentation(entry)).toMatchObject({
+    target: {link: 's1e3'}, progressPercent: 0,
+  });
+  mainStorage.setString('watch_history_progress_show', JSON.stringify({
+    episodeLink: 's1e3', percentage: 25, updatedAt: (entry.manualMarkedAt || 0) + 1,
+  }));
+  expect(getContinueWatchingPresentation(entry)).toMatchObject({
+    target: {link: 's1e3'}, progressPercent: 25,
+  });
+  expect(getWatchHistoryCardProgress(entry)).toBe(25);
+});
+
+it('keeps a manually completed series in history and restores it when episodes arrive', () => {
+  const storage = new WatchHistoryStorage();
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+  ], true);
+  markEpisodesManuallyWatched('show', ['s1e1', 's1e2']);
+  recomputeSeriesCompletion('show');
+  useWatchHistoryStore.getState().recordManualEpisode({
+    ...item('show', true), manualEpisodeLink: 's1e2',
+    episodeNumber: 2, seasonNumber: 1,
+  });
+  expect(storage.getWatchHistory()).toHaveLength(1);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30)).toEqual([]);
+
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2},
+    {link: 's1e3', seasonNumber: 1, episodeNumber: 3},
+  ], true);
+  expect(selectContinueWatchingItems(storage.getWatchHistory(), 30).map(entry => entry.link))
+    .toEqual(['show']);
+  expect(getContinueWatchingPresentation(storage.getWatchHistory()[0])).toMatchObject({
+    target: {link: 's1e3'}, progressPercent: 0, hasNewEpisodes: true,
+  });
+});
+
+it('removes manual progress when its history title is deleted', () => {
+  const storage = new WatchHistoryStorage();
+  setSeriesCatalog('show', [{link: 'episode-1', seasonNumber: 1}], true);
+  setEpisodeManuallyWatched('show', 'episode-1', true);
+  useWatchHistoryStore.getState().recordManualEpisode({
+    ...item('show', true), manualEpisodeLink: 'episode-1',
+  });
+  useWatchHistoryStore.getState().removeItemsByLinks(['show']);
+  expect(storage.getWatchHistory()).toHaveLength(0);
+  expect(getEpisodeProgressPercent('show', 'episode-1')).toBe(0);
 });
 
 it('orders new episodes and playback by the most recent activity', () => {

@@ -7,7 +7,6 @@ import {
 } from '../storage/ManualEpisodeCompletionStorage';
 import {
   getSeriesCatalog,
-  isSeriesComplete,
   SeriesCatalogEpisode,
 } from '../storage/SeriesCompletionStorage';
 
@@ -141,20 +140,19 @@ export const selectContinueWatchingItems = (
       seen.add(item.link);
       return true;
     })
-    .filter(
-      item =>
-        item.isSeries === true
-          ? !isSeriesComplete(item.link)
-          : item.isSeries === false
-            ? getHistoryProgressPercent(item) < WATCH_COMPLETION_PERCENT
-            : true,
+    .map(item => ({item, catalog: item.isSeries === true ? getSeriesCatalog(item.link) : undefined}))
+    .filter(({item, catalog}) =>
+      item.isSeries === true
+        ? catalog?.fullyWatched !== true
+        : item.isSeries === false
+          ? getHistoryProgressPercent(item) < WATCH_COMPLETION_PERCENT
+          : true,
     )
-    .sort((left, right) => {
-      const activityAt = (item: WatchHistoryItem) => Math.max(
-        item.timestamp ?? item.lastPlayed ?? 0,
-        getSeriesCatalog(item.link)?.newEpisodesDetectedAt ?? 0,
-      );
-      return activityAt(right) - activityAt(left);
-    })
+    .map(({item, catalog}) => ({
+      item,
+      activityAt: Math.max(item.timestamp ?? item.lastPlayed ?? 0, catalog?.newEpisodesDetectedAt ?? 0),
+    }))
+    .sort((left, right) => right.activityAt - left.activityAt)
+    .map(({item}) => item)
     .slice(0, limit);
 };

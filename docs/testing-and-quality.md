@@ -15,11 +15,16 @@ npm test
 ## Cronologia ed episodi visti
 
 - `Svuota cronologia` e `Elimina selezionati` rimuovono anche il progresso degli episodi dei titoli eliminati. Gli altri titoli conservano il proprio stato.
+- La cronologia conserva tutti i titoli senza espellere automaticamente il piu vecchio dopo 100 voci. La Home mostra al massimo 30 card di `Continua a guardare`; `Altro` mostra tutte le voci ancora da guardare.
+- La lista `Watch History` calcola il progresso solo delle card renderizzate. La sincronizzazione dei titoli provenienti dai provider controlla un piccolo gruppo per visita, cosi una cronologia lunga non avvia richieste per tutti i titoli insieme.
+- `Segna come visto` e `Segna come visti fino a qui` inseriscono o aggiornano una sola card nella cronologia, con l'episodio segnato come riferimento. La card compare in `Continua a guardare` se restano episodi; se la serie e completa resta soltanto nella cronologia. Una riproduzione successiva aggiorna il riferimento.
 - Il menu di pressione prolungata su un episodio offre l'azione per segnare come visti tutti gli episodi disponibili fino a quello selezionato, incluso, anche nelle stagioni precedenti. Il comando si applica subito, senza conferma, e mostra un indicatore durante il caricamento.
 - L'azione riusa il catalogo completo quando disponibile; altrimenti carica solo le stagioni necessarie, fino a tre alla volta. Se manca una stagione necessaria, non modifica alcun episodio. Gli speciali in stagione 0 non vengono inclusi automaticamente.
 - Smoke test: segnare due episodi manualmente, svuotare la cronologia e riaprire la serie; le barre arancioni devono essere scomparse. Ripetere eliminando un solo titolo dalla Watch History e verificare che un secondo titolo mantenga le barre.
 - Smoke test: su una serie con almeno due stagioni, segnare come visti fino a un episodio della seconda stagione. Verificare barra arancione per tutti gli episodi precedenti, assenza della barra per quelli successivi, comportamento identico con ordinamento inverso e corretto stato di `Continua a guardare`.
 - Smoke test: ripetere su una stagione avanzata di una serie lunga dopo riavvio dell'app. Verificare assenza di richiesta di conferma, indicatore di caricamento, completamento coerente e nessun episodio segnato parzialmente se il provider non risponde.
+- Smoke test: su una serie mai riprodotta, segnare manualmente un episodio e verificare una sola card in cronologia e in `Continua a guardare`, diretta al prossimo episodio. Ripetere con tutti gli episodi completati: la card resta in cronologia ma scompare da `Continua a guardare`. Verificare poi una nuova puntata, una riproduzione successiva e la cancellazione selettiva.
+- Smoke test: creare oltre 100 titoli nella cronologia; verificare che i piu vecchi restino accessibili e che la Home continui a mostrare massimo 30 card, mentre `Altro` ne mostri tutte le idonee.
 
 Per misurare separatamente dev client e APK release locale durante i test di
 Home, Info, episodi e poster, seguire [Profilazione Home e Info](performance-profiling.md).

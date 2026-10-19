@@ -1,5 +1,5 @@
 import {create} from 'zustand';
-import {cacheStorage, WatchHistoryItem, watchHistoryStorage} from '../storage';
+import {cacheStorage, mainStorage, WatchHistoryItem, watchHistoryStorage} from '../storage';
 import {
   clearHiddenContinueWatchingLinks,
   getHiddenContinueWatchingLinks,
@@ -51,6 +51,8 @@ const convertStorageToZustand = (items: any[]): WatchHistoryItem[] => {
 
 const titleSyncInFlight = new Set<string>();
 let titleMigrationInFlight: Promise<void> | null = null;
+const TITLE_MIGRATION_CURSOR_KEY = 'watchHistoryTitleMigrationCursor';
+const MAX_TITLE_MIGRATIONS_PER_VISIT = 4;
 
 const refreshHistoryState = (set: (partial: Partial<History>) => void) => {
   set({
@@ -312,22 +314,27 @@ const useWatchHistoryStore = create<History>(set => ({
     titleMigrationInFlight = (async () => {
       const uniqueLinks = new Set<string>();
       const history = watchHistoryStorage.getWatchHistory();
-
-      for (const item of history) {
-        if (!item?.link || uniqueLinks.has(item.link)) {
-          continue;
+      const candidates = history.filter(item => {
+        if (!item?.link || uniqueLinks.has(item.link) ||
+            !shouldResolveProviderCardTitle(item.provider)) {
+          return false;
         }
         uniqueLinks.add(item.link);
-
-        if (!shouldResolveProviderCardTitle(item.provider)) {
-          continue;
-        }
-
+        return true;
+      });
+      if (candidates.length === 0) {
+        return;
+      }
+      const start = (mainStorage.getNumber(TITLE_MIGRATION_CURSOR_KEY) || 0) % candidates.length;
+      const count = Math.min(MAX_TITLE_MIGRATIONS_PER_VISIT, candidates.length);
+      for (let index = 0; index < count; index++) {
+        const item = candidates[(start + index) % candidates.length];
         await syncDisplayTitleForLink({
           link: item.link,
           set,
         });
       }
+      mainStorage.setNumber(TITLE_MIGRATION_CURSOR_KEY, (start + count) % candidates.length);
     })()
       .catch(error => {
         console.error('❌ Error migrating watch history display titles:', error);

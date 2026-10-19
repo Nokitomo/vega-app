@@ -62,8 +62,7 @@ export class WatchHistoryStorage {
    * Replace the whole watch history list.
    */
   setWatchHistory(items: WatchHistoryItem[]): void {
-    const limitedHistory = (items || []).slice(0, 100);
-    mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, limitedHistory);
+    mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, items || []);
   }
 
   /**
