@@ -30,6 +30,7 @@ import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
 import {useLogoFallback} from '../lib/hooks/useLogoFallback';
 import {startPerfNavigation} from '../lib/utils/perfTrace';
+import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 
 interface HeroProps {
   isDrawerOpen: boolean;
@@ -48,6 +49,10 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   const {t} = useTranslation();
   const {provider} = useContentStore(state => state);
   const {hero} = useHeroStore(state => state);
+  const metadataProvider = getMetadataSourceProvider(
+    provider.value,
+    hero?.link || '',
+  );
 
   const showHamburgerMenu = useUiSettingsStore(
     state => state.showHamburgerMenu,
@@ -216,7 +221,7 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     if (!heroData) {
       return '';
     }
-    if (provider.value !== 'animeunity' && heroData.name) {
+    if (metadataProvider !== 'animeunity' && heroData.name) {
       return heroData.name;
     }
     const titleKey = (
@@ -236,7 +241,7 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
       );
     }
     return heroData.title || '';
-  }, [heroData, t]);
+  }, [heroData, metadataProvider, t]);
 
   const {
     uri: logoUri,

@@ -27,6 +27,7 @@ import {
   hasContentInventoryChanged,
 } from '../services/metadataRefreshPolicy';
 import {
+  getMetadataSourceProvider,
   streamCenterMetaOrigin,
   unwrapStreamCenterInfo,
   wrapStreamCenterInfo,
@@ -282,6 +283,7 @@ export const useEnhancedMetadata = (
 
 // Combined hook for both info and metadata
 export const useContentDetails = (link: string, providerValue: string) => {
+  const metadataProvider = getMetadataSourceProvider(providerValue, link);
   // First, get the basic content info
   const {
     data: info,
@@ -293,10 +295,10 @@ export const useContentDetails = (link: string, providerValue: string) => {
 
   const animeIds = info?.extra?.ids;
   const allowExternalMeta =
-    providerValue !== 'animeunity' ||
+    metadataProvider !== 'animeunity' ||
     !!animeIds?.malId ||
     !!animeIds?.anilistId;
-  const preferAnimeMeta = providerValue === 'animeunity';
+  const preferAnimeMeta = metadataProvider === 'animeunity';
   const externalImdbId =
     allowExternalMeta && !preferAnimeMeta ? info?.imdbId || '' : '';
   const externalType =
@@ -318,7 +320,7 @@ export const useContentDetails = (link: string, providerValue: string) => {
 
   const artworkSources = info?.extra?.artworkSources;
   const animeArtworkNeedsFallback =
-    providerValue === 'animeunity' &&
+    metadataProvider === 'animeunity' &&
     !!info &&
     shouldFetchAniListBanner({
       anilistId: animeIds?.anilistId,

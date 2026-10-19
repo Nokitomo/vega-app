@@ -20,6 +20,7 @@ import {
 } from '../services/animeArtwork';
 import {fetchAniListBanner} from '../services/animeMeta';
 import {selectArtworkCandidates} from '../services/artworkSelection';
+import {getMetadataSourceProvider} from '../services/streamCenterMetadata';
 import {resolveAnimeExternalIds} from '../providers/externalIds';
 import {measurePerfSync, traceAsync} from '../utils/perfTrace';
 import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
@@ -52,7 +53,8 @@ const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
   if (!heroLink) {
     return '';
   }
-  return buildProviderCacheKey('heroMetadata:v2', providerValue, heroLink);
+  const policyVersion = providerValue === 'streamcenter' ? 'v3' : 'v2';
+  return buildProviderCacheKey(`heroMetadata:${policyVersion}`, providerValue, heroLink);
 };
 
 const shouldHideHomeCategory = (
@@ -575,10 +577,14 @@ export const clearHeroCache = (providerValue?: string) => {
 // New hook for hero metadata with React Query
 export const useHeroMetadata = (heroLink: string, providerValue: string) => {
   const cacheKey = buildHeroMetadataCacheKey(heroLink, providerValue);
+  const metadataProvider = getMetadataSourceProvider(providerValue, heroLink);
+  const metadataKind = providerValue === 'streamcenter'
+    ? 'heroMetadata:sourceAware'
+    : 'heroMetadata';
   const providerCacheScope = getProviderCacheScope(providerValue);
 
   return useQuery({
-    queryKey: ['heroMetadata', heroLink, providerValue, providerCacheScope],
+    queryKey: [metadataKind, heroLink, providerValue, providerCacheScope],
     queryFn: async () => {
       const {providerManager: importedProviderManager} =
         await import('../services/ProviderManager');
@@ -615,7 +621,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
           isMeaningfulValue(primary) ? primary : fallback;
 
         const artworkCandidates = selectArtworkCandidates({
-          providerValue,
+          providerValue: metadataProvider,
           info: providerInfo,
           enhanced: enhancedMeta,
           activePoster: providerInfo.poster || providerInfo.image,
@@ -662,14 +668,14 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
 
       const animeExternalIds = resolveAnimeExternalIds(info.extra?.ids);
       const metaKey = buildEnhancedMetaKey({
-        imdbId: providerValue === 'animeunity' ? undefined : info.imdbId,
-        type: providerValue === 'animeunity' ? undefined : info.type,
+        imdbId: metadataProvider === 'animeunity' ? undefined : info.imdbId,
+        type: metadataProvider === 'animeunity' ? undefined : info.type,
         malId: animeExternalIds.malId,
         anilistId: animeExternalIds.anilistId,
       });
       const artworkSources = info?.extra?.artworkSources;
       const needsAnimeArtworkFallback =
-        providerValue === 'animeunity' &&
+        metadataProvider === 'animeunity' &&
         shouldFetchAniListBanner({
           anilistId: animeExternalIds.anilistId,
           backgroundSource: artworkSources?.background,
@@ -677,11 +683,11 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
 
       if (
         metaKey &&
-        (providerValue !== 'animeunity' || needsAnimeArtworkFallback)
+        (metadataProvider !== 'animeunity' || needsAnimeArtworkFallback)
       ) {
         try {
           const enhancedMeta =
-            providerValue === 'animeunity'
+            metadataProvider === 'animeunity'
               ? {
                   banner: await fetchAniListBanner(
                     Number(animeExternalIds.anilistId),
@@ -697,7 +703,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
             const merged = mergeHeroMeta(info, enhancedMeta);
             if (cacheKey) {
               writePersistedCache(cacheStorage, cacheKey, merged);
-              writeMetadata('heroMetadata', providerValue, heroLink, merged);
+              writeMetadata(metadataKind, providerValue, heroLink, merged);
             }
             return merged;
           }
@@ -705,7 +711,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
           const merged = mergeHeroMeta(info, undefined);
           if (cacheKey) {
             writePersistedCache(cacheStorage, cacheKey, merged);
-            writeMetadata('heroMetadata', providerValue, heroLink, merged);
+            writeMetadata(metadataKind, providerValue, heroLink, merged);
           }
           return merged;
         }
@@ -714,7 +720,7 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
       const merged = mergeHeroMeta(info, undefined);
       if (cacheKey) {
         writePersistedCache(cacheStorage, cacheKey, merged);
-        writeMetadata('heroMetadata', providerValue, heroLink, merged);
+        writeMetadata(metadataKind, providerValue, heroLink, merged);
       }
       return merged;
     },
@@ -733,13 +739,13 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         return undefined;
       }
       return (
-        readMetadata<any>('heroMetadata', providerValue, heroLink)?.value ||
+        readMetadata<any>(metadataKind, providerValue, heroLink)?.value ||
         readPersistedCache<any>(cacheStorage, cacheKey)?.value
       );
     },
     initialDataUpdatedAt: () =>
       cacheKey
-        ? readMetadata<any>('heroMetadata', providerValue, heroLink)
+        ? readMetadata<any>(metadataKind, providerValue, heroLink)
             ?.updatedAt ||
           readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
         : undefined,

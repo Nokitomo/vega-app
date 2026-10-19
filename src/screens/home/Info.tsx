@@ -41,6 +41,7 @@ import type {
   PostVariant,
 } from '../../lib/providers/types';
 import {selectArtworkCandidates} from '../../lib/services/artworkSelection';
+import {getMetadataSourceProvider} from '../../lib/services/streamCenterMetadata';
 import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
 import {resolveWebViewLink} from '../../lib/utils/providerLinks';
 import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
@@ -91,6 +92,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     route.params.link,
   );
   const activeLink = selectedVariantLink || route.params.link;
+  const metadataProvider = getMetadataSourceProvider(providerValue, activeLink);
   const routeSelectedVariant = useMemo(
     () => routeVariants.find(variant => variant.link === activeLink),
     [activeLink, routeVariants],
@@ -203,8 +205,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return info?.title;
   }, [info?.titleKey, info?.titleParams, info?.title, t]);
   const forceProviderTitle = useMemo(
-    () => PROVIDER_FIRST_TITLE_PROVIDERS.has(providerValue),
-    [providerValue],
+    () => PROVIDER_FIRST_TITLE_PROVIDERS.has(metadataProvider),
+    [metadataProvider],
   );
   const libraryTitle = useMemo(
     () => (forceProviderTitle ? providerTitle : meta?.name || providerTitle),
@@ -213,12 +215,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const artworkCandidates = useMemo(
     () =>
       selectArtworkCandidates({
-        providerValue,
+        providerValue: metadataProvider,
         info,
         enhanced: meta,
         activePoster,
       }),
-    [providerValue, info, meta, activePoster],
+    [metadataProvider, info, meta, activePoster],
   );
   const posterImage = useMemo(() => {
     return artworkCandidates.poster[0] || PLACEHOLDER_IMAGE;
@@ -251,32 +253,32 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
   // Memoized computed values
   const isStreamingUnity = useMemo(
-    () => providerValue === 'streamingunity',
-    [providerValue],
+    () => metadataProvider === 'streamingunity',
+    [metadataProvider],
   );
   const hasImdbMeta = useMemo(() => !!meta?.name, [meta?.name]);
   const allowProviderMetadata = useMemo(
     () =>
-      (providerValue !== 'altadefinizionez' &&
-        providerValue !== 'streamingunity') ||
+      (metadataProvider !== 'altadefinizionez' &&
+        metadataProvider !== 'streamingunity') ||
       !hasImdbMeta,
-    [providerValue, hasImdbMeta],
+    [metadataProvider, hasImdbMeta],
   );
   const hasAnimeExternalIds = useMemo(
     () =>
-      providerValue === 'animeunity' &&
+      metadataProvider === 'animeunity' &&
       (!!animeExternalIds.malId || !!animeExternalIds.anilistId),
-    [animeExternalIds.anilistId, animeExternalIds.malId, providerValue],
+    [animeExternalIds.anilistId, animeExternalIds.malId, metadataProvider],
   );
   const allowProviderStudio = useMemo(() => {
     if (!allowProviderMetadata || !info?.studio) {
       return false;
     }
-    if (providerValue === 'animeunity') {
+    if (metadataProvider === 'animeunity') {
       return true;
     }
     return !hasAnimeExternalIds;
-  }, [allowProviderMetadata, info?.studio, providerValue, hasAnimeExternalIds]);
+  }, [allowProviderMetadata, info?.studio, metadataProvider, hasAnimeExternalIds]);
   const hasMetaYear = useMemo(
     () => meta?.year != null && String(meta.year).trim() !== '',
     [meta?.year],
@@ -319,16 +321,16 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   );
   const synopsis = useMemo(() => {
     if (
-      providerValue === 'altadefinizionez' ||
-      providerValue === 'streamingunity'
+      metadataProvider === 'altadefinizionez' ||
+      metadataProvider === 'streamingunity'
     ) {
       return info?.synopsis || meta?.description || t('No synopsis available');
     }
-    if (providerValue === 'animeunity') {
+    if (metadataProvider === 'animeunity') {
       return info?.synopsis || t('No synopsis available');
     }
     return meta?.description || info?.synopsis || t('No synopsis available');
-  }, [providerValue, meta?.description, info?.synopsis, t]);
+  }, [metadataProvider, meta?.description, info?.synopsis, t]);
 
   const badgeYear = useMemo(() => {
     if (hasMetaYear) {
@@ -388,7 +390,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return meta?.name || providerTitle;
   }, [forceProviderTitle, meta?.name, providerTitle]);
   const isDubbedItalian = useMemo(() => {
-    if (providerValue !== 'animeunity') {
+    if (metadataProvider !== 'animeunity') {
       return false;
     }
     const rawDub = info?.extra?.flags?.dub;
@@ -400,7 +402,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       return normalized === '1' || normalized === 'true';
     }
     return false;
-  }, [providerValue, info?.extra?.flags?.dub]);
+  }, [metadataProvider, info?.extra?.flags?.dub]);
 
   const backgroundImage =
     artworkCandidates.background[0] || PLACEHOLDER_IMAGE;

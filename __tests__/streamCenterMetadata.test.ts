@@ -2,6 +2,7 @@ import {describe, expect, it} from '@jest/globals';
 import type {Info} from '../src/lib/providers/types';
 import {
   episodeIdentity,
+  getMetadataSourceProvider,
   streamCenterEpisodesOrigin,
   streamCenterMetaOrigin,
   unwrapStreamCenterEpisodes,
@@ -42,6 +43,24 @@ describe('StreamCenter shares source metadata without durable stream links', () 
       streamCenterMetaOrigin('https://www.animeunity.so/anime/20-test')
         ?.source,
     ).toBe('animeunity');
+    expect(getMetadataSourceProvider(
+      'streamcenter',
+      'https://www.animeunity.so/anime/20-test',
+    )).toBe('animeunity');
+    expect(getMetadataSourceProvider(
+      'streamcenter',
+      'https://streamingunity.vip/it/titles/42-test',
+    )).toBe('streamingunity');
+    expect(getMetadataSourceProvider(
+      'streamcenter',
+      'streamcenter:v1:meta:animeunity:%7B%22url%22%3A%2220%22%7D',
+    )).toBe('animeunity');
+    expect(getMetadataSourceProvider('streamcenter', 'unknown-link'))
+      .toBe('streamcenter');
+    expect(getMetadataSourceProvider(
+      'animeunity',
+      'https://streamingunity.vip/it/titles/42-test',
+    )).toBe('animeunity');
   });
 
   it('rebuilds episode playback routes from stable source links', () => {

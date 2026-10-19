@@ -43,6 +43,14 @@ export const streamCenterMetaOrigin = (link: string): Route | undefined => {
   }
 };
 
+/** Use the original source's display rules without changing StreamCenter routing. */
+export const getMetadataSourceProvider = (
+  providerValue: string,
+  link: string,
+): string => providerValue === 'streamcenter'
+  ? streamCenterMetaOrigin(link)?.source || providerValue
+  : providerValue;
+
 export const streamCenterEpisodesOrigin = (link: string): Route | undefined =>
   decodeRoute(link, 'episodes');
 
