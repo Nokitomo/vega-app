@@ -89,6 +89,7 @@ import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 import EpisodeMetadata from './EpisodeMetadata';
 import {getFillerEpisodes} from '../lib/services/fillerDatabase';
 import {readMetadata, writeMetadata} from '../lib/storage/MetadataDatabase';
+import {needsPrePlayRefresh, resolvePrePlayEpisodes} from '../lib/utils/prePlayEpisodes';
 import {
   readPersistedCache,
   writePersistedCache,
@@ -109,6 +110,7 @@ interface SeasonListProps {
   metaTitle: string;
   providerValue: string;
   contentInfo?: Info;
+  excludedQualities?: string[];
   checkContent?: () => Promise<unknown>;
   aniSkipMalId?: number;
   contentIds?: {
@@ -381,6 +383,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   metaTitle,
   providerValue,
   contentInfo,
+  excludedQualities = [],
   checkContent,
   aniSkipMalId,
   contentIds,
@@ -2067,38 +2070,82 @@ const SeasonList: React.FC<SeasonListProps> = ({
         return;
       }
 
-      if (
-        providerValue === 'animeunity' ||
-        providerValue === 'streamingunity'
-      ) {
+      let playableEpisodes: EpisodeLink[] = episodeData;
+      let playableIndex = linkIndex;
+      let playableSeasons = LinkList;
+      const currentSeasonLink = seasonEpisodesLink || activeSeason?.episodesLink;
+      if (needsPrePlayRefresh(providerValue)) {
         const verification = Promise.allSettled([
           checkContent?.(),
-          seasonEpisodesLink ? refetchEpisodes() : undefined,
+          currentSeasonLink && currentSeasonLink === activeSeason?.episodesLink
+            ? refetchEpisodes()
+            : undefined,
         ]);
         let timeout: ReturnType<typeof setTimeout> | undefined;
         try {
-          await Promise.race([
+          const results = await Promise.race([
             verification,
             new Promise<void>(resolve => {
               timeout = setTimeout(resolve, 1200);
             }),
           ]);
+          if (Array.isArray(results)) {
+            const contentResult = results[0];
+            if (contentResult.status === 'fulfilled' && contentResult.value &&
+                typeof contentResult.value === 'object' &&
+                'data' in contentResult.value) {
+              const freshInfo = (contentResult.value as {data?: Info}).data;
+              if (Array.isArray(freshInfo?.linkList)) {
+                const allowed = freshInfo.linkList.filter(item =>
+                  !item.quality || !excludedQualities.includes(item.quality),
+                );
+                const nextSeasons = allowed.length > 0 ? allowed : freshInfo.linkList;
+                if (nextSeasons.some(item =>
+                  item.episodesLink === currentSeasonLink ||
+                  (item.directLinks && item.title === activeSeason?.title),
+                )) {
+                  playableSeasons = nextSeasons;
+                }
+              }
+            }
+            const episodesResult = results[1];
+            if (episodesResult.status === 'fulfilled' && episodesResult.value &&
+                typeof episodesResult.value === 'object' &&
+                'data' in episodesResult.value) {
+              const freshEpisodes = (episodesResult.value as {data?: EpisodeLink[]}).data;
+              const resolved = resolvePrePlayEpisodes(
+                episodeData,
+                linkIndex,
+                normalizedEpisodes,
+                Array.isArray(freshEpisodes) ? freshEpisodes : undefined,
+                sortOrder === 'desc',
+              );
+              playableEpisodes = resolved.episodes;
+              playableIndex = resolved.index;
+            }
+          }
         } finally {
           if (timeout) {clearTimeout(timeout);}
         }
       }
 
-      const link = episodeData[linkIndex].link;
+      const link = playableEpisodes[playableIndex].link;
       const file = (
         metaTitle +
         seasonTitle +
-        episodeData[linkIndex]?.title
+        playableEpisodes[playableIndex]?.title
       ).replaceAll(/[^a-zA-Z0-9]/g, '_');
 
       const externalPlayer = settingsStorage.getBool('useExternalPlayer');
       const dwFile = await ifExists(file);
-      const seasonIndex =
-        activeSeasonIndex >= 0 ? activeSeasonIndex : undefined;
+      const refreshedSeasonIndex = playableSeasons.findIndex(item =>
+        currentSeasonLink
+          ? item.episodesLink === currentSeasonLink
+          : isSameSeason(activeSeason, item),
+      );
+      const seasonIndex = refreshedSeasonIndex >= 0
+        ? refreshedSeasonIndex
+        : activeSeasonIndex >= 0 ? activeSeasonIndex : undefined;
 
       if (externalPlayer) {
         if (dwFile) {
@@ -2113,27 +2160,27 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }
         handleExternalPlayer(link, contentType, {
           currentEpisodeLink: link,
-          episodeList: (episodeData || []) as EpisodeLink[],
+          episodeList: playableEpisodes,
           seasonTitle,
           seasonNumber: resolvedSeasonNumber,
-          seasonEpisodesLink,
+          seasonEpisodesLink: currentSeasonLink,
         });
         return;
       }
 
       navigation.navigate('Player', {
-        linkIndex,
-        episodeList: episodeData,
+        linkIndex: playableIndex,
+        episodeList: playableEpisodes,
         type: contentType,
         primaryTitle: primaryTitle,
         secondaryTitle: seasonTitle,
         episodeNumber: parsedEpisodeNumber,
         seasonNumber: resolvedSeasonNumber,
-        seasonEpisodesLink: seasonEpisodesLink,
+        seasonEpisodesLink: currentSeasonLink,
         poster: poster,
         providerValue: providerValue,
         infoUrl: routeParams.link,
-        seasons: LinkList,
+        seasons: playableSeasons,
         seasonIndex,
       });
     },
@@ -2150,6 +2197,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
       LinkList,
       checkContent,
       refetchEpisodes,
+      normalizedEpisodes,
+      sortOrder,
+      excludedQualities,
+      isSameSeason,
     ],
   );
 
@@ -2451,6 +2502,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       seasonNumber:
         normalizeNumericValue(resumeItem.seasonNumber) ?? activeSeasonNumber,
       episodeData: resumeList,
+      seasonEpisodesLink: activeSeason?.episodesLink,
     });
     setPendingPlay(null);
   }, [
@@ -2559,6 +2611,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       seasonNumber:
         normalizeNumericValue(resumeItem.seasonNumber) ?? activeSeasonNumber,
       episodeData: resumeList,
+      seasonEpisodesLink: activeSeason?.episodesLink,
     });
   }, [
     resumeProgress,

@@ -1197,6 +1197,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           refreshVersion={episodeRefreshVersion}
                           providerValue={providerValue}
                           contentInfo={info}
+                          excludedQualities={excludedQualities}
                           checkContent={check}
                           aniSkipMalId={
                             animeExternalIds.malId
