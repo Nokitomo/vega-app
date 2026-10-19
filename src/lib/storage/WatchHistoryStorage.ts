@@ -30,6 +30,8 @@ export interface WatchHistoryItem {
   episodeTitle?: string;
   episodeNumber?: number;
   seasonNumber?: number;
+  manualEpisodeLink?: string;
+  manualMarkedAt?: number;
   cachedInfoData?: any; // Add cached info data
 }
 
@@ -73,7 +75,7 @@ export class WatchHistoryStorage {
       item.displayTitle?.trim() || item.title?.trim() || undefined;
 
     // Check if the item already exists
-    const existingIndex = history.findIndex(i => i.id === item.id);
+    const existingIndex = history.findIndex(i => i.link === item.link || i.id === item.id);
 
     if (existingIndex !== -1) {
       // Update existing item
@@ -87,6 +89,12 @@ export class WatchHistoryStorage {
         timestamp: Date.now(), // Always update timestamp
       };
       history.splice(existingIndex, 1);
+      // Legacy entries can have another ID for the same content link.
+      for (let index = history.length - 1; index >= 0; index--) {
+        if (history[index].link === item.link) {
+          history.splice(index, 1);
+        }
+      }
       history.unshift(updatedItem);
     } else {
       // Add new item

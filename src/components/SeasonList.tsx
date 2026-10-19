@@ -437,7 +437,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     showFillerLabels,
     type,
   ]);
-  const {addItem, updatePlaybackInfo, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
+  const {addItem, recordManualEpisode, updatePlaybackInfo, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
   useEffect(() => {
     classifyHistoryItem(routeParams.link, type !== 'movie');
   }, [classifyHistoryItem, routeParams.link, type]);
@@ -2134,6 +2134,23 @@ const SeasonList: React.FC<SeasonListProps> = ({
   );
 
   // Memoized mark as watched handler
+  const recordManualHistory = useCallback((episodeLink: string) => {
+    const episode = episodeList.find(item => item.link === episodeLink) ||
+      activeSeason?.directLinks?.find(item => item.link === episodeLink);
+    recordManualEpisode({
+      id: routeParams.link,
+      link: routeParams.link,
+      title: metaTitle || '',
+      poster: poster?.poster || poster?.background,
+      provider: providerValue,
+      isSeries: type !== 'movie',
+      manualEpisodeLink: episodeLink,
+      episodeTitle: episode?.title,
+      episodeNumber: episode?.episodeNumber,
+      seasonNumber: episode?.seasonNumber ?? activeSeasonNumber,
+    });
+  }, [activeSeason?.directLinks, activeSeasonNumber, episodeList, metaTitle, poster?.background, poster?.poster, providerValue, recordManualEpisode, routeParams.link, type]);
+
   const markAsWatched = useCallback(() => {
     if (stickyMenu.link) {
       setEpisodeManuallyWatched(routeParams.link, stickyMenu.link, true);
@@ -2146,11 +2163,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }),
       );
       recomputeSeriesCompletion(routeParams.link);
-      refreshHistory();
+      recordManualHistory(stickyMenu.link);
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 100}));
       setStickyMenu({active: false});
     }
-  }, [refreshHistory, routeParams.link, stickyMenu.link]);
+  }, [recordManualHistory, routeParams.link, stickyMenu.link]);
 
   const markWatchedThroughEpisode = useCallback(async () => {
     const targetLink = stickyMenu.link;
@@ -2183,15 +2200,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
         markEpisodesManuallyWatched(routeParams.link, remaining.map(episode => episode.link));
         recomputeSeriesCompletion(routeParams.link);
         refreshProgressData();
-        refreshHistory();
       }
+      recordManualHistory(targetLink);
     } catch {
       Alert.alert(t('Episodes unavailable'), t('Unable to load complete series episodes'));
     } finally {
       markingThroughRef.current = false;
       setMarkingThrough(false);
     }
-  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, refreshProgressData, routeParams.link, stickyMenu.link, t]);
+  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, recordManualHistory, refreshProgressData, routeParams.link, stickyMenu.link, t]);
 
   // Memoized mark as unwatched handler
   const markAsUnwatched = useCallback(() => {

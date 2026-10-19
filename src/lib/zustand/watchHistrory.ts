@@ -28,6 +28,7 @@ export interface History {
   refreshHistory: () => void;
   classifyHistoryItem: (link: string, isSeries: boolean) => void;
   addItem: (item: WatchHistoryItem) => void;
+  recordManualEpisode: (item: WatchHistoryItem & {manualEpisodeLink: string}) => void;
   updatePlaybackInfo: (
     link: string,
     playbackInfo: Partial<WatchHistoryItem>,
@@ -120,7 +121,11 @@ const syncDisplayTitleForLink = async ({
       return;
     }
 
-    const nextHistory = history.map(item =>
+    const latestHistory = watchHistoryStorage.getWatchHistory();
+    if (!latestHistory.some(item => item.link === normalizedLink)) {
+      return;
+    }
+    const nextHistory = latestHistory.map(item =>
       item.link === normalizedLink
         ? {
             ...item,
@@ -196,6 +201,32 @@ const useWatchHistoryStore = create<History>(set => ({
     } catch (error) {
       console.error('❌ Error:', error);
     }
+  },
+  recordManualEpisode: item => {
+    if (!item.link || !item.manualEpisodeLink) {
+      return;
+    }
+    const previous = watchHistoryStorage.getWatchHistory().find(
+      entry => entry.link === item.link,
+    );
+    watchHistoryStorage.addToWatchHistory({
+      ...previous,
+      ...item,
+      id: item.link,
+      title: item.title || previous?.title || '',
+      displayTitle: item.displayTitle || previous?.displayTitle || item.title,
+      poster: item.poster || previous?.poster,
+      provider: item.provider || previous?.provider,
+      manualMarkedAt: Date.now(),
+    });
+    const hiddenFromContinueWatching = showInContinueWatching(item.link);
+    set({
+      hiddenFromContinueWatching,
+      history: convertStorageToZustand(watchHistoryStorage.getWatchHistory()),
+    });
+    syncDisplayTitleForLink({link: item.link, set}).catch(error => {
+      console.error('Error syncing watch history display title:', error);
+    });
   },
 
   updatePlaybackInfo: (link, playbackInfo) => {

@@ -2,6 +2,7 @@ import {mainStorage} from '../storage/StorageService';
 import {WatchHistoryItem} from '../storage/WatchHistoryStorage';
 import {
   getEpisodeProgressPercent,
+  getEpisodeProgressSnapshot,
   WATCH_COMPLETION_PERCENT,
 } from '../storage/ManualEpisodeCompletionStorage';
 import {
@@ -18,10 +19,29 @@ export type ContinueWatchingPresentation = {
   hasNewEpisodes: boolean;
 };
 
+const getPlaybackProgress = (link: string): {episodeLink: string; updatedAt: number} => {
+  try {
+    const raw = mainStorage.getString(`watch_history_progress_${link}`);
+    const parsed = raw ? JSON.parse(raw) : undefined;
+    return {
+      episodeLink: String(parsed?.episodeLink || ''),
+      updatedAt: Number(parsed?.updatedAt) || 0,
+    };
+  } catch {
+    return {episodeLink: '', updatedAt: 0};
+  }
+};
+
+export const isLatestManualEpisodeMark = (item: WatchHistoryItem): boolean =>
+  !!item.manualEpisodeLink &&
+  getEpisodeProgressPercent(item.link, item.manualEpisodeLink) >= WATCH_COMPLETION_PERCENT &&
+  (item.manualMarkedAt || 0) >= getPlaybackProgress(item.link).updatedAt;
+
 export const getContinueWatchingPresentation = (
   item: WatchHistoryItem,
 ): ContinueWatchingPresentation => {
-  const historyProgress = getHistoryProgressPercent(item);
+  const manualLatest = item.isSeries === true && isLatestManualEpisodeMark(item);
+  const historyProgress = manualLatest ? 0 : getHistoryProgressPercent(item);
   if (item.isSeries !== true) {
     return {progressPercent: historyProgress, hasNewEpisodes: false};
   }
@@ -33,14 +53,13 @@ export const getContinueWatchingPresentation = (
   if (episodes.length === 0) {
     return {progressPercent: historyProgress, hasNewEpisodes: false};
   }
+  const episodeProgress = getEpisodeProgressSnapshot(
+    item.link, episodes.map(episode => episode.link),
+  );
 
-  let lastEpisodeLink = '';
-  try {
-    const raw = mainStorage.getString(`watch_history_progress_${item.link}`);
-    lastEpisodeLink = raw ? String(JSON.parse(raw)?.episodeLink || '') : '';
-  } catch {
-    // An invalid legacy progress record should not block the card.
-  }
+  let lastEpisodeLink = manualLatest
+    ? item.manualEpisodeLink || ''
+    : getPlaybackProgress(item.link).episodeLink;
   let lastIndex = episodes.findIndex(episode => episode.link === lastEpisodeLink);
   if (lastIndex < 0 && item.episodeNumber != null) {
     lastIndex = episodes.findIndex(episode =>
@@ -53,8 +72,8 @@ export const getContinueWatchingPresentation = (
   }
 
   const progressFor = (episode: SeriesCatalogEpisode) => {
-    const recorded = getEpisodeProgressPercent(item.link, episode.link);
-    return episode.link === lastEpisodeLink
+    const recorded = episodeProgress.get(episode.link) || 0;
+    return !manualLatest && episode.link === lastEpisodeLink
       ? Math.max(recorded, historyProgress)
       : recorded;
   };
@@ -78,6 +97,9 @@ export const getContinueWatchingPresentation = (
 };
 
 export const getHistoryProgressPercent = (item: WatchHistoryItem): number => {
+  if (isLatestManualEpisodeMark(item)) {
+    return 100;
+  }
   try {
     const stored = mainStorage.getString(`watch_history_progress_${item.link}`);
     if (stored) {

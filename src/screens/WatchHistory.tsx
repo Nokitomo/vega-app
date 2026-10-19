@@ -15,9 +15,10 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {WatchHistoryStackParamList} from '../App';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import useThemeStore from '../lib/zustand/themeStore';
-import {mainStorage} from '../lib/storage';
 import {useTranslation} from 'react-i18next';
 import {hasItaBadge} from '../lib/utils/helpers';
+import {isLatestManualEpisodeMark} from '../lib/utils/continueWatching';
+import {getWatchHistoryCardProgress} from '../lib/utils/watchHistoryCardProgress';
 
 type Props = NativeStackScreenProps<WatchHistoryStackParamList, 'WatchHistory'>;
 const WatchHistory = ({navigation}: Props) => {
@@ -27,7 +28,6 @@ const WatchHistory = ({navigation}: Props) => {
   const {history, clearHistory, removeItemsByLinks, migrateDisplayTitles} = useWatchHistoryStore(
     state => state,
   );
-  const [progressData, setProgressData] = useState<Record<string, number>>({});
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedLinks, setSelectedLinks] = useState<Set<string>>(() => new Set());
 
@@ -103,90 +103,6 @@ const WatchHistory = ({navigation}: Props) => {
       ],
     );
   };
-  // Load all progress data when component mounts
-  useEffect(() => {
-    const loadProgressData = () => {
-      const progressMap: Record<string, number> = {};
-      uniqueHistory.forEach(item => {
-        try {
-          // First try to get the dedicated watch history progress
-          // Use the infoUrl or link as the key, matching Player.tsx
-          const historyKey = item.link;
-          const historyProgressKey = `watch_history_progress_${historyKey}`;
-          const storedProgress = mainStorage.getString(historyProgressKey);
-          // Log what we're looking for and what we found
-          console.log(
-            `Looking for progress: ${historyProgressKey}`,
-            storedProgress ? 'FOUND' : 'NOT FOUND',
-          );
-
-          if (storedProgress) {
-            const parsed = JSON.parse(storedProgress);
-            console.log(`Progress data for ${item.title}:`, {
-              percentage: parsed.percentage?.toFixed(1) + '%',
-              currentTime: parsed.currentTime?.toFixed(1),
-              duration: parsed.duration?.toFixed(1),
-              updatedAt: new Date(parsed.updatedAt).toLocaleTimeString(),
-            });
-            if (parsed.percentage) {
-              progressMap[item.link] = Math.min(
-                Math.max(parsed.percentage, 0),
-                100,
-              );
-              return;
-            } else if (parsed.currentTime && parsed.duration) {
-              const percentage = (parsed.currentTime / parsed.duration) * 100;
-              progressMap[item.link] = Math.min(Math.max(percentage, 0), 100);
-              return;
-            }
-          }
-          // Try episode-specific key if this item has an episodeTitle
-          if (item.episodeTitle) {
-            const episodeKey = `watch_history_progress_${historyKey}_${item.episodeTitle.replace(
-              /\s+/g,
-              '_',
-            )}`;
-            const episodeData = mainStorage.getString(episodeKey);
-            if (episodeData) {
-              const parsed = JSON.parse(episodeData);
-              if (parsed.percentage) {
-                progressMap[item.link] = Math.min(
-                  Math.max(parsed.percentage, 0),
-                  100,
-                );
-                return;
-              }
-            }
-          }
-
-          // Fall back to standard video position cache
-          const cachedProgress = mainStorage.getString(item.link);
-          if (cachedProgress) {
-            const parsed = JSON.parse(cachedProgress);
-            if (parsed.position && parsed.duration) {
-              const percentage = (parsed.position / parsed.duration) * 100;
-              progressMap[item.link] = Math.min(Math.max(percentage, 0), 100);
-              return;
-            }
-          }
-
-          // Use the progress from history item itself as last resort
-          if (item.currentTime && item.duration) {
-            const percentage = (item.currentTime / item.duration) * 100;
-            progressMap[item.link] = Math.min(Math.max(percentage, 0), 100);
-            return;
-          }
-        } catch (e) {
-          console.error('Error processing progress for item:', item.title, e);
-        }
-      });
-      console.log('Final progress data loaded:', progressMap);
-      setProgressData(progressMap);
-    };
-
-    loadProgressData();
-  }, [uniqueHistory]);
-
   const handleNavigateToInfo = (item: any) => {
     try {
       // Parse the link if it's a JSON string
@@ -252,7 +168,7 @@ const WatchHistory = ({navigation}: Props) => {
       <FlashList
         data={uniqueHistory}
         extraData={{selectionMode, selectedLinks}}
-        estimatedItemSize={150}
+        estimatedItemSize={220}
         numColumns={3}
         ListEmptyComponent={() => (
           <View className="flex-1 justify-center items-center mt-10">
@@ -264,7 +180,8 @@ const WatchHistory = ({navigation}: Props) => {
         )}
         renderItem={({item}) => {
           // Get the progress for this item
-          const progress = progressData[item.link] || 0;
+          const progress = getWatchHistoryCardProgress(item);
+          const manuallyMarked = isLatestManualEpisodeMark(item);
           const displayTitle = item.displayTitle || item.title;
           const showItaBadge = hasItaBadge(displayTitle);
 
@@ -423,6 +340,11 @@ const WatchHistory = ({navigation}: Props) => {
                 {item.episodeTitle && (
                   <Text numberOfLines={1} className="text-white/60 text-xs">
                     {item.episodeTitle}
+                  </Text>
+                )}
+                {manuallyMarked && (
+                  <Text numberOfLines={1} className="text-white/60 text-xs">
+                    {t('Marked as watched manually')}
                   </Text>
                 )}
               </TouchableOpacity>
