@@ -20,7 +20,7 @@ import {HomeStackParamList, TabStackParamList} from '../../App';
 import LinearGradient from 'react-native-linear-gradient';
 import SeasonList from '../../components/SeasonList';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {settingsStorage, watchListStorage} from '../../lib/storage';
+import {settingsStorage, watchHistoryStorage, watchListStorage} from '../../lib/storage';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useContentStore from '../../lib/zustand/contentStore';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
@@ -41,7 +41,10 @@ import type {
   PostVariant,
 } from '../../lib/providers/types';
 import {selectArtworkCandidates} from '../../lib/services/artworkSelection';
-import {getMetadataSourceProvider} from '../../lib/services/streamCenterMetadata';
+import {
+  getMetadataSourceProvider,
+  resolveSavedStreamCenterLink,
+} from '../../lib/services/streamCenterMetadata';
 import {USER_WEBVIEW_ENABLED} from '../../lib/config/features';
 import {resolveWebViewLink} from '../../lib/utils/providerLinks';
 import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
@@ -91,11 +94,20 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [selectedVariantLink, setSelectedVariantLink] = useState(
     route.params.link,
   );
-  const activeLink = selectedVariantLink || route.params.link;
+  const activeLink = useMemo(() => resolveSavedStreamCenterLink(
+    providerValue,
+    selectedVariantLink || route.params.link,
+    providerValue === 'streamcenter'
+      ? [
+          ...watchHistoryStorage.getWatchHistory(),
+          ...watchListStorage.getWatchList(),
+        ]
+      : [],
+  ), [providerValue, route.params.link, selectedVariantLink]);
   const metadataProvider = getMetadataSourceProvider(providerValue, activeLink);
   const routeSelectedVariant = useMemo(
-    () => routeVariants.find(variant => variant.link === activeLink),
-    [activeLink, routeVariants],
+    () => routeVariants.find(variant => variant.link === selectedVariantLink),
+    [selectedVariantLink, routeVariants],
   );
   const activePoster = routeSelectedVariant?.image || route.params.poster;
   const activeRouteParams = useMemo(
@@ -103,11 +115,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
       ...route.params,
       link: activeLink,
       poster: activePoster,
-      continueWatchingTarget: activeLink === route.params.link
+      continueWatchingTarget: selectedVariantLink === route.params.link
         ? route.params.continueWatchingTarget
         : undefined,
     }),
-    [activeLink, activePoster, route.params],
+    [activeLink, activePoster, route.params, selectedVariantLink],
   );
   const infoHeaderHeight = useMemo(() => {
     const width =

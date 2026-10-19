@@ -51,6 +51,36 @@ export const getMetadataSourceProvider = (
   ? streamCenterMetaOrigin(link)?.source || providerValue
   : providerValue;
 
+const streamCenterContentIdentity = (link: string): string | undefined => {
+  const origin = streamCenterMetaOrigin(link);
+  if (!origin) {return undefined;}
+  const url = origin.data.url;
+  if (origin.source === 'animeunity') {
+    const id = url.match(/\/(?:anime|info_api)\/(\d+)(?:\D|$)/i)?.[1];
+    return id ? `animeunity:${id}` : undefined;
+  }
+  const id = url.match(/\/titles\/(\d+)(?:\D|$)/i)?.[1];
+  if (!id) {return undefined;}
+  const season = url.match(/\/season-(\d+)(?:\D|$)/i)?.[1];
+  return `streamingunity:${id}${season ? `:season:${season}` : ''}`;
+};
+
+/** Reuse a saved link when a provider changes domains, preserving progress keys. */
+export const resolveSavedStreamCenterLink = (
+  providerValue: string,
+  link: string,
+  savedItems: ReadonlyArray<{provider?: string; link: string}>,
+): string => {
+  if (providerValue !== 'streamcenter') {return link;}
+  const identity = streamCenterContentIdentity(link);
+  if (!identity) {return link;}
+  const streamCenterItems = savedItems.filter(item => item.provider === 'streamcenter');
+  if (streamCenterItems.some(item => item.link === link)) {return link;}
+  return streamCenterItems.find(
+    item => streamCenterContentIdentity(item.link) === identity,
+  )?.link || link;
+};
+
 export const streamCenterEpisodesOrigin = (link: string): Route | undefined =>
   decodeRoute(link, 'episodes');
 

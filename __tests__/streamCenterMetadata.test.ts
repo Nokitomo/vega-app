@@ -3,6 +3,7 @@ import type {Info} from '../src/lib/providers/types';
 import {
   episodeIdentity,
   getMetadataSourceProvider,
+  resolveSavedStreamCenterLink,
   streamCenterEpisodesOrigin,
   streamCenterMetaOrigin,
   unwrapStreamCenterEpisodes,
@@ -36,6 +37,42 @@ describe('StreamCenter shares source metadata without durable stream links', () 
     expect(route?.source).toBe('animeunity');
     expect(route?.data.url).toBe('20|1|2');
     expect(unwrapStreamCenterInfo(wrapped)).toEqual(sourceInfo);
+  });
+
+  it('reuses saved StreamCenter links across provider domain changes', () => {
+    const animeOld = 'https://www.animeunity.so/anime/42-example';
+    const animeMirror =
+      'streamcenter:v1:meta:animeunity:%7B%22url%22%3A%22https%3A%2F%2Fmirror.example%2Fanime%2F42-example%22%7D';
+    const streamingOld = 'https://streamingunity.vip/it/titles/75-example';
+    const streamingMirror =
+      'streamcenter:v1:meta:streamingunity:%7B%22url%22%3A%22https%3A%2F%2Fmirror.example%2Fit%2Ftitles%2F75-example%22%7D';
+    const saved = [
+      {provider: 'streamcenter', link: animeOld},
+      {provider: 'streamcenter', link: streamingOld},
+      {provider: 'animeunity', link: 'https://www.animeunity.so/anime/76-other'},
+    ];
+    expect(resolveSavedStreamCenterLink('streamcenter', animeMirror, saved))
+      .toBe(animeOld);
+    expect(resolveSavedStreamCenterLink('streamcenter', streamingMirror, saved))
+      .toBe(streamingOld);
+    expect(resolveSavedStreamCenterLink('streamcenter', animeMirror, [
+      {provider: 'streamcenter', link: animeMirror}, ...saved,
+    ])).toBe(animeMirror);
+    expect(resolveSavedStreamCenterLink('streamcenter', animeMirror, [
+      {provider: 'animeunity', link: animeOld},
+    ])).toBe(animeMirror);
+    expect(resolveSavedStreamCenterLink('animeunity', animeMirror, saved))
+      .toBe(animeMirror);
+    expect(resolveSavedStreamCenterLink(
+      'streamcenter',
+      'streamcenter:v1:meta:streamingunity:%7B%22url%22%3A%22https%3A%2F%2Fmirror.example%2Fit%2Ftitles%2F76-other%22%7D',
+      saved,
+    )).not.toBe(streamingOld);
+    expect(resolveSavedStreamCenterLink(
+      'streamcenter',
+      'streamcenter:v1:meta:animeunity:%7B%22url%22%3A%22https%3A%2F%2Fmirror.example%2Funknown%22%7D',
+      saved,
+    )).not.toBe(animeOld);
   });
 
   it('can identify a source from a StreamCenter link', () => {
