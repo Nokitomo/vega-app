@@ -9,6 +9,7 @@ import {
 } from '../src/lib/storage/ManualEpisodeCompletionStorage';
 import {
   getContinueWatchingPresentation,
+  getInfoPlaybackSelection,
   selectContinueWatchingItems,
 } from '../src/lib/utils/continueWatching';
 import {
@@ -102,6 +103,59 @@ it('shows a manually marked series in history and targets the next episode', () 
     target: {link: 's1e2'}, progressPercent: 0,
   });
   expect(getWatchHistoryCardProgress(storage.getWatchHistory()[0])).toBe(100);
+});
+
+it('updates the Info play target immediately after a manual mark across seasons', () => {
+  const storage = new WatchHistoryStorage();
+  setSeriesCatalog('show', [
+    {link: 's1e1', seasonNumber: 1, episodeNumber: 1, seasonEpisodesLink: 'season-1'},
+    {link: 's1e2', seasonNumber: 1, episodeNumber: 2, seasonEpisodesLink: 'season-1'},
+    {link: 's2e1', seasonNumber: 2, episodeNumber: 1, seasonEpisodesLink: 'season-2'},
+  ], true);
+  storage.addToWatchHistory(item('show', true));
+  const initialTarget = {link: 's1e2', seasonNumber: 1, episodeNumber: 2};
+  expect(getInfoPlaybackSelection(storage.getWatchHistory()[0], initialTarget, false))
+    .toMatchObject({target: initialTarget, playFromBeginning: false});
+
+  markEpisodesManuallyWatched('show', ['s1e1', 's1e2']);
+  recomputeSeriesCompletion('show');
+  useWatchHistoryStore.getState().recordManualEpisode({
+    ...item('show', true), manualEpisodeLink: 's1e2',
+    seasonNumber: 1, episodeNumber: 2,
+  });
+  expect(getInfoPlaybackSelection(storage.getWatchHistory()[0], initialTarget, true))
+    .toMatchObject({
+      target: {link: 's2e1', seasonNumber: 2, seasonEpisodesLink: 'season-2'},
+      playFromBeginning: false,
+      resetPlayback: false,
+    });
+
+  setEpisodeManuallyWatched('show', 's1e2', false);
+  recomputeSeriesCompletion('show');
+  expect(getInfoPlaybackSelection(storage.getWatchHistory()[0], initialTarget, true))
+    .toMatchObject({target: {link: 's1e2'}, playFromBeginning: false});
+});
+
+it('replays the first episode after completing a series and advances when new episodes arrive', () => {
+  const storage = new WatchHistoryStorage();
+  const first = {link: 's1e1', seasonNumber: 1, episodeNumber: 1, seasonEpisodesLink: 'season-1'};
+  setSeriesCatalog('show', [first, {
+    link: 's1e2', seasonNumber: 1, episodeNumber: 2, seasonEpisodesLink: 'season-1',
+  }], true);
+  markEpisodesManuallyWatched('show', ['s1e1', 's1e2']);
+  recomputeSeriesCompletion('show');
+  storage.addToWatchHistory(item('show', true));
+  const entry = storage.getWatchHistory()[0];
+  expect(getInfoPlaybackSelection(entry, {link: 's1e2'}, false))
+    .toMatchObject({target: first, playFromBeginning: true, resetPlayback: true});
+
+  setSeriesCatalog('show', [first, {
+    link: 's1e2', seasonNumber: 1, episodeNumber: 2, seasonEpisodesLink: 'season-1',
+  }, {
+    link: 's2e1', seasonNumber: 2, episodeNumber: 1, seasonEpisodesLink: 'season-2',
+  }], true);
+  expect(getInfoPlaybackSelection(entry, {link: 's1e2'}, true))
+    .toMatchObject({target: {link: 's2e1'}, playFromBeginning: false});
 });
 
 it('updates one existing history card and prefers the latest manual episode', () => {

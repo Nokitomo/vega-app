@@ -93,7 +93,10 @@ import {
   readPersistedCache,
   writePersistedCache,
 } from '../lib/utils/persistedCache';
-import type {ContinueWatchingTarget} from '../lib/utils/continueWatching';
+import {
+  getInfoPlaybackSelection,
+  type ContinueWatchingTarget,
+} from '../lib/utils/continueWatching';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -437,7 +440,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     showFillerLabels,
     type,
   ]);
-  const {addItem, recordManualEpisode, updatePlaybackInfo, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
+  const {history, addItem, recordManualEpisode, updatePlaybackInfo, refreshHistory, classifyHistoryItem} = useWatchHistoryStore(state => state);
   useEffect(() => {
     classifyHistoryItem(routeParams.link, type !== 'movie');
   }, [classifyHistoryItem, routeParams.link, type]);
@@ -815,6 +818,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const [resumeProgress, setResumeProgress] = useState<ResumeProgress | null>(
     null,
   );
+  const [manualProgressChanged, setManualProgressChanged] = useState(false);
   const [episodeProgressMap, setEpisodeProgressMap] = useState<
     Record<string, number>
   >({});
@@ -858,8 +862,38 @@ const SeasonList: React.FC<SeasonListProps> = ({
       link => link && link.title && link.link,
     );
   }, [activeSeason?.directLinks, normalizedEpisodes.length]);
+  const historyItem = useMemo(
+    () => history.find(item => item.link === routeParams.link),
+    [history, routeParams.link],
+  );
+  const playbackSelection = useMemo(
+    () => getInfoPlaybackSelection(
+      historyItem,
+      routeParams.continueWatchingTarget,
+      manualProgressChanged,
+    ),
+    [
+      historyItem,
+      routeParams.continueWatchingTarget,
+      manualProgressChanged,
+      episodeProgressMap,
+      episodeList,
+      LinkList,
+      refreshVersion,
+    ],
+  );
+  const canResumePlayback = !!resumeProgress?.currentTime &&
+    !playbackSelection.resetPlayback &&
+    (!playbackSelection.target || (
+      resumeProgress.episodeLink === playbackSelection.target.link &&
+      getEpisodeProgressPercent(routeParams.link, playbackSelection.target.link) <
+        WATCH_COMPLETION_PERCENT
+    ));
   const resumeEpisodeLabel = useMemo(() => {
-    const continueTarget = routeParams.continueWatchingTarget;
+    if (playbackSelection.playFromBeginning || playbackSelection.resetPlayback) {
+      return undefined;
+    }
+    const continueTarget = playbackSelection.target;
     if (continueTarget) {
       return getEpisodeLabel({
         episodeTitle: continueTarget.title,
@@ -911,7 +945,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     normalizedDirectLinks,
     normalizedEpisodes,
     resumeProgress,
-    routeParams.continueWatchingTarget,
+    playbackSelection,
   ]);
 
   // Memoized filtering and sorting logic for episodes
@@ -2149,6 +2183,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       episodeNumber: episode?.episodeNumber,
       seasonNumber: episode?.seasonNumber ?? activeSeasonNumber,
     });
+    setManualProgressChanged(true);
   }, [activeSeason?.directLinks, activeSeasonNumber, episodeList, metaTitle, poster?.background, poster?.poster, providerValue, recordManualEpisode, routeParams.link, type]);
 
   const markAsWatched = useCallback(() => {
@@ -2224,6 +2259,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       clearEpisodePlaybackProgress(routeParams.link, stickyMenu.link);
       recomputeSeriesCompletion(routeParams.link);
       refreshHistory();
+      setManualProgressChanged(true);
       setEpisodeProgressMap(prev => ({...prev, [stickyMenu.link!]: 0}));
       setStickyMenu({active: false});
     }
@@ -2431,13 +2467,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   ]);
 
   const handleResume = useCallback(() => {
-    const continueTarget = routeParams.continueWatchingTarget;
-    const isResume = !!resumeProgress &&
-      (!continueTarget || (
-        resumeProgress.episodeLink === continueTarget.link &&
-        getEpisodeProgressPercent(routeParams.link, continueTarget.link) <
-          WATCH_COMPLETION_PERCENT
-      ));
+    const continueTarget = playbackSelection.target;
+    const isResume = canResumePlayback;
     const targetEpisodeNumber = isResume
       ? normalizeNumericValue(resumeProgress?.episodeNumber) ??
         getEpisodeNumber(resumeProgress?.episodeTitle)
@@ -2446,9 +2477,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
     const target: PendingPlay = {
       isResume,
       episodeNumber: targetEpisodeNumber,
-      episodeTitle: continueTarget?.title || resumeProgress?.episodeTitle,
-      episodeLink: continueTarget?.link || resumeProgress?.episodeLink,
-      seasonNumber: continueTarget?.seasonNumber ?? resumeProgress?.seasonNumber,
+      episodeTitle: continueTarget?.title ||
+        (playbackSelection.resetPlayback ? undefined : resumeProgress?.episodeTitle),
+      episodeLink: continueTarget?.link ||
+        (playbackSelection.resetPlayback ? undefined : resumeProgress?.episodeLink),
+      seasonNumber: continueTarget?.seasonNumber ??
+        (playbackSelection.resetPlayback ? undefined : resumeProgress?.seasonNumber),
     };
 
     let targetSeason: Link | undefined;
@@ -2528,7 +2562,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
     });
   }, [
     resumeProgress,
-    routeParams.continueWatchingTarget,
+    routeParams.link,
+    playbackSelection,
+    canResumePlayback,
     LinkList,
     getPlayableList,
     resolveEpisodeIndex,
@@ -3049,14 +3085,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 color={primary}
               />
               <Text className="text-white font-semibold">
-                {resumeProgress?.currentTime &&
-                (!routeParams.continueWatchingTarget ||
-                  routeParams.continueWatchingTarget.link === resumeProgress.episodeLink &&
-                  getEpisodeProgressPercent(
-                    routeParams.link,
-                    routeParams.continueWatchingTarget.link,
-                  ) < WATCH_COMPLETION_PERCENT)
-                  ? t('Resume') : t('Play')}
+                {playbackSelection.playFromBeginning
+                  ? t('Play from beginning')
+                  : canResumePlayback ? t('Resume') : t('Play')}
               </Text>
               {resumeEpisodeLabel ? (
                 <Text className="text-white/80 text-xs">
@@ -3065,8 +3096,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
               ) : null}
             </View>
             <Text className="text-white/80 text-xs">
-              {routeParams.continueWatchingTarget &&
-              routeParams.continueWatchingTarget.link !== resumeProgress?.episodeLink
+              {playbackSelection.resetPlayback ||
+              (playbackSelection.target &&
+              playbackSelection.target.link !== resumeProgress?.episodeLink)
                 ? null
                 : formatResumeTime(resumeProgress?.currentTime ?? 0)}
             </Text>

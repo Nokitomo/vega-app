@@ -18,6 +18,31 @@ export type ContinueWatchingPresentation = {
   hasNewEpisodes: boolean;
 };
 
+export type InfoPlaybackSelection = {
+  target?: ContinueWatchingTarget;
+  playFromBeginning: boolean;
+  resetPlayback: boolean;
+};
+
+/** Keep the Info button in sync after an episode is marked without changing its entry route. */
+export const getInfoPlaybackSelection = (
+  item: WatchHistoryItem | undefined,
+  initialTarget: ContinueWatchingTarget | undefined,
+  manualProgressChanged: boolean,
+): InfoPlaybackSelection => {
+  const catalog = item?.isSeries === true ? getSeriesCatalog(item.link) : undefined;
+  if (catalog?.fullyWatched) {
+    const target = catalog.episodes?.[0] ||
+      (catalog.episodeLinks[0] ? {link: catalog.episodeLinks[0]} : undefined);
+    return {target, playFromBeginning: true, resetPlayback: true};
+  }
+  if (manualProgressChanged && item?.isSeries === true) {
+    const target = getContinueWatchingPresentation(item).target;
+    return {target, playFromBeginning: false, resetPlayback: !target};
+  }
+  return {target: initialTarget, playFromBeginning: false, resetPlayback: false};
+};
+
 const getPlaybackProgress = (link: string): {episodeLink: string; updatedAt: number} => {
   try {
     const raw = mainStorage.getString(`watch_history_progress_${link}`);
