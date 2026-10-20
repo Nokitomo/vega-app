@@ -21,6 +21,7 @@ import {getProviderCacheScope} from '../utils/providerCacheScope';
 import {hasContentInventoryChanged, getMetadataCheckInterval} from './metadataRefreshPolicy';
 import {reconcileEpisodes} from './episodeReconciliation';
 import {providerManager} from './ProviderManager';
+import {getMetadataSourceProvider} from './streamCenterMetadata';
 
 const HOUR = 60 * 60 * 1000;
 const MAX_TITLES_PER_VISIT = 12;
@@ -35,7 +36,11 @@ let inFlight: Promise<boolean> | undefined;
 const checkId = (item: WatchHistoryItem) => `${item.provider}:${item.link}`;
 const checkInterval = (item: WatchHistoryItem): number => {
   const info = readMetadata<Info>('contentInfo', item.provider!, item.link)?.value;
-  const policy = getMetadataCheckInterval(item.provider!, info);
+  const origin = getMetadataSourceProvider(item.provider!, item.link);
+  const metadataProvider = item.provider === 'streamcenter' && origin === 'animeunity'
+    ? origin
+    : item.provider!;
+  const policy = getMetadataCheckInterval(metadataProvider, info);
   return Number.isFinite(policy)
     ? Math.min(policy, ENDED_RECHECK_MS)
     : ENDED_RECHECK_MS;

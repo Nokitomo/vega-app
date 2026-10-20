@@ -89,3 +89,38 @@ it('finds a new provider season and restores a completed title without changing 
   expect(await checkContinueWatchingSeries(storage.getWatchHistory(), [])).toBe(false);
   expect(fullFetch).toHaveBeenCalledTimes(1);
 });
+
+it('uses AnimeUnity check timing only for StreamCenter anime routes', async () => {
+  const hour = 60 * 60 * 1000;
+  const animeLink = 'streamcenter:v1:meta:animeunity:' + encodeURIComponent(
+    JSON.stringify({url: 'https://www.animeunity.to/anime/42-example'}),
+  );
+  const filmLink = 'streamcenter:v1:meta:streamingunity:' + encodeURIComponent(
+    JSON.stringify({url: 'https://streamingunity.example/it/titles/42-example'}),
+  );
+  const anime = {
+    id: animeLink, link: animeLink, title: 'Anime', provider: 'streamcenter',
+    isSeries: true,
+  };
+  const film = {
+    id: filmLink, link: filmLink, title: 'Series', provider: 'streamcenter',
+    isSeries: true,
+  };
+  mainStorage.setObject('continueWatchingProviderChecks', {
+    [`streamcenter:${animeLink}`]: Date.now() - 5 * hour,
+    [`streamcenter:${filmLink}`]: Date.now() - 7 * hour,
+  });
+  metadata.writeMetadata('contentInfo', 'streamcenter', filmLink, {
+    title: 'Series', synopsis: '', image: '', imdbId: '', type: 'series',
+    linkList: [], extra: {meta: {status: 'Returning Series'}},
+  });
+  const inventory = jest.spyOn(providerManager, 'getContentInventory')
+    .mockRejectedValue(new Error('Inventory unavailable'));
+
+  expect(await checkContinueWatchingSeries([anime, film], [])).toBe(false);
+  expect(inventory).toHaveBeenCalledTimes(1);
+  expect(inventory).toHaveBeenCalledWith({
+    link: animeLink,
+    providerValue: 'streamcenter',
+  });
+});
