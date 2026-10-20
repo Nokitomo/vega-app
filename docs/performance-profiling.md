@@ -144,3 +144,34 @@ separata: tracciare il lavoro JS dei moduli provider, il numero e la concorrenza
 delle richieste dei metadati e il costo di rendering delle card. I dati di
 `gfxinfo` del dev client su questo emulatore includono il costo di rendering
 dell'emulatore stesso e non sono un benchmark di dispositivi reali.
+
+### Misura dei parser provider del 20 ottobre 2026
+
+I log e le schermate temporanei sono in `.codex/perf-provider-fix-20261020/`.
+Il dev client su `Medium_phone_API_35` ha caricato i bundle locali aggiornati
+dei tre provider tramite il server di sviluppo. La configurazione temporanea
+dell'app e stata rimossa dopo le prove. Nessun episodio e stato avviato.
+
+- Su una pagina Inertia sintetica di circa 250 KB, 50 estrazioni ripetute
+  hanno richiesto in media 16,91 ms con il parsing completo Cheerio e 0,17 ms
+  con l'estrazione mirata di `data-page`. Questa misura isola il parser e non
+  rappresenta il tempo totale di apertura della scheda.
+- In una prima apertura StreamingUnity, `provider.meta` completo ha richiesto
+  14,1 s, `metadata_ready` 426 ms e `first_layout` 782 ms. Alla riapertura
+  della stessa scheda, questi ultimi due valori sono stati 286 e 775 ms.
+- In una prima apertura StreamCenter, `provider.meta` completo ha richiesto
+  19,6 s e `metadata_ready` 20,0 s. Alla riapertura della stessa scheda,
+  `metadata_ready` e `first_layout` sono stati 138 e 392 ms. La prima
+  apertura ha registrato un `js_lag` massimo di 3,35 s.
+- Una scheda anime delegata da StreamCenter e stata confrontata visivamente
+  tra bundle installati e bundle aggiornati: artwork, testo, cast e 13 episodi
+  erano presenti in entrambi. Un primo tentativo con i bundle aggiornati aveva
+  fallito per richieste AnimeUnity con `network_error`; la ripetizione e
+  riuscita. Il valore `provider.meta` della ripetizione e stato 10,3 s.
+
+I tempi della prima apertura dipendono da rete e cache esterne non controllate;
+non consentono di attribuire al solo parsing una variazione del tempo totale.
+Il percorso locale di test ha anche prodotto un eccesso di download dei moduli
+prima che il refresh automatico venisse disattivato nella configurazione
+temporanea. Quel tentativo e il relativo arresto del processo non sono inclusi
+nelle misure sopra. Le pause JS residue richiedono ulteriori misure mirate.
