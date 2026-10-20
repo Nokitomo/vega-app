@@ -63,6 +63,7 @@ import PlayerEpisodeSidebar from '../../components/PlayerEpisodeSidebar';
 import PlayerMenuRow from '../../components/PlayerMenuRow';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import {recordEpisodePlaybackProgress} from '../../lib/storage/SeriesCompletionStorage';
+import {sameWatchContent, watchProgressKey} from '../../lib/storage/SharedAnimeWatchIdentity';
 import {useStream, useVideoSettings} from '../../lib/hooks/useStream';
 import {useContentInfo} from '../../lib/hooks/useContentInfo';
 import {
@@ -1832,7 +1833,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
       const hasHistoryEntry = watchHistoryStorage
         .getWatchHistory()
-        .some(item => item.link === historyKey);
+        .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
@@ -1882,11 +1883,11 @@ const Player = ({route}: Props): React.JSX.Element => {
         seasonEpisodesLink: route.params?.seasonEpisodesLink || '',
         updatedAt: Date.now(),
       };
-      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      const historyProgressKey = watchProgressKey(historyKey);
       mainStorage.setString(historyProgressKey, JSON.stringify(progressData));
       watchHistoryStorage.addProgressKey(historyProgressKey);
       if (episodeTitle) {
-        const episodeKey = `watch_history_progress_${historyKey}_${episodeTitle.replace(
+        const episodeKey = `${watchProgressKey(historyKey)}_${episodeTitle.replace(
           /\s+/g,
           '_',
         )}`;
@@ -1983,7 +1984,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         };
 
         if (progressData.episodeTitle) {
-          const episodeKey = `watch_history_progress_${historyKey}_${progressData.episodeTitle.replace(
+          const episodeKey = `${watchProgressKey(historyKey)}_${progressData.episodeTitle.replace(
             /\s+/g,
             '_',
           )}`;
@@ -2010,7 +2011,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
       const hasHistoryEntry = watchHistoryStorage
         .getWatchHistory()
-        .some(item => item.link === historyKey);
+        .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
@@ -2042,7 +2043,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         playbackRate,
       });
 
-      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      const historyProgressKey = watchProgressKey(historyKey);
       mainStorage.setString(
         historyProgressKey,
         JSON.stringify({

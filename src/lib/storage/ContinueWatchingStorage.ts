@@ -1,26 +1,29 @@
 import {mainStorage} from './StorageService';
+import {sharedWatchContentKey} from './SharedAnimeWatchIdentity';
 
 const HIDDEN_KEY = 'continueWatchingHiddenLinks';
 
 export const getHiddenContinueWatchingLinks = (): string[] =>
-  mainStorage.getArray<string>(HIDDEN_KEY) || [];
+  [...new Set((mainStorage.getArray<string>(HIDDEN_KEY) || []).map(sharedWatchContentKey))];
 
 export const hideFromContinueWatching = (link: string): string[] => {
   const links = getHiddenContinueWatchingLinks();
-  if (!link || links.includes(link)) {
+  const key = sharedWatchContentKey(link);
+  if (!link || links.includes(key)) {
     return links;
   }
-  const next = [...links, link];
+  const next = [...links, key];
   mainStorage.setArray(HIDDEN_KEY, next);
   return next;
 };
 
 export const showInContinueWatching = (link: string): string[] => {
   const links = getHiddenContinueWatchingLinks();
-  if (!links.includes(link)) {
+  const key = sharedWatchContentKey(link);
+  if (!links.includes(key)) {
     return links;
   }
-  const next = links.filter(item => item !== link);
+  const next = links.filter(item => item !== key);
   mainStorage.setArray(HIDDEN_KEY, next);
   return next;
 };

@@ -1,4 +1,11 @@
 import {cacheStorage, mainStorage} from './StorageService';
+import {
+  relatedWatchContentLinks,
+  sameWatchContent,
+  sharedWatchContentKey,
+  sharedWatchEpisodeKey,
+  watchProgressKey,
+} from './SharedAnimeWatchIdentity';
 
 /**
  * Storage keys for watch history
@@ -52,10 +59,26 @@ export class WatchHistoryStorage {
    * Get all watch history items
    */
   getWatchHistory(): WatchHistoryItem[] {
-    return (
-      mainStorage.getArray<WatchHistoryItem>(WatchHistoryKeys.WATCH_HISTORY) ||
-      []
-    );
+    const stored = mainStorage.getArray<WatchHistoryItem>(WatchHistoryKeys.WATCH_HISTORY) || [];
+    const seen = new Set<string>();
+    const duplicate = stored.some(item => {
+      const key = sharedWatchContentKey(item.link);
+      if (seen.has(key)) {return true;}
+      seen.add(key);
+      return false;
+    });
+    if (!duplicate) {return stored;}
+    seen.clear();
+    const history = [...stored]
+      .sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0))
+      .filter(item => {
+        const key = sharedWatchContentKey(item.link);
+        if (seen.has(key)) {return false;}
+        seen.add(key);
+        return true;
+      });
+    this.setWatchHistory(history);
+    return history;
   }
 
   /**
@@ -74,7 +97,8 @@ export class WatchHistoryStorage {
       item.displayTitle?.trim() || item.title?.trim() || undefined;
 
     // Check if the item already exists
-    const existingIndex = history.findIndex(i => i.link === item.link || i.id === item.id);
+    const existingIndex = history.findIndex(i =>
+      sameWatchContent(i.link, item.link) || i.id === item.id);
 
     if (existingIndex !== -1) {
       // Update existing item
@@ -90,7 +114,7 @@ export class WatchHistoryStorage {
       history.splice(existingIndex, 1);
       // Legacy entries can have another ID for the same content link.
       for (let index = history.length - 1; index >= 0; index--) {
-        if (history[index].link === item.link) {
+        if (sameWatchContent(history[index].link, item.link)) {
           history.splice(index, 1);
         }
       }
@@ -112,7 +136,8 @@ export class WatchHistoryStorage {
    */
   removeFromWatchHistory(id: string): void {
     const history = this.getWatchHistory();
-    const filteredHistory = history.filter(item => item.id !== id);
+    const filteredHistory = history.filter(item =>
+      item.id !== id && !sameWatchContent(item.link, id));
     mainStorage.setArray(WatchHistoryKeys.WATCH_HISTORY, filteredHistory);
   }
 
@@ -123,7 +148,8 @@ export class WatchHistoryStorage {
       return;
     }
     this.setWatchHistory(
-      this.getWatchHistory().filter(item => !selected.has(item.link)),
+      this.getWatchHistory().filter(item =>
+        ![...selected].some(link => sameWatchContent(item.link, link))),
     );
   }
 
@@ -171,10 +197,12 @@ export class WatchHistoryStorage {
       mainStorage.getObject<Record<string, string[]>>(
         WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS,
       ) || {};
-    const list = map[link] || [];
-    if (!list.includes(episodeLink)) {
-      list.push(episodeLink);
-      map[link] = list;
+    const contentKey = sharedWatchContentKey(link);
+    const episodeKey = sharedWatchEpisodeKey(link, episodeLink);
+    const list = map[contentKey] || [];
+    if (!list.includes(episodeKey)) {
+      list.push(episodeKey);
+      map[contentKey] = list;
       mainStorage.setObject(WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS, map);
     }
   }
@@ -187,7 +215,20 @@ export class WatchHistoryStorage {
       mainStorage.getObject<Record<string, string[]>>(
         WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS,
       ) || {};
-    return map[link] || [];
+    const key = sharedWatchContentKey(link);
+    const episodes = new Set(map[key] || []);
+    let migrated = false;
+    for (const alias of relatedWatchContentLinks(link)) {
+      if (alias === key || !map[alias]) {continue;}
+      map[alias].forEach(episode => episodes.add(sharedWatchEpisodeKey(link, episode)));
+      delete map[alias];
+      migrated = true;
+    }
+    if (migrated || episodes.size !== (map[key] || []).length) {
+      map[key] = [...episodes];
+      mainStorage.setObject(WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS, map);
+    }
+    return [...episodes];
   }
 
   /**
@@ -201,12 +242,13 @@ export class WatchHistoryStorage {
       mainStorage.getObject<Record<string, string[]>>(
         WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS,
       ) || {};
-    const keys = map[link] || [];
+    const aliases = relatedWatchContentLinks(link);
+    const keys = aliases.flatMap(alias => map[alias] || []);
     keys.forEach(key => {
       cacheStorage.delete(key);
     });
-    if (link in map) {
-      delete map[link];
+    if (aliases.some(alias => alias in map)) {
+      aliases.forEach(alias => delete map[alias]);
       mainStorage.setObject(WatchHistoryKeys.WATCH_HISTORY_EPISODE_KEYS, map);
     }
   }
@@ -218,18 +260,19 @@ export class WatchHistoryStorage {
     if (!link) {
       return;
     }
-    const prefix = `watch_history_progress_${link}`;
+    const prefixes = relatedWatchContentLinks(link).map(alias =>
+      `watch_history_progress_${alias}`);
     const otherPrefixes = this.getWatchHistory()
       .filter(item => item.link && item.link !== link)
-      .map(item => `watch_history_progress_${item.link}`);
+      .map(item => watchProgressKey(item.link));
     const keys = this.getProgressKeys();
     const remaining: string[] = [];
     keys.forEach(key => {
       const belongsToAnotherTitle = otherPrefixes.some(other =>
         key === other || key.startsWith(`${other}_`),
       );
-      if (!belongsToAnotherTitle &&
-          (key === prefix || key.startsWith(`${prefix}_`))) {
+      if (!belongsToAnotherTitle && prefixes.some(prefix =>
+        key === prefix || key.startsWith(`${prefix}_`))) {
         mainStorage.delete(key);
         return;
       }
@@ -245,8 +288,11 @@ export class WatchHistoryStorage {
     if (!link) {
       return;
     }
-    const baseKey = `watch_history_progress_${link}`;
+    const baseKey = watchProgressKey(link);
     mainStorage.delete(baseKey);
+    for (const alias of relatedWatchContentLinks(link)) {
+      mainStorage.delete(`watch_history_progress_${alias}`);
+    }
     cacheStorage.delete(link);
     this.clearEpisodeKeys(link);
     this.removeProgressKeysForLink(link);

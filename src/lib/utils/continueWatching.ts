@@ -1,4 +1,8 @@
-import {mainStorage} from '../storage/StorageService';
+import {
+  getWatchProgressString,
+  sameWatchEpisode,
+  sharedWatchContentKey,
+} from '../storage/SharedAnimeWatchIdentity';
 import {WatchHistoryItem} from '../storage/WatchHistoryStorage';
 import {
   getEpisodeProgressPercent,
@@ -45,7 +49,7 @@ export const getInfoPlaybackSelection = (
 
 const getPlaybackProgress = (link: string): {episodeLink: string; updatedAt: number} => {
   try {
-    const raw = mainStorage.getString(`watch_history_progress_${link}`);
+    const raw = getWatchProgressString(link);
     const parsed = raw ? JSON.parse(raw) : undefined;
     return {
       episodeLink: String(parsed?.episodeLink || ''),
@@ -84,7 +88,8 @@ export const getContinueWatchingPresentation = (
   let lastEpisodeLink = manualLatest
     ? item.manualEpisodeLink || ''
     : getPlaybackProgress(item.link).episodeLink;
-  let lastIndex = episodes.findIndex(episode => episode.link === lastEpisodeLink);
+  let lastIndex = episodes.findIndex(episode =>
+    sameWatchEpisode(item.link, episode.link, lastEpisodeLink));
   if (lastIndex < 0 && item.episodeNumber != null) {
     lastIndex = episodes.findIndex(episode =>
       episode.episodeNumber === item.episodeNumber &&
@@ -97,7 +102,7 @@ export const getContinueWatchingPresentation = (
 
   const progressFor = (episode: SeriesCatalogEpisode) => {
     const recorded = episodeProgress.get(episode.link) || 0;
-    return !manualLatest && episode.link === lastEpisodeLink
+    return !manualLatest && sameWatchEpisode(item.link, episode.link, lastEpisodeLink)
       ? Math.max(recorded, historyProgress)
       : recorded;
   };
@@ -125,7 +130,7 @@ export const getHistoryProgressPercent = (item: WatchHistoryItem): number => {
     return 100;
   }
   try {
-    const stored = mainStorage.getString(`watch_history_progress_${item.link}`);
+    const stored = getWatchProgressString(item.link);
     if (stored) {
       const progress = JSON.parse(stored);
       if (progress.percentage != null) {
@@ -159,10 +164,11 @@ export const selectContinueWatchingItems = (
   const hidden = new Set(hiddenLinks);
   return history
     .filter(item => {
-      if (seen.has(item.link) || hidden.has(item.link)) {
+      const key = sharedWatchContentKey(item.link);
+      if (seen.has(key) || hidden.has(key)) {
         return false;
       }
-      seen.add(item.link);
+      seen.add(key);
       return true;
     })
     .map(item => ({item, catalog: item.isSeries === true ? getSeriesCatalog(item.link) : undefined}))

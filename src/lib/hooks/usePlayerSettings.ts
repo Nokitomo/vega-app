@@ -1,6 +1,7 @@
 import {useCallback, useRef, useState} from 'react';
 import {cacheStorage, mainStorage, watchHistoryStorage} from '../storage';
 import {recordEpisodePlaybackProgress} from '../storage/SeriesCompletionStorage';
+import {watchProgressKey} from '../storage/SharedAnimeWatchIdentity';
 
 interface UsePlayerProgressOptions {
   activeEpisode: any;
@@ -87,7 +88,7 @@ export const usePlayerProgress = ({
       try {
         if (currentTime > 0 && duration > 0) {
           const historyKey = routeParams.infoUrl || link;
-          const historyProgressKey = `watch_history_progress_${historyKey}`;
+          const historyProgressKey = watchProgressKey(historyKey);
           const percentage = (currentTime / duration) * 100;
           const routeEpisode =
             routeParams?.episodeList?.[routeParams?.linkIndex] || undefined;
@@ -140,7 +141,7 @@ export const usePlayerProgress = ({
 
           // Also store with episodeTitle-specific key for series episodes
           if (episodeTitle) {
-            const episodeKey = `watch_history_progress_${historyKey}_${episodeTitle.replace(
+            const episodeKey = `${watchProgressKey(historyKey)}_${episodeTitle.replace(
               /\s+/g,
               '_',
             )}`;

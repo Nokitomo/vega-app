@@ -43,6 +43,10 @@ import {
   clearEpisodePlaybackProgress,
   recomputeSeriesCompletion,
 } from '../lib/storage/SeriesCompletionStorage';
+import {
+  getWatchProgressString,
+  sameWatchContent,
+} from '../lib/storage/SharedAnimeWatchIdentity';
 import {extensionManager} from '../lib/services/ExtensionManager';
 import {providerManager} from '../lib/services/ProviderManager';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -480,12 +484,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
   );
 
   const refreshProgressData = useCallback(() => {
-    const progressKey = `watch_history_progress_${routeParams.link}`;
-    const storedProgress = mainStorage.getString(progressKey);
+    const storedProgress = getWatchProgressString(routeParams.link);
     let nextResume: ResumeProgress | null = null;
     const hasHistory = watchHistoryStorage
       .getWatchHistory()
-      .some(item => item.link === routeParams.link);
+      .some(item => sameWatchContent(item.link, routeParams.link));
 
     if (!hasHistory) {
       setResumeProgress(prev =>

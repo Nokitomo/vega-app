@@ -57,6 +57,12 @@ import {
   recomputeSeriesCompletion,
   recordEpisodePlaybackProgress,
 } from '../lib/storage/SeriesCompletionStorage';
+import {
+  getWatchProgressString,
+  sameWatchContent,
+  sameWatchEpisode,
+  watchProgressKey,
+} from '../lib/storage/SharedAnimeWatchIdentity';
 import {extensionManager} from '../lib/services/ExtensionManager';
 import {providerManager} from '../lib/services/ProviderManager';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -866,7 +872,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
     );
   }, [activeSeason?.directLinks, normalizedEpisodes.length]);
   const historyItem = useMemo(
-    () => history.find(item => item.link === routeParams.link),
+    () => {
+      const item = history.find(entry => sameWatchContent(entry.link, routeParams.link));
+      return item ? {...item, link: routeParams.link} : undefined;
+    },
     [history, routeParams.link],
   );
   const playbackSelection = useMemo(
@@ -888,7 +897,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const canResumePlayback = !!resumeProgress?.currentTime &&
     !playbackSelection.resetPlayback &&
     (!playbackSelection.target || (
-      resumeProgress.episodeLink === playbackSelection.target.link &&
+      sameWatchEpisode(routeParams.link,
+        resumeProgress.episodeLink || '', playbackSelection.target.link) &&
       getEpisodeProgressPercent(routeParams.link, playbackSelection.target.link) <
         WATCH_COMPLETION_PERCENT
     ));
@@ -918,11 +928,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
       if (episodeLink) {
         matched =
-          normalizedEpisodes.find(item => item.link === episodeLink) ||
-          normalizedDirectLinks.find(item => item.link === episodeLink) ||
+          normalizedEpisodes.find(item => sameWatchEpisode(routeParams.link, item.link, episodeLink)) ||
+          normalizedDirectLinks.find(item => sameWatchEpisode(routeParams.link, item.link, episodeLink)) ||
           LinkList.flatMap(item =>
             Array.isArray(item.directLinks) ? item.directLinks : [],
-          ).find(item => item.link === episodeLink) ||
+          ).find(item => sameWatchEpisode(routeParams.link, item.link, episodeLink)) ||
           findCachedEpisodeByLink(resumeProgress.seasonEpisodesLink, episodeLink);
       }
 
@@ -1058,12 +1068,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
   );
 
   const refreshProgressData = useCallback(() => {
-    const progressKey = `watch_history_progress_${routeParams.link}`;
-    const storedProgress = mainStorage.getString(progressKey);
+    const storedProgress = getWatchProgressString(routeParams.link);
     let nextResume: ResumeProgress | null = null;
     const hasHistory = watchHistoryStorage
       .getWatchHistory()
-      .some(item => item.link === routeParams.link);
+      .some(item => sameWatchContent(item.link, routeParams.link));
 
     if (!hasHistory) {
       setResumeProgress(prev =>
@@ -1682,7 +1691,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
       const hasHistoryEntry = watchHistoryStorage
         .getWatchHistory()
-        .some(item => item.link === historyKey);
+        .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
@@ -1729,11 +1738,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
         seasonEpisodesLink: activeSeason?.episodesLink || '',
         updatedAt: Date.now(),
       };
-      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      const historyProgressKey = watchProgressKey(historyKey);
       mainStorage.setString(historyProgressKey, JSON.stringify(progressData));
       watchHistoryStorage.addProgressKey(historyProgressKey);
       if (episodeTitle) {
-        const episodeKey = `watch_history_progress_${historyKey}_${episodeTitle.replace(
+        const episodeKey = `${watchProgressKey(historyKey)}_${episodeTitle.replace(
           /\s+/g,
           '_',
         )}`;
@@ -1817,7 +1826,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         };
 
         if (progressData.episodeTitle) {
-          const episodeKey = `watch_history_progress_${historyKey}_${progressData.episodeTitle.replace(
+          const episodeKey = `${watchProgressKey(historyKey)}_${progressData.episodeTitle.replace(
             /\s+/g,
             '_',
           )}`;
@@ -1844,7 +1853,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
       const hasHistoryEntry = watchHistoryStorage
         .getWatchHistory()
-        .some(item => item.link === historyKey);
+        .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
@@ -1875,7 +1884,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         playbackRate: 1,
       });
 
-      const historyProgressKey = `watch_history_progress_${historyKey}`;
+      const historyProgressKey = watchProgressKey(historyKey);
       mainStorage.setString(
         historyProgressKey,
         JSON.stringify({

@@ -20,6 +20,7 @@ import {
   resolveProviderCardTitle,
   shouldResolveProviderCardTitle,
 } from '../utils/providerCardTitleResolver';
+import {sameWatchContent} from '../storage/SharedAnimeWatchIdentity';
 
 export interface History {
   history: WatchHistoryItem[];
@@ -154,12 +155,12 @@ const useWatchHistoryStore = create<History>(set => ({
   refreshHistory: () => refreshHistoryState(set),
   classifyHistoryItem: (link, isSeries) => {
     const history = watchHistoryStorage.getWatchHistory();
-    const existing = history.find(item => item.link === link);
+    const existing = history.find(item => sameWatchContent(item.link, link));
     if (!existing || existing.isSeries === isSeries) {
       return;
     }
     watchHistoryStorage.setWatchHistory(
-      history.map(item => item.link === link ? {...item, isSeries} : item),
+      history.map(item => sameWatchContent(item.link, link) ? {...item, isSeries} : item),
     );
     refreshHistoryState(set);
   },
@@ -209,7 +210,7 @@ const useWatchHistoryStore = create<History>(set => ({
       return;
     }
     const previous = watchHistoryStorage.getWatchHistory().find(
-      entry => entry.link === item.link,
+      entry => sameWatchContent(entry.link, item.link),
     );
     watchHistoryStorage.addToWatchHistory({
       ...previous,
@@ -234,7 +235,7 @@ const useWatchHistoryStore = create<History>(set => ({
   updatePlaybackInfo: (link, playbackInfo) => {
     try {
       const history = watchHistoryStorage.getWatchHistory();
-      const existingItem = history.find(item => item.link === link);
+      const existingItem = history.find(item => sameWatchContent(item.link, link));
 
       if (existingItem) {
         const updatedItem = {
@@ -258,8 +259,9 @@ const useWatchHistoryStore = create<History>(set => ({
   },
 
   removeItemsByLinks: links => {
-    const existing = new Set(watchHistoryStorage.getWatchHistory().map(item => item.link));
-    const selected = [...new Set(links)].filter(link => existing.has(link));
+    const existing = watchHistoryStorage.getWatchHistory().map(item => item.link);
+    const selected = [...new Set(links)].filter(link =>
+      existing.some(itemLink => sameWatchContent(itemLink, link)));
     if (selected.length === 0) {
       return;
     }

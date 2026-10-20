@@ -1,9 +1,18 @@
 import {mainStorage} from './StorageService';
 import {
   getEpisodeProgressSnapshot,
-  SERIES_EPISODE_PROGRESS_PREFIX,
   WATCH_COMPLETION_PERCENT,
 } from './ManualEpisodeCompletionStorage';
+import {
+  clearSharedEpisodeProgress,
+  readSharedEpisodeProgress,
+  sharedEpisodeProgressKey,
+} from './SharedAnimeEpisodeProgressStorage';
+import {
+  relatedWatchContentLinks,
+  sharedWatchContentKey,
+  sharedWatchEpisodeKey,
+} from './SharedAnimeWatchIdentity';
 
 export type SeriesCatalogEpisode = {
   link: string;
@@ -27,17 +36,34 @@ type EpisodeProgress = Record<string, number>;
 
 const catalogKey = (contentLink: string) => `seriesCatalog_${contentLink}`;
 const progressKey = (contentLink: string) =>
-  `${SERIES_EPISODE_PROGRESS_PREFIX}${contentLink}`;
+  sharedEpisodeProgressKey(contentLink);
 const CATALOG_KEYS = 'seriesCatalogContentLinks';
+const completionRevisions = new Map<string, string>();
 
 const readCatalog = (contentLink: string): SeriesCatalog | undefined =>
   mainStorage.getObject<SeriesCatalog>(catalogKey(contentLink));
 
-export const getSeriesCatalog = (contentLink: string): SeriesCatalog | undefined =>
-  readCatalog(contentLink);
+export const getSeriesCatalog = (contentLink: string): SeriesCatalog | undefined => {
+  if (sharedWatchContentKey(contentLink) !== contentLink) {
+    const revision = () => [
+      mainStorage.getKeyRevision(catalogKey(contentLink)),
+      mainStorage.getKeyRevision(progressKey(contentLink)),
+      mainStorage.getKeyRevision(`manualWatchedEpisodes_${sharedWatchContentKey(contentLink)}`),
+      mainStorage.getKeyRevision('watchHistory'),
+      mainStorage.getKeyRevision('manualWatchedEpisodeContents'),
+      mainStorage.getKeyRevision(CATALOG_KEYS),
+      mainStorage.getKeyRevision('watchHistoryEpisodeKeys'),
+    ].join(':');
+    if (completionRevisions.get(contentLink) !== revision()) {
+      recomputeSeriesCompletion(contentLink);
+      completionRevisions.set(contentLink, revision());
+    }
+  }
+  return readCatalog(contentLink);
+};
 
 const readProgress = (contentLink: string): EpisodeProgress =>
-  mainStorage.getObject<EpisodeProgress>(progressKey(contentLink)) || {};
+  readSharedEpisodeProgress(contentLink);
 
 const trackContent = (contentLink: string): void => {
   const contents = mainStorage.getArray<string>(CATALOG_KEYS) || [];
@@ -77,7 +103,7 @@ export const recomputeSeriesCompletion = (contentLink: string): boolean => {
 };
 
 export const isSeriesComplete = (contentLink: string): boolean =>
-  readCatalog(contentLink)?.fullyWatched === true;
+  getSeriesCatalog(contentLink)?.fullyWatched === true;
 
 export const setSeriesCatalog = (
   contentLink: string,
@@ -152,12 +178,13 @@ export const recordEpisodePlaybackProgress = (
   }
   const percentage = Math.min(Math.max((currentTime / duration) * 100, 0), 100);
   const progress = readProgress(contentLink);
-  if (Math.abs((progress[episodeLink] ?? -1) - percentage) < 0.5 &&
-      (progress[episodeLink] >= WATCH_COMPLETION_PERCENT) ===
+  const episodeKey = sharedWatchEpisodeKey(contentLink, episodeLink);
+  if (Math.abs((progress[episodeKey] ?? -1) - percentage) < 0.5 &&
+      (progress[episodeKey] >= WATCH_COMPLETION_PERCENT) ===
         (percentage >= WATCH_COMPLETION_PERCENT)) {
     return;
   }
-  progress[episodeLink] = percentage;
+  progress[episodeKey] = percentage;
   mainStorage.setObject(progressKey(contentLink), progress);
   trackContent(contentLink);
   recomputeSeriesCompletion(contentLink);
@@ -168,25 +195,30 @@ export const clearEpisodePlaybackProgress = (
   episodeLink: string,
 ): void => {
   const progress = readProgress(contentLink);
-  if (episodeLink in progress) {
-    delete progress[episodeLink];
+  const episodeKey = sharedWatchEpisodeKey(contentLink, episodeLink);
+  if (sharedWatchContentKey(contentLink) !== contentLink) {
+    progress[episodeKey] = 0;
+    mainStorage.setObject(progressKey(contentLink), progress);
+  } else if (episodeKey in progress) {
+    delete progress[episodeKey];
     mainStorage.setObject(progressKey(contentLink), progress);
   }
   recomputeSeriesCompletion(contentLink);
 };
 
 export const clearSeriesCompletion = (contentLink: string): void => {
-  mainStorage.delete(catalogKey(contentLink));
-  mainStorage.delete(progressKey(contentLink));
+  const aliases = relatedWatchContentLinks(contentLink);
+  aliases.forEach(link => mainStorage.delete(catalogKey(link)));
+  clearSharedEpisodeProgress(contentLink);
   const contents = mainStorage.getArray<string>(CATALOG_KEYS) || [];
-  mainStorage.setArray(CATALOG_KEYS, contents.filter(link => link !== contentLink));
+  mainStorage.setArray(CATALOG_KEYS, contents.filter(link => !aliases.includes(link)));
 };
 
 export const clearAllSeriesCompletions = (): void => {
   const contents = mainStorage.getArray<string>(CATALOG_KEYS) || [];
   contents.forEach(contentLink => {
     mainStorage.delete(catalogKey(contentLink));
-    mainStorage.delete(progressKey(contentLink));
+    clearSharedEpisodeProgress(contentLink);
   });
   mainStorage.delete(CATALOG_KEYS);
 };

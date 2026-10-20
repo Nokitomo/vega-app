@@ -1,20 +1,68 @@
 import {cacheStorage, mainStorage} from './StorageService';
 import {watchHistoryStorage} from './WatchHistoryStorage';
+import {
+  relatedWatchContentLinks,
+  sharedWatchContentKey,
+  sharedWatchEpisodeKey,
+} from './SharedAnimeWatchIdentity';
+import {
+  readSharedEpisodeProgress,
+  SERIES_EPISODE_PROGRESS_PREFIX,
+} from './SharedAnimeEpisodeProgressStorage';
 
 export const WATCH_COMPLETION_PERCENT = 95;
-export const SERIES_EPISODE_PROGRESS_PREFIX = 'seriesEpisodeProgress_';
+export {SERIES_EPISODE_PROGRESS_PREFIX};
 
 const keyForContent = (contentLink: string) =>
-  `manualWatchedEpisodes_${contentLink}`;
+  `manualWatchedEpisodes_${sharedWatchContentKey(contentLink)}`;
 const CONTENT_KEYS = 'manualWatchedEpisodeContents';
+const migrationRevisions = new Map<string, string>();
+
+const migrationRevision = (): string => [
+  mainStorage.getKeyRevision('watchHistory'),
+  mainStorage.getKeyRevision(CONTENT_KEYS),
+  mainStorage.getKeyRevision('seriesCatalogContentLinks'),
+  mainStorage.getKeyRevision('watchHistoryEpisodeKeys'),
+].join(':');
+
+const getManualSet = (contentLink: string): Set<string> => {
+  const key = sharedWatchContentKey(contentLink);
+  const links = new Set(
+    (mainStorage.getArray<string>(keyForContent(contentLink)) || [])
+      .map(link => sharedWatchEpisodeKey(contentLink, link)),
+  );
+  if (key !== contentLink && migrationRevisions.get(key) !== migrationRevision()) {
+    let migrated = false;
+    for (const alias of relatedWatchContentLinks(contentLink)) {
+      if (alias === key) {continue;}
+      const legacyKey = `manualWatchedEpisodes_${alias}`;
+      for (const episode of mainStorage.getArray<string>(legacyKey) || []) {
+        links.add(sharedWatchEpisodeKey(contentLink, episode));
+        migrated = true;
+      }
+      if (mainStorage.contains(legacyKey)) {
+        mainStorage.delete(legacyKey);
+        migrated = true;
+      }
+    }
+    if (migrated) {
+      mainStorage.setArray(keyForContent(contentLink), [...links]);
+      const contents = mainStorage.getArray<string>(CONTENT_KEYS) || [];
+      mainStorage.setArray(CONTENT_KEYS, [
+        ...new Set([...contents.filter(link =>
+          !relatedWatchContentLinks(contentLink).includes(link)), key]),
+      ]);
+    }
+    migrationRevisions.set(key, migrationRevision());
+  }
+  return links;
+};
 
 export const isEpisodeManuallyWatched = (
   contentLink: string,
   episodeLink: string,
 ): boolean =>
-  !!mainStorage
-    .getArray<string>(keyForContent(contentLink))
-    ?.includes(episodeLink);
+  getManualSet(contentLink).has(sharedWatchEpisodeKey(contentLink, episodeLink));
 
 export const getEpisodeProgressPercent = (
   contentLink: string,
@@ -23,15 +71,16 @@ export const getEpisodeProgressPercent = (
   if (isEpisodeManuallyWatched(contentLink, episodeLink)) {
     return 100;
   }
-  const recorded = mainStorage.getObject<Record<string, number>>(
-    `${SERIES_EPISODE_PROGRESS_PREFIX}${contentLink}`,
-  )?.[episodeLink];
+  const recorded = readSharedEpisodeProgress(contentLink)[
+    sharedWatchEpisodeKey(contentLink, episodeLink)];
   if (Number.isFinite(recorded)) {
     return Math.min(Math.max(recorded!, 0), 100);
   }
   // Legacy manual marks wrote an untracked 1/1 cache entry. After clearing
   // history that entry must never make the episode appear watched again.
-  if (!watchHistoryStorage.getEpisodeKeys(contentLink).includes(episodeLink)) {
+  if (!watchHistoryStorage.getEpisodeKeys(contentLink).some(link =>
+    sharedWatchEpisodeKey(contentLink, link) ===
+    sharedWatchEpisodeKey(contentLink, episodeLink))) {
     return 0;
   }
   try {
@@ -52,18 +101,18 @@ export const getEpisodeProgressSnapshot = (
   contentLink: string,
   episodeLinks: readonly string[],
 ): Map<string, number> => {
-  const manual = new Set(getManuallyWatchedEpisodeLinks(contentLink));
-  const recorded = mainStorage.getObject<Record<string, number>>(
-    `${SERIES_EPISODE_PROGRESS_PREFIX}${contentLink}`,
-  ) || {};
-  const tracked = new Set(watchHistoryStorage.getEpisodeKeys(contentLink));
+  const manual = getManualSet(contentLink);
+  const recorded = readSharedEpisodeProgress(contentLink);
+  const tracked = new Set(watchHistoryStorage.getEpisodeKeys(contentLink).map(link =>
+    sharedWatchEpisodeKey(contentLink, link)));
   const result = new Map<string, number>();
   for (const link of episodeLinks) {
-    if (manual.has(link)) {
+    const episodeKey = sharedWatchEpisodeKey(contentLink, link);
+    if (manual.has(episodeKey)) {
       result.set(link, 100);
-    } else if (Number.isFinite(recorded[link])) {
-      result.set(link, Math.min(Math.max(recorded[link], 0), 100));
-    } else if (!tracked.has(link)) {
+    } else if (Number.isFinite(recorded[episodeKey])) {
+      result.set(link, Math.min(Math.max(recorded[episodeKey], 0), 100));
+    } else if (!tracked.has(episodeKey)) {
       result.set(link, 0);
     } else {
       try {
@@ -82,7 +131,7 @@ export const getEpisodeProgressSnapshot = (
 };
 
 export const getManuallyWatchedEpisodeLinks = (contentLink: string): string[] =>
-  mainStorage.getArray<string>(keyForContent(contentLink)) || [];
+  [...getManualSet(contentLink)];
 
 export const markEpisodesManuallyWatched = (
   contentLink: string,
@@ -93,12 +142,13 @@ export const markEpisodesManuallyWatched = (
   }
   const next = [...new Set([
     ...getManuallyWatchedEpisodeLinks(contentLink),
-    ...episodeLinks.filter(Boolean),
+    ...episodeLinks.filter(Boolean).map(link => sharedWatchEpisodeKey(contentLink, link)),
   ])];
   mainStorage.setArray(keyForContent(contentLink), next);
   const contents = mainStorage.getArray<string>(CONTENT_KEYS) || [];
-  if (!contents.includes(contentLink)) {
-    mainStorage.setArray(CONTENT_KEYS, [...contents, contentLink]);
+  const key = sharedWatchContentKey(contentLink);
+  if (!contents.includes(key)) {
+    mainStorage.setArray(CONTENT_KEYS, [...contents, key]);
   }
 };
 
@@ -111,10 +161,11 @@ export const setEpisodeManuallyWatched = (
     return;
   }
   const key = keyForContent(contentLink);
-  const current = mainStorage.getArray<string>(key) || [];
-  const next = current.filter(link => link !== episodeLink);
+  const current = getManualSet(contentLink);
+  const episodeKey = sharedWatchEpisodeKey(contentLink, episodeLink);
+  const next = [...current].filter(link => link !== episodeKey);
   if (watched) {
-    next.push(episodeLink);
+    next.push(episodeKey);
   }
   if (next.length > 0) {
     mainStorage.setArray(key, next);
@@ -122,9 +173,10 @@ export const setEpisodeManuallyWatched = (
     mainStorage.delete(key);
   }
   const contents = mainStorage.getArray<string>(CONTENT_KEYS) || [];
-  const nextContents = contents.filter(link => link !== contentLink);
+  const contentKey = sharedWatchContentKey(contentLink);
+  const nextContents = contents.filter(link => link !== contentKey);
   if (next.length > 0) {
-    nextContents.push(contentLink);
+    nextContents.push(contentKey);
   }
   mainStorage.setArray(CONTENT_KEYS, nextContents);
 };
@@ -133,11 +185,14 @@ export const clearManualEpisodeCompletions = (contentLink: string): void => {
   if (!contentLink) {
     return;
   }
+  for (const alias of relatedWatchContentLinks(contentLink)) {
+    mainStorage.delete(`manualWatchedEpisodes_${alias}`);
+  }
   mainStorage.delete(keyForContent(contentLink));
   const contents = mainStorage.getArray<string>(CONTENT_KEYS) || [];
   mainStorage.setArray(
     CONTENT_KEYS,
-    contents.filter(link => link !== contentLink),
+    contents.filter(link => !relatedWatchContentLinks(contentLink).includes(link)),
   );
 };
 

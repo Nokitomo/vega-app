@@ -21,6 +21,7 @@ import {hasContentInventoryChanged, getMetadataCheckInterval} from './metadataRe
 import {reconcileEpisodes} from './episodeReconciliation';
 import {providerManager} from './ProviderManager';
 import {getMetadataSourceProvider} from './streamCenterMetadata';
+import {sharedWatchContentKey} from '../storage/SharedAnimeWatchIdentity';
 import {
   animeEpisodesSourceLink,
   animeMetaSourceLink,
@@ -219,7 +220,8 @@ export const checkContinueWatchingSeries = async (
     const now = Date.now();
     const checks = mainStorage.getObject<CheckTimes>(CHECK_KEY) || {};
     const candidates = history
-      .filter(item => item.isSeries && item.provider && item.link && !hidden.has(item.link))
+      .filter(item => item.isSeries && item.provider && item.link &&
+        !hidden.has(sharedWatchContentKey(item.link)))
       .filter(item => {
         return now - (checks[checkId(item)] || 0) >= checkInterval(item);
       })
