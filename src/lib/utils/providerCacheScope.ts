@@ -2,6 +2,7 @@ import {extensionStorage, ExtensionKeys} from '../storage/extensionStorage';
 import {extensionManager} from '../services/ExtensionManager';
 import {measurePerfSync} from './perfTrace';
 import {mainStorage} from '../storage/StorageService';
+import {getTmdbCacheVersion, usesAppTmdbApiKey} from '../storage/tmdbApiKeyStorage';
 
 const scopeCache = new Map<string, {revision: string; scope: string}>();
 
@@ -12,7 +13,7 @@ const getScopeRevision = (): string =>
     ExtensionKeys.PROVIDER_SOURCES,
   ]
     .map(key => mainStorage.getKeyRevision(key))
-    .join(':');
+    .join(':') + `:${getTmdbCacheVersion()}`;
 
 const normalizeScopePart = (value: unknown, fallback: string): string => {
   const normalized = String(value ?? '').trim();
@@ -50,7 +51,10 @@ export const getProviderCacheScope = (providerValue: string): string => {
       module?.cachedAt || installed?.lastUpdated,
       'legacy',
     );
-    const scope = `${source}:${normalizedValue}:${version}:${revision}`;
+    const tmdbVersion = usesAppTmdbApiKey(providerValue)
+      ? `:tmdb${getTmdbCacheVersion()}`
+      : '';
+    const scope = `${source}:${normalizedValue}:${version}:${revision}${tmdbVersion}`;
     if (!testMode) {
       scopeCache.set(providerValue, {revision: storageRevision, scope});
     }

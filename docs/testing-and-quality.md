@@ -12,6 +12,10 @@ npm run lint
 npm test
 ```
 
+## Preferenze TMDB
+
+- In Impostazioni > Preferenze > Metadati, salvare una chiave di prova e verificare che AnimeUnity, StreamingUnity e StreamCenter usino la stessa impostazione, senza campi duplicati nei provider. Sostituirla o rimuoverla, riaprire Info e poster, e verificare che i dati vengano recuperati di nuovo senza alterare gli episodi visti e la cronologia.
+
 ## Cronologia ed episodi visti
 
 - `Svuota cronologia` e `Elimina selezionati` rimuovono anche il progresso degli episodi dei titoli eliminati. Gli altri titoli conservano il proprio stato.

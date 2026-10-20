@@ -3,11 +3,52 @@ import {
   clearProviderKvStore,
   createProviderKvStore,
 } from '../src/lib/providers/providerKvStore';
-import {providerKvStorage} from '../src/lib/storage/StorageService';
+import {
+  cacheStorage,
+  mainStorage,
+  providerKvStorage,
+  secureStorage,
+} from '../src/lib/storage/StorageService';
+import {setAppTmdbApiKey} from '../src/lib/storage/tmdbApiKeyStorage';
+import {createProviderContext} from '../src/lib/providers/providerContext';
 
 describe('provider KV store', () => {
   beforeEach(() => {
     providerKvStorage.clearAll();
+    secureStorage.clearAll();
+    mainStorage.clearAll();
+    cacheStorage.clearAll();
+  });
+
+  it('shares the app TMDB key only with the three supported providers', async () => {
+    setAppTmdbApiKey('  common-key  ');
+    expect(secureStorage.getString('tmdbApiKey')).toBe('common-key');
+    expect(mainStorage.getString('tmdbApiKey')).toBeUndefined();
+    for (const provider of ['animeunity', 'streamingunity', 'streamcenter']) {
+      const store = createProviderKvStore(provider, 'Nokitomo');
+      await expect(store.get('tmdbApiKey')).resolves.toBe('common-key');
+      await store.set('localSetting', 'untouched');
+      await store.clear();
+      await expect(store.get('tmdbApiKey')).resolves.toBe('common-key');
+    }
+    await expect(
+      createProviderKvStore('torrentio', 'Nokitomo').get('tmdbApiKey'),
+    ).resolves.toBeUndefined();
+    setAppTmdbApiKey('');
+    await expect(
+      createProviderKvStore('animeunity', 'Nokitomo').get('tmdbApiKey'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not reuse provider persistent metadata after the app key changes', () => {
+    const oldContext = createProviderContext('animeunity', 'Nokitomo');
+    oldContext.cache?.setString('artwork', 'old-result');
+    expect(oldContext.cache?.getString('artwork')).toBe('old-result');
+    setAppTmdbApiKey('new-key');
+    const newContext = createProviderContext('animeunity', 'Nokitomo');
+    expect(newContext.cache?.getString('artwork')).toBeUndefined();
+    expect(createProviderContext('streamcenter', 'Nokitomo').cache?.getString('artwork'))
+      .toBeUndefined();
   });
 
   it('stores JSON values and lists provider-local keys', async () => {

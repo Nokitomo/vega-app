@@ -11,11 +11,47 @@ import {
 } from '../src/lib/storage/StorageService';
 import {isProviderModuleCurrent} from '../src/lib/services/UpdateProviders';
 import {getProviderCacheScope} from '../src/lib/utils/providerCacheScope';
+import {setAppTmdbApiKey} from '../src/lib/storage/tmdbApiKeyStorage';
+import {secureStorage} from '../src/lib/storage/StorageService';
 
 describe('provider settings modules', () => {
   beforeEach(() => {
     mainStorage.clearAll();
     providerKvStorage.clearAll();
+    secureStorage.clearAll();
+  });
+
+  it('hides the old TMDB setting from already installed provider modules', async () => {
+    extensionStorage.cacheProviderModules({
+      value: 'animeunity',
+      sourceAuthor: 'Nokitomo',
+      version: '1.3.27',
+      cachedAt: 123,
+      modules: {
+        settings: `exports.getSettingsSchema = async () => [
+          {key: 'tmdbApiKey', type: 'text', label: 'TMDB key'},
+          {key: 'other', type: 'toggle', label: 'Other'}
+        ];`,
+      },
+    });
+    await expect(providerManager.getSettingsSchema({
+      providerValue: 'animeunity', sourceAuthor: 'Nokitomo',
+    })).resolves.toEqual([
+      expect.objectContaining({key: 'other'}),
+    ]);
+  });
+
+  it('refreshes only supported provider scopes when the app key changes', () => {
+    const anime = getProviderCacheScope('animeunity');
+    const streaming = getProviderCacheScope('streamingunity');
+    const center = getProviderCacheScope('streamcenter');
+    const other = getProviderCacheScope('torrentio');
+    expect(setAppTmdbApiKey('new-key')).toBe(true);
+    expect(getProviderCacheScope('animeunity')).not.toBe(anime);
+    expect(getProviderCacheScope('streamingunity')).not.toBe(streaming);
+    expect(getProviderCacheScope('streamcenter')).not.toBe(center);
+    expect(getProviderCacheScope('torrentio')).toBe(other);
+    expect(setAppTmdbApiKey('new-key')).toBe(false);
   });
 
   it('executes settings.js with a provider-scoped KV store', async () => {
@@ -173,12 +209,12 @@ describe('provider settings modules', () => {
       modules: {meta: 'second'},
     });
 
-    expect(getProviderCacheScope('animeunity')).toBe('First:animeunity:1.0.0:100');
+    expect(getProviderCacheScope('animeunity')).toBe('First:animeunity:1.0.0:100:tmdb0');
     extensionStorage.setDefaultProviderSource('Second');
-    expect(getProviderCacheScope('animeunity')).toBe('Second:animeunity:2.0.0:200');
+    expect(getProviderCacheScope('animeunity')).toBe('Second:animeunity:2.0.0:200:tmdb0');
 
     mainStorage.clearAll();
-    expect(getProviderCacheScope('animeunity')).toBe('default:animeunity:legacy:legacy');
+    expect(getProviderCacheScope('animeunity')).toBe('default:animeunity:legacy:legacy:tmdb0');
   });
 
   it('updates the scope when an installed provider changes without modules', () => {
@@ -195,13 +231,13 @@ describe('provider settings modules', () => {
     };
     extensionStorage.setInstalledProviders([provider]);
     expect(getProviderCacheScope('streamingunity')).toBe(
-      'Nokitomo:streamingunity:1.0.0:100',
+      'Nokitomo:streamingunity:1.0.0:100:tmdb0',
     );
     extensionStorage.setInstalledProviders([
       {...provider, version: '1.0.1', lastUpdated: 200},
     ]);
     expect(getProviderCacheScope('streamingunity')).toBe(
-      'Nokitomo:streamingunity:1.0.1:200',
+      'Nokitomo:streamingunity:1.0.1:200:tmdb0',
     );
   });
 });

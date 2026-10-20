@@ -1,5 +1,6 @@
 import {ProviderKvStore} from './types';
 import {providerKvStorage} from '../storage/StorageService';
+import {getAppTmdbApiKey, usesAppTmdbApiKey} from '../storage/tmdbApiKeyStorage';
 
 const MAX_KEY_LENGTH = 256;
 const MAX_VALUE_LENGTH = 1_000_000;
@@ -38,6 +39,10 @@ export const createProviderKvStore = (
 
   return {
     get: async <T = unknown>(key: string): Promise<T | undefined> => {
+      validateKey(key);
+      if (key === 'tmdbApiKey' && usesAppTmdbApiKey(providerValue)) {
+        return getAppTmdbApiKey() as T | undefined;
+      }
       const raw = providerKvStorage.getString(storageKey(key));
       if (raw === undefined) {
         return undefined;

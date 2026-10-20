@@ -198,3 +198,20 @@ export const removeMetadata = (
     }
   });
 };
+
+/** Only provider-derived metadata is removed; watch state lives elsewhere. */
+export const clearTmdbProviderMetadata = (): void => {
+  const db = openDatabase();
+  if (!db) {
+    return;
+  }
+  try {
+    db.runSync(
+      `DELETE FROM metadata_records WHERE
+       provider LIKE ? OR provider LIKE ? OR provider LIKE ?`,
+      ['%:animeunity', '%:streamingunity', '%:streamcenter'],
+    );
+  } catch (error) {
+    console.warn('TMDB metadata cache invalidation failed:', error);
+  }
+};

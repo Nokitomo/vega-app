@@ -22,6 +22,7 @@ import {useTranslation} from 'react-i18next';
 import {setAppLanguage, SupportedLanguage} from '../../i18n';
 import DownloadLocationPreference from './components/DownloadLocationPreference';
 import DnsSettings from './components/DnsSettings';
+import TmdbApiKeySettings from './components/TmdbApiKeySettings';
 // Lazy-load Firebase to allow running without google-services.json
 const getAnalytics = (): any | null => {
   try {
@@ -196,6 +197,8 @@ const Preferences = () => {
         </View>
 
         <DnsSettings primary={primary} />
+
+        <TmdbApiKeySettings primary={primary} />
 
         {/* Theme Section */}
         <View className="mb-6">

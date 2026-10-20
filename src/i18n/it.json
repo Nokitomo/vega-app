@@ -677,5 +677,13 @@
   "skip.credits": "Titoli di coda",
   "skip.intro": "Intro",
   "skip.preview": "Anteprima",
-  "New episodes": "Nuovi episodi"
+  "New episodes": "Nuovi episodi",
+  "Metadata": "Metadati",
+  "TMDB API key": "Chiave API TMDB",
+  "Optional. Shared by AnimeUnity, StreamingUnity and StreamCenter when installed.": "Facoltativa. Condivisa da AnimeUnity, StreamingUnity e StreamCenter se installati.",
+  "Enter a new key to replace the saved one": "Inserisci una nuova chiave per sostituire quella salvata",
+  "Enter TMDB API key v3": "Inserisci la chiave API TMDB v3",
+  "TMDB key saved": "Chiave TMDB salvata",
+  "No TMDB key saved": "Nessuna chiave TMDB salvata",
+  "Unable to save TMDB key.": "Impossibile salvare la chiave TMDB."
 }

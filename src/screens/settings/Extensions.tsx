@@ -36,6 +36,7 @@ import RenderProviderFlagIcon from '../../components/RenderProviderFLagIcon';
 import {useTranslation} from 'react-i18next';
 import ProviderSourceManager from './components/ProviderSourceManager';
 import ProviderSettingsModal from './components/ProviderSettingsModal';
+import {usesAppTmdbApiKey} from '../../lib/storage/tmdbApiKeyStorage';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Extensions'>;
 
@@ -136,7 +137,7 @@ const Extensions = ({navigation}: Props) => {
       )?.modules.settings;
       return {
         ...provider,
-        hasSettings: Boolean(
+        hasSettings: !usesAppTmdbApiKey(provider.value) && Boolean(
           provider.hasSettings || manifestEntry?.hasSettings || cachedSettings,
         ),
       };

@@ -16,6 +16,7 @@ import {extensionManager} from './ExtensionManager';
 import i18n from '../../i18n';
 import {extensionStorage} from '../storage/extensionStorage';
 import {clearProviderKvStore} from '../providers/providerKvStore';
+import {usesAppTmdbApiKey} from '../storage/tmdbApiKeyStorage';
 import {measurePerfSync, perfTrace, traceAsync} from '../utils/perfTrace';
 
 export class ProviderManager {
@@ -647,6 +648,7 @@ export class ProviderManager {
           typeof field.key === 'string' &&
           field.key.trim().length > 0 &&
           typeof field.label === 'string' &&
+          !(field.key === 'tmdbApiKey' && usesAppTmdbApiKey(providerValue)) &&
           supportedTypes.has(field.type),
       );
       this.settingsSchemaCache.set(cacheKey, schema);

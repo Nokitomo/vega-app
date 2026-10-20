@@ -12,6 +12,7 @@ import {openWebView} from '../services/wafResolver';
 import {cacheStorage} from '../storage';
 import {createProviderKvStore} from './providerKvStore';
 import {createAnimeUnityFileCache} from './providerFileCache';
+import {getTmdbCacheVersion, usesAppTmdbApiKey} from '../storage/tmdbApiKeyStorage';
 import {installPerfAxiosTrace} from '../utils/perfTrace';
 
 installPerfAxiosTrace(axios);
@@ -34,7 +35,9 @@ export const createProviderContext = (
 ): ProviderContext => {
   const cachePrefix = `provider:${encodeURIComponent(
     sourceAuthor || 'legacy',
-  )}:${encodeURIComponent(providerValue)}:`;
+  )}:${encodeURIComponent(providerValue)}${
+    usesAppTmdbApiKey(providerValue) ? `:tmdb${getTmdbCacheVersion()}` : ''
+  }:`;
 
   return {
     axios,
