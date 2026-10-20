@@ -49,7 +49,7 @@ export const createProviderContext = (
       delete: key => cacheStorage.delete(`${cachePrefix}${key}`),
     },
     fileCache:
-      providerValue === 'animeunity'
+      providerValue === 'animeunity' || providerValue === 'streamcenter'
         ? createAnimeUnityFileCache(sourceAuthor)
         : undefined,
     kvStore: createProviderKvStore(providerValue, sourceAuthor),

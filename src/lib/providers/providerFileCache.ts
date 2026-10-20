@@ -12,6 +12,7 @@ export type ProviderFileCacheEntry = {
 
 let cacheGeneration = 0;
 const sourceGenerations = new Map<string, number>();
+const pendingWrites = new Map<string, Promise<void>>();
 
 const sourceKey = (sourceAuthor?: string) => sourceAuthor || 'legacy';
 
@@ -88,29 +89,45 @@ export const createAnimeUnityFileCache = (sourceAuthor?: string) => {
       if (!isCurrent()) {
         return;
       }
-      const paths = await cachePaths(sourceAuthor);
-      const latest = (await existingEntries(paths))[0]?.path;
-      const path = paths.find(candidate => candidate !== latest) || paths[0];
-      const directory = path.slice(0, path.lastIndexOf('/'));
-      await RNFS.mkdir(directory);
-      const temporary = `${path}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
-      try {
-        await RNFS.writeFile(temporary, value, 'utf8');
-        const written = await RNFS.stat(temporary);
-        if (!written.isFile() || written.size > MAX_ENTRY_BYTES) {
-          throw new Error('Provider file cache entry is too large');
-        }
+      // Both providers may download the same index at once. Serialize writes
+      // within the shared source directory so neither replaces the other's file.
+      const previous = pendingWrites.get(author) || Promise.resolve();
+      const writeTask = previous.catch(() => undefined).then(async () => {
         if (!isCurrent()) {
           return;
         }
-        // Replace the older copy; the most recent valid copy remains intact.
-        if (await RNFS.exists(path)) {
-          await RNFS.unlink(path);
+        const paths = await cachePaths(sourceAuthor);
+        const latest = (await existingEntries(paths))[0]?.path;
+        const path = paths.find(candidate => candidate !== latest) || paths[0];
+        const directory = path.slice(0, path.lastIndexOf('/'));
+        await RNFS.mkdir(directory);
+        const temporary = `${path}.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
+        try {
+          await RNFS.writeFile(temporary, value, 'utf8');
+          const written = await RNFS.stat(temporary);
+          if (!written.isFile() || written.size > MAX_ENTRY_BYTES) {
+            throw new Error('Provider file cache entry is too large');
+          }
+          if (!isCurrent()) {
+            return;
+          }
+          // Replace the older copy; the most recent valid copy remains intact.
+          if (await RNFS.exists(path)) {
+            await RNFS.unlink(path);
+          }
+          await RNFS.moveFile(temporary, path);
+        } finally {
+          if (await RNFS.exists(temporary)) {
+            await RNFS.unlink(temporary);
+          }
         }
-        await RNFS.moveFile(temporary, path);
+      });
+      pendingWrites.set(author, writeTask);
+      try {
+        await writeTask;
       } finally {
-        if (await RNFS.exists(temporary)) {
-          await RNFS.unlink(temporary);
+        if (pendingWrites.get(author) === writeTask) {
+          pendingWrites.delete(author);
         }
       }
     },
@@ -119,6 +136,7 @@ export const createAnimeUnityFileCache = (sourceAuthor?: string) => {
 
 export const clearProviderFileCache = async (): Promise<void> => {
   cacheGeneration += 1;
+  await Promise.all([...pendingWrites.values()].map(write => write.catch(() => undefined)));
   if (await RNFS.exists(CACHE_ROOT)) {
     await RNFS.unlink(CACHE_ROOT);
   }
@@ -133,6 +151,7 @@ export const clearAnimeUnityFileCache = async (
   }
   const author = sourceKey(sourceAuthor);
   sourceGenerations.set(author, (sourceGenerations.get(author) || 0) + 1);
+  await pendingWrites.get(author)?.catch(() => undefined);
   const [path] = await cachePaths(sourceAuthor);
   const directory = path.slice(0, path.lastIndexOf('/'));
   if (await RNFS.exists(directory)) {

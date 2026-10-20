@@ -1,5 +1,8 @@
 const RNFS = require('@dr.pogodin/react-native-fs');
 const Crypto = require('expo-crypto');
+const {mainStorage} = require('../src/lib/storage/StorageService');
+const {extensionStorage} = require('../src/lib/storage/extensionStorage');
+const {createProviderContext} = require('../src/lib/providers/providerContext');
 const {
   clearAnimeUnityFileCache,
   clearProviderFileCache,
@@ -11,6 +14,7 @@ let modifiedAt = Date.now();
 
 beforeEach(() => {
   files.clear();
+  mainStorage.clearAll();
   modifiedAt = Date.now();
   Crypto.digestStringAsync.mockImplementation(async (_algorithm, value) =>
     value.includes('Other') ? 'other-digest' : 'mock-digest',
@@ -60,6 +64,69 @@ beforeEach(() => {
       }
     }
   });
+});
+
+const installedProvider = (value, author) => ({
+  value,
+  display_name: value,
+  source: {author, url: 'https://example.com/providers'},
+  version: '1.0.0',
+  icon: '',
+  disabled: false,
+  type: 'italy',
+  installed: true,
+});
+
+test('AnimeUnity and StreamCenter reuse one AniBridge file for the same source', async () => {
+  const anime = createProviderContext('animeunity', 'Nokitomo').fileCache;
+  const streamCenter = createProviderContext('streamcenter', 'Nokitomo').fileCache;
+  const streamingUnity = createProviderContext('streamingunity', 'Nokitomo');
+  expect(anime).toBeDefined();
+  expect(streamCenter).toBeDefined();
+  expect(streamingUnity.fileCache).toBeUndefined();
+
+  await anime.write('anibridge-v3', 'from-animeunity');
+  expect((await streamCenter.read('anibridge-v3')).value).toBe('from-animeunity');
+  await streamCenter.write('anibridge-v3', 'from-streamcenter');
+  expect((await anime.read('anibridge-v3')).value).toBe('from-streamcenter');
+  await expect(streamCenter.read('other-key')).rejects.toThrow(/Unsupported/);
+});
+
+test('serializes simultaneous writes from both providers', async () => {
+  const anime = createProviderContext('animeunity', 'Nokitomo').fileCache;
+  const streamCenter = createProviderContext('streamcenter', 'Nokitomo').fileCache;
+  await Promise.all([
+    anime.write('anibridge-v3', 'first'),
+    streamCenter.write('anibridge-v3', 'second'),
+  ]);
+  expect((await anime.read('anibridge-v3')).value).toBe('second');
+  expect(files.size).toBe(2);
+});
+
+test.each([
+  ['animeunity', 'streamcenter'],
+  ['streamcenter', 'animeunity'],
+])('keeps the shared file when %s is uninstalled before %s', async (first, last) => {
+  const anime = createProviderContext('animeunity', 'Nokitomo').fileCache;
+  const streamCenter = createProviderContext('streamcenter', 'Nokitomo').fileCache;
+  const otherSource = createProviderContext('animeunity', 'Other').fileCache;
+  await anime.write('anibridge-v3', 'shared');
+  await otherSource.write('anibridge-v3', 'other');
+  extensionStorage.setInstalledProviders([
+    installedProvider('animeunity', 'Nokitomo'),
+    installedProvider('streamcenter', 'Nokitomo'),
+    installedProvider('animeunity', 'Other'),
+  ]);
+
+  extensionStorage.uninstallProvider(first, 'Nokitomo');
+  const surviving = last === 'animeunity' ? anime : streamCenter;
+  expect((await surviving.read('anibridge-v3')).value).toBe('shared');
+
+  extensionStorage.uninstallProvider(last, 'Nokitomo');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(await createProviderContext('streamcenter', 'Nokitomo')
+    .fileCache.read('anibridge-v3')).toBeUndefined();
+  expect((await otherSource.read('anibridge-v3')).value).toBe('other');
 });
 
 test('persists the AniBridge index across contexts and safely replaces old copies', async () => {

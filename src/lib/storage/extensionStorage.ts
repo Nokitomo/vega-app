@@ -298,6 +298,9 @@ export class ExtensionStorage {
    */
   uninstallProvider(providerValue: string, sourceAuthor?: string): void {
     const installed = this.getInstalledProviders();
+    const removed = installed.filter(p =>
+      this.isProviderMatch(p, providerValue, sourceAuthor),
+    );
     const filtered = installed.filter(
       p => !this.isProviderMatch(p, providerValue, sourceAuthor),
     );
@@ -308,9 +311,20 @@ export class ExtensionStorage {
     clearProviderKvStore(providerValue, sourceAuthor).catch(error => {
       console.warn('Failed to clear provider settings:', error);
     });
-    if (providerValue === 'animeunity') {
-      clearAnimeUnityFileCache(sourceAuthor).catch(error => {
-        console.warn('Failed to clear AnimeUnity file cache:', error);
+    if (providerValue === 'animeunity' || providerValue === 'streamcenter') {
+      const removedAuthors = new Set(
+        removed.map(provider => provider.source?.author || 'legacy'),
+      );
+      removedAuthors.forEach(author => {
+        const stillNeeded = filtered.some(provider =>
+          (provider.value === 'animeunity' || provider.value === 'streamcenter') &&
+          (provider.source?.author || 'legacy') === author,
+        );
+        if (!stillNeeded) {
+          clearAnimeUnityFileCache(author).catch(error => {
+            console.warn('Failed to clear shared AniBridge file cache:', error);
+          });
+        }
       });
     }
   }
