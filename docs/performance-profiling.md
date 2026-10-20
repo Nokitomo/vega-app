@@ -241,3 +241,41 @@ fix. Restano pause JS da indagare separatamente.
 Log e schermate temporanei: `.codex/perf-anime-season-layout-20261021/`.
 La configurazione temporanea usata per caricare i bundle locali e stata
 rimossa dopo la prova.
+
+### Metadati `hero` dei provider del 21 ottobre 2026
+
+L'app richiedeva gia `purpose: 'hero'` per la Home. StreamCenter ora inoltra
+questo scopo al provider delegato. StreamingUnity mantiene gli stessi campi
+visibili, le preferenze artwork e i fallback, ma nella sola richiesta `hero`
+non costruisce i link delle stagioni e non esegue i controlli di disponibilita
+dei film. Quando si apre la scheda, `purpose: 'full'` continua a produrre i
+link e a fare i controlli precedenti. AnimeUnity riceve `hero` anche tramite
+StreamCenter. Le fixture confrontano i campi visibili `hero` e `full` e
+verificano che il controllo stagionale sia saltato solo nella Home.
+
+Sul dev client `Medium_phone_API_35` sono stati caricati i bundle locali dei
+tre provider. Le Home mostravano immagini, titoli, generi e sezioni; sono state
+aperte una serie StreamingUnity e una scheda AnimeUnity delegata da
+StreamCenter, con stagioni ed episodi presenti. Sono stati effettuati scroll
+verticali e orizzontali, senza avviare il player. Le tracce non mostrano crash
+o eccezioni non gestite. Il massimo `js_lag` del campione e stato 1,76 s;
+`provider.meta` della Home ha impiegato circa 9,8-10,6 s su AnimeUnity,
+10,1 s su StreamingUnity e 7,4-21,5 s su StreamCenter. Questi span includono
+rete, cache e provider delegati; non sono misure isolate del lavoro JS.
+
+Le pause JS non sono eliminate da questo fix. Durante una pausa di 1,76 s
+erano in corso piu richieste a pagine TMDB; le letture sincrone tracciate
+nello stesso intervallo totalizzavano poche decine di millisecondi, quindi
+non spiegano da sole la pausa. All'avvio si e vista anche una pausa di 1,52 s
+prima che le schede fossero caricate. Il campione indica contesa tra lavoro
+provider, rendering della Home e carico del dev client, ma non attribuisce
+con certezza la pausa a una singola funzione. Per il passo successivo servono
+profili temporizzati del thread JS e del rendering delle card durante avvio e
+scroll, separando il parsing delle risposte dal commit React e dal caricamento
+immagini. `gfxinfo` dell'emulatore ha registrato 295 frame lenti su 717
+(41,1%); questo valore include il costo dell'emulatore e del dev client e non
+va interpretato come prestazione di un dispositivo reale.
+
+Tracce, `gfxinfo`, `meminfo` e schermate sono in
+`.codex/perf-provider-hero-20261021/`; restano fuori dai commit. La
+configurazione temporanea per il server locale e stata rimossa.
