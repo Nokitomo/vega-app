@@ -124,3 +124,33 @@ it('uses AnimeUnity check timing only for StreamCenter anime routes', async () =
     providerValue: 'streamcenter',
   });
 });
+
+it('publishes automatically refreshed StreamCenter anime Info to AnimeUnity', async () => {
+  const sourceLink = 'https://www.animeunity.to/anime/42-example';
+  const animeLink = 'streamcenter:v1:meta:animeunity:' + encodeURIComponent(
+    JSON.stringify({url: sourceLink}),
+  );
+  const item = {
+    id: animeLink, link: animeLink, title: 'Anime',
+    provider: 'streamcenter', isSeries: true,
+  };
+  jest.spyOn(providerManager, 'getContentInventory').mockResolvedValue({
+    complete: true, episodesCount: 2,
+  });
+  jest.spyOn(providerManager, 'getMetaData').mockResolvedValue({
+    title: 'Anime', synopsis: '', image: '', imdbId: '', type: 'series',
+    episodesCount: 2,
+    linkList: [{title: 'Season 1', directLinks: [
+      {title: 'Episode 1', link: 'streamcenter:v1:stream:animeunity:%7B%22url%22%3A%2242%7C1%22%7D'},
+      {title: 'Episode 2', link: 'streamcenter:v1:stream:animeunity:%7B%22url%22%3A%2242%7C2%22%7D'},
+    ]}],
+  });
+
+  expect(await checkContinueWatchingSeries([item], [])).toBe(true);
+  const source = metadata.readMetadata<any>('contentInfo', 'animeunity', sourceLink);
+  expect(source?.value.episodesCount).toBe(2);
+  expect(source?.value.linkList[0].directLinks[1].link).toBe('42|2');
+  expect(metadata.readMetadata<any>('contentInfo', 'streamcenter', animeLink)
+    ?.value.linkList[0].directLinks[1].link)
+    .toContain('streamcenter:v1:stream:animeunity:');
+});

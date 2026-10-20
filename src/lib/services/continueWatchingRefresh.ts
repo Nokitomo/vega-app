@@ -6,7 +6,6 @@ import type {
 import {queryClient} from '../client';
 import {extensionManager} from './ExtensionManager';
 import {
-  markMetadataChecked,
   readMetadata,
   writeMetadata,
 } from '../storage/MetadataDatabase';
@@ -22,6 +21,16 @@ import {hasContentInventoryChanged, getMetadataCheckInterval} from './metadataRe
 import {reconcileEpisodes} from './episodeReconciliation';
 import {providerManager} from './ProviderManager';
 import {getMetadataSourceProvider} from './streamCenterMetadata';
+import {
+  animeEpisodesSourceLink,
+  animeMetaSourceLink,
+  markSharedAnimeEpisodesChecked,
+  markSharedAnimeInfoChecked,
+  readSharedAnimeEpisodes,
+  readSharedAnimeInfo,
+  writeSharedAnimeEpisodes,
+  writeSharedAnimeInfo,
+} from './animeMetadataSharing';
 
 const HOUR = 60 * 60 * 1000;
 const MAX_TITLES_PER_VISIT = 12;
@@ -35,7 +44,7 @@ let inFlight: Promise<boolean> | undefined;
 
 const checkId = (item: WatchHistoryItem) => `${item.provider}:${item.link}`;
 const checkInterval = (item: WatchHistoryItem): number => {
-  const info = readMetadata<Info>('contentInfo', item.provider!, item.link)?.value;
+  const info = readSharedAnimeInfo(item.provider!, item.link)?.value;
   const origin = getMetadataSourceProvider(item.provider!, item.link);
   const metadataProvider = item.provider === 'streamcenter' && origin === 'animeunity'
     ? origin
@@ -59,9 +68,7 @@ const fetchCatalog = async (
     let episodes: EpisodeLink[] = [];
     let cacheWritten = false;
     if (group.episodesLink) {
-      const cached = readMetadata<EpisodeLink[]>(
-        'episodes', providerValue, group.episodesLink,
-      );
+      const cached = readSharedAnimeEpisodes(providerValue, group.episodesLink);
       if (cached?.value.length) {
         const inventory = await providerManager.getEpisodeInventory({
           url: group.episodesLink,
@@ -95,10 +102,16 @@ const fetchCatalog = async (
             episodes = episodes.map(episode => byLink.get(episode.link) || episode);
           }
           if (reconciled.added.length || reconciled.confirmedRemoved.length) {
-            writeMetadata('episodes', providerValue, group.episodesLink, episodes, version);
+            writeSharedAnimeEpisodes(providerValue, group.episodesLink, episodes, version);
             cacheWritten = true;
           } else {
-            markMetadataChecked('episodes', providerValue, group.episodesLink, version);
+            const sourceLink = animeEpisodesSourceLink(providerValue, group.episodesLink);
+            if (providerValue === 'streamcenter' && sourceLink &&
+              !readMetadata<EpisodeLink[]>('episodes', 'animeunity', sourceLink)) {
+              writeSharedAnimeEpisodes(providerValue, group.episodesLink, episodes, version);
+            } else {
+              markSharedAnimeEpisodesChecked(providerValue, group.episodesLink, version);
+            }
             cacheWritten = true;
           }
         } else {
@@ -116,7 +129,7 @@ const fetchCatalog = async (
         });
       }
       if (episodes.length && !cacheWritten) {
-        writeMetadata('episodes', providerValue, group.episodesLink, episodes, version);
+        writeSharedAnimeEpisodes(providerValue, group.episodesLink, episodes, version);
       }
     } else {
       episodes = (group.directLinks || []) as EpisodeLink[];
@@ -140,7 +153,7 @@ const fetchCatalog = async (
 
 const checkOne = async (item: WatchHistoryItem): Promise<boolean> => {
   const providerValue = item.provider || '';
-  const storedInfo = readMetadata<Info>('contentInfo', providerValue, item.link);
+  const storedInfo = readSharedAnimeInfo(providerValue, item.link);
   const previousInventory = readMetadata<ContentInventory>(
     'contentInventory', providerValue, item.link,
   );
@@ -161,7 +174,16 @@ const checkOne = async (item: WatchHistoryItem): Promise<boolean> => {
     );
   if (!changed) {
     writeMetadata('contentInventory', providerValue, item.link, inventory);
-    markMetadataChecked('contentInfo', providerValue, item.link);
+    const sourceLink = animeMetaSourceLink(providerValue, item.link);
+    if (providerValue === 'streamcenter' && sourceLink && storedInfo &&
+      !readMetadata<Info>('contentInfo', 'animeunity', sourceLink)) {
+      writeSharedAnimeInfo(
+        providerValue, item.link, storedInfo.value,
+        extensionManager.getProviderModules(providerValue)?.version || '',
+      );
+    } else {
+      markSharedAnimeInfoChecked(providerValue, item.link);
+    }
     return false;
   }
 
@@ -175,7 +197,7 @@ const checkOne = async (item: WatchHistoryItem): Promise<boolean> => {
   const episodes = await fetchCatalog(info, providerValue);
   setSeriesCatalog(item.link, episodes, true);
   const version = extensionManager.getProviderModules(providerValue)?.version || '';
-  writeMetadata('contentInfo', providerValue, item.link, info, version);
+  writeSharedAnimeInfo(providerValue, item.link, info, version);
   writeMetadata('contentInventory', providerValue, item.link, inventory, version);
   queryClient.setQueryData(
     ['contentInfo', item.link, providerValue, getProviderCacheScope(providerValue)],

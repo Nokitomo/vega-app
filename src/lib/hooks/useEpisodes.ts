@@ -27,6 +27,11 @@ import {
   unwrapStreamCenterEpisodes,
   wrapStreamCenterEpisodes,
 } from '../services/streamCenterMetadata';
+import {
+  markSharedAnimeEpisodesChecked,
+  readSharedAnimeEpisodes,
+  writeSharedAnimeEpisodes,
+} from '../services/animeMetadataSharing';
 
 const EPISODES_STALE_MS = 4 * 60 * 60 * 1000;
 
@@ -49,12 +54,8 @@ export const useEpisodes = (
     !!origin;
   const episodeKey = origin ? episodeIdentity : (link: string) => link;
   const readDurableEpisodes = () => {
-    const own = readMetadata<EpisodeLink[]>(
-      'episodes',
-      providerValue,
-      episodesLink || '',
-    );
-    if (!origin) {return own;}
+    const own = readSharedAnimeEpisodes(providerValue, episodesLink || '');
+    if (!origin || origin.source === 'animeunity') {return own;}
     const source = readMetadata<EpisodeLink[]>(
       'episodes',
       origin.source,
@@ -73,20 +74,8 @@ export const useEpisodes = (
     !!installedRecord && installedRecord.providerVersion !== providerVersion;
   const saveEpisodes = (episodes: EpisodeLink[]) => {
     if (!episodesLink) {return;}
-    const durableEpisodes = origin
-      ? wrapStreamCenterEpisodes(
-          unwrapStreamCenterEpisodes(episodes),
-          origin,
-        )
-      : episodes;
-    writeMetadata(
-      'episodes',
-      providerValue,
-      episodesLink,
-      durableEpisodes,
-      providerVersion,
-    );
-    if (origin) {
+    writeSharedAnimeEpisodes(providerValue, episodesLink, episodes, providerVersion);
+    if (origin?.source === 'streamingunity') {
       writeMetadata(
         'episodes',
         origin.source,
@@ -157,25 +146,24 @@ export const useEpisodes = (
             reconciliation.added.length === 0 &&
             reconciliation.confirmedRemoved.length === 0
           ) {
-            markMetadataChecked(
-              'episodes',
-              providerValue,
-              episodesLink,
-              providerVersion,
-            );
+            markSharedAnimeEpisodesChecked(providerValue, episodesLink, providerVersion);
             if (origin) {
-              markMetadataChecked(
-                'episodes',
-                origin.source,
-                origin.data.url,
-                extensionManager.getProviderModules(origin.source)?.version || '',
-              );
+              if (origin.source === 'streamingunity') {
+                markMetadataChecked(
+                  'episodes', origin.source, origin.data.url,
+                  extensionManager.getProviderModules(origin.source)?.version || '',
+                );
+              }
               if (
                 !readMetadata<EpisodeLink[]>(
                   'episodes',
                   providerValue,
                   episodesLink,
-                )
+                ) ||
+                (origin.source === 'animeunity' &&
+                  !readMetadata<EpisodeLink[]>(
+                    'episodes', 'animeunity', origin.data.url,
+                  ))
               ) {
                 saveEpisodes(durable.value);
               }

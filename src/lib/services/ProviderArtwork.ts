@@ -17,6 +17,7 @@ import {
   removeMetadata,
   writeMetadata,
 } from '../storage/MetadataDatabase';
+import {animeMetaSourceLink} from './animeMetadataSharing';
 
 const ARTWORK_STALE_MS = 24 * 60 * 60 * 1000;
 const MAX_CONCURRENT_LOOKUPS = 2;
@@ -65,16 +66,27 @@ const enqueue = (key: string, task: () => Promise<void>) => {
 const posterCacheKey = (providerValue: string, link: string) =>
   buildProviderCacheKey('preferredPosterW300V2', providerValue, link);
 
+const posterDurable = (providerValue: string, link: string) => {
+  const own = readMetadata<ProviderPosterCacheValue>(
+    'preferredPosterW300V2', providerValue, link,
+  );
+  const sourceLink = animeMetaSourceLink(providerValue, link);
+  const shared = providerValue === 'streamcenter' && sourceLink
+    ? readMetadata<ProviderPosterCacheValue>(
+        'preferredPosterW300V2', 'animeunity', sourceLink,
+      )
+    : undefined;
+  return shared?.value.poster && (!own?.value.poster || shared.updatedAt >= own.updatedAt)
+    ? shared
+    : own;
+};
+
 export const getCachedProviderPoster = (
   providerValue: string,
   link: string,
 ) => {
   return measurePerfSync('poster_cache_read', {provider: providerValue}, () => {
-    const durable = readMetadata<ProviderPosterCacheValue>(
-      'preferredPosterW300V2',
-      providerValue,
-      link,
-    );
+    const durable = posterDurable(providerValue, link);
     if (durable?.value.poster) {
       return {
         value: durable.value,
@@ -82,10 +94,19 @@ export const getCachedProviderPoster = (
         ageMs: Math.max(0, Date.now() - durable.updatedAt),
       };
     }
-    return readPersistedCache<ProviderPosterCacheValue>(
+    const ownCache = readPersistedCache<ProviderPosterCacheValue>(
       cacheStorage,
       posterCacheKey(providerValue, link),
     );
+    const sourceLink = animeMetaSourceLink(providerValue, link);
+    const sourceCache = providerValue === 'streamcenter' && sourceLink
+      ? readPersistedCache<ProviderPosterCacheValue>(
+          cacheStorage, posterCacheKey('animeunity', sourceLink),
+        )
+      : undefined;
+    return sourceCache && (!ownCache || sourceCache.updatedAt >= ownCache.updatedAt)
+      ? sourceCache
+      : ownCache;
   });
 };
 
@@ -135,16 +156,22 @@ export const resolveProviderPoster = ({
   if (signal?.aborted) {
     return Promise.resolve(cached?.value.poster);
   }
-  const durable = readMetadata<ProviderPosterCacheValue>(
-    'preferredPosterW300V2',
-    providerValue,
-    link,
-  );
+  const durable = posterDurable(providerValue, link);
   if (
     !forceRefresh &&
     cached &&
     (durable?.value.poster || cached.ageMs <= ARTWORK_STALE_MS)
   ) {
+    const sourceLink = animeMetaSourceLink(providerValue, link);
+    if (providerValue === 'streamcenter' && sourceLink && cached.value.poster &&
+      !readMetadata<ProviderPosterCacheValue>(
+        'preferredPosterW300V2', 'animeunity', sourceLink,
+      )) {
+      writeMetadata(
+        'preferredPosterW300V2', 'animeunity', sourceLink,
+        {poster: cached.value.poster},
+      );
+    }
     // Count cache hits without flooding the JS bridge during Home rendering.
     if (isPerfTraceEnabled) {
       const cacheHits = (posterCacheHitsByProvider.get(providerValue) ?? 0) + 1;
@@ -210,6 +237,17 @@ export const resolveProviderPoster = ({
           writeMetadata('preferredPosterW300V2', providerValue, link, {poster});
         } else if (forceRefresh) {
           removeMetadata('preferredPosterW300V2', providerValue, link);
+        }
+        const sourceLink = animeMetaSourceLink(providerValue, link);
+        if (providerValue === 'streamcenter' && sourceLink) {
+          writePersistedCache(
+            cacheStorage, posterCacheKey('animeunity', sourceLink), {poster},
+          );
+          if (poster) {
+            writeMetadata('preferredPosterW300V2', 'animeunity', sourceLink, {poster});
+          } else if (forceRefresh) {
+            removeMetadata('preferredPosterW300V2', 'animeunity', sourceLink);
+          }
         }
       }
       entry.resolve(poster || cached?.value.poster);

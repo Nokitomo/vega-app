@@ -32,6 +32,11 @@ import {
   unwrapStreamCenterInfo,
   wrapStreamCenterInfo,
 } from '../services/streamCenterMetadata';
+import {
+  markSharedAnimeInfoChecked,
+  readSharedAnimeInfo,
+  writeSharedAnimeInfo,
+} from '../services/animeMetadataSharing';
 
 const CONTENT_INFO_STALE_MS = 24 * 60 * 60 * 1000;
 const ENHANCED_META_STALE_MS = 24 * 60 * 60 * 1000;
@@ -53,8 +58,9 @@ export const useContentInfo = (link: string, providerValue: string) => {
   const origin =
     providerValue === 'streamcenter' ? streamCenterMetaOrigin(link) : undefined;
   const readDurableInfo = () => {
-    const own = readMetadata<Info>('contentInfo', providerValue, link);
-    if (!origin) {return own;}
+    const shared = readSharedAnimeInfo(providerValue, link);
+    if (!origin || origin.source === 'animeunity') {return shared;}
+    const own = shared;
     const source = readMetadata<Info>(
       'contentInfo',
       origin.source,
@@ -105,27 +111,21 @@ export const useContentInfo = (link: string, providerValue: string) => {
               inventory,
               providerVersion,
             );
-            markMetadataChecked(
-              'contentInfo',
-              providerValue,
-              link,
-              providerVersion,
-            );
+            markSharedAnimeInfoChecked(providerValue, link, providerVersion);
             if (origin) {
-              markMetadataChecked(
-                'contentInfo',
-                origin.source,
-                origin.data.url,
-                extensionManager.getProviderModules(origin.source)?.version || '',
-              );
-              if (!readMetadata<Info>('contentInfo', providerValue, link)) {
-                writeMetadata(
-                  'contentInfo',
-                  providerValue,
-                  link,
-                  stored.value,
-                  providerVersion,
+              if (origin.source !== 'animeunity') {
+                // StreamingUnity keeps its existing independent metadata cache.
+                markMetadataChecked(
+                  'contentInfo', origin.source, origin.data.url,
+                  extensionManager.getProviderModules(origin.source)?.version || '',
                 );
+              }
+              if (
+                !readMetadata<Info>('contentInfo', providerValue, link) ||
+                (origin.source === 'animeunity' &&
+                  !readMetadata<Info>('contentInfo', 'animeunity', origin.data.url))
+              ) {
+                writeSharedAnimeInfo(providerValue, link, stored.value, providerVersion);
               }
             }
             return stored.value;
@@ -142,8 +142,8 @@ export const useContentInfo = (link: string, providerValue: string) => {
       }
       if (cacheKey) {
         writePersistedCache(cacheStorage, cacheKey, data);
-        writeMetadata('contentInfo', providerValue, link, data, providerVersion);
-        if (origin) {
+        writeSharedAnimeInfo(providerValue, link, data, providerVersion);
+        if (origin?.source === 'streamingunity') {
           writeMetadata(
             'contentInfo',
             origin.source,
