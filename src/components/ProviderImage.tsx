@@ -6,6 +6,7 @@ import {
   resolveProviderPoster,
 } from '../lib/services/ProviderArtwork';
 import type {Post} from '../lib/providers/types';
+import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {
   isPerfTraceEnabled,
   observePerfDuration,
@@ -16,13 +17,18 @@ const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
 const ANIMEUNITY_PROVIDER = 'animeunity';
 
+const usesAnimeUnityPoster = (providerValue?: string, link?: string): boolean =>
+  !!providerValue &&
+  !!link &&
+  getMetadataSourceProvider(providerValue, link) === ANIMEUNITY_PROVIDER;
+
 const getInitialSourceUri = (
   uri?: string,
   link?: string,
   providerValue?: string,
 ): string => {
   const fallbackUri = uri || PLACEHOLDER_IMAGE;
-  if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+  if (!providerValue || !link || !usesAnimeUnityPoster(providerValue, link)) {
     return fallbackUri;
   }
   const cached = getCachedProviderPoster(providerValue, link);
@@ -92,7 +98,7 @@ const ProviderImage = ({
     const fallbackUri = uri || PLACEHOLDER_IMAGE;
     setHasTriedFallback(false);
     updateSourceUri(getInitialSourceUri(uri, link, providerValue));
-    if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+    if (!providerValue || !link || !usesAnimeUnityPoster(providerValue, link)) {
       return;
     }
     let cancelled = false;
@@ -138,7 +144,7 @@ const ProviderImage = ({
     }
     setHasTriedFallback(true);
 
-    if (providerValue !== ANIMEUNITY_PROVIDER || !link) {
+    if (!providerValue || !link || !usesAnimeUnityPoster(providerValue, link)) {
       if (isMounted.current) {
         updateSourceUri(PLACEHOLDER_IMAGE);
       }

@@ -157,6 +157,67 @@ it('keeps the catalog image for other providers', async () => {
   await act(async () => component.unmount());
 });
 
+it('resolves StreamCenter anime posters through StreamCenter without mixing caches', async () => {
+  const link = 'https://www.animeunity.to/anime/1-example';
+  const preferred = 'https://image.tmdb.org/t/p/w300/anime.jpg';
+  const hints = {anilistId: 123, malId: 456, isMovie: false};
+  getCachedPosterMock.mockReturnValue({
+    value: {poster: preferred},
+    ageMs: 0,
+    updatedAt: Date.now(),
+  });
+  resolvePosterMock.mockResolvedValue(preferred);
+
+  let component!: renderer.ReactTestRenderer;
+  await act(async () => {
+    component = renderer.create(
+      <ProviderImage
+        uri={props.uri}
+        link={link}
+        providerValue="streamcenter"
+        artworkHints={hints}
+      />,
+    );
+  });
+
+  expect(component.root.findByType(Image).props.source.uri).toBe(preferred);
+  expect(getCachedPosterMock).toHaveBeenCalledWith('streamcenter', link);
+  expect(resolvePosterMock).toHaveBeenCalledWith(
+    expect.objectContaining({providerValue: 'streamcenter', link, hints}),
+  );
+
+  await act(async () => component.unmount());
+});
+
+it('recognizes an encoded StreamCenter anime mirror and keeps film cards unchanged', async () => {
+  const animeLink = `streamcenter:v1:meta:animeunity:${encodeURIComponent(
+    JSON.stringify({url: 'https://mirror.example/anime/1'}),
+  )}`;
+  const filmLink = 'https://streamingunity.example/it/titles/2-example';
+
+  let component!: renderer.ReactTestRenderer;
+  await act(async () => {
+    component = renderer.create(
+      <ProviderImage {...props} link={animeLink} providerValue="streamcenter" />,
+    );
+  });
+  expect(resolvePosterMock).toHaveBeenCalledWith(
+    expect.objectContaining({providerValue: 'streamcenter', link: animeLink}),
+  );
+
+  jest.clearAllMocks();
+  await act(async () => {
+    component.update(
+      <ProviderImage {...props} link={filmLink} providerValue="streamcenter" />,
+    );
+  });
+  expect(component.root.findByType(Image).props.source.uri).toBe(props.uri);
+  expect(getCachedPosterMock).not.toHaveBeenCalled();
+  expect(resolvePosterMock).not.toHaveBeenCalled();
+
+  await act(async () => component.unmount());
+});
+
 it('uses the catalog image after a cached lookup found no preferred poster', async () => {
   getCachedPosterMock.mockReturnValue({
     value: {},
