@@ -175,3 +175,34 @@ Il percorso locale di test ha anche prodotto un eccesso di download dei moduli
 prima che il refresh automatico venisse disattivato nella configurazione
 temporanea. Quel tentativo e il relativo arresto del processo non sono inclusi
 nelle misure sopra. Le pause JS residue richiedono ulteriori misure mirate.
+
+### Lookup TMDB mirato di StreamingUnity del 20 ottobre 2026
+
+Il resolver usato per colmare i campi mancanti della scheda StreamingUnity
+richiede ora solo i campi necessari. Il percorso TMDB condiviso usato da
+AnimeUnity mantiene il comportamento precedente. La ricerca delle immagini
+resta separata e continua a seguire le preferenze dell'app. Anche StreamCenter
+usa il percorso mirato quando delega una scheda a StreamingUnity.
+
+La fixture deterministica con il solo cast mancante ha prodotto un oggetto
+`Info` identico prima e dopo. In una fixture TV, le richieste del resolver
+TMDB sono passate da 15 a 3: le pagine delle stagioni e le gallerie immagini
+non servono al recupero del cast. In una fixture film con preferenze immagini
+attive le richieste totali sono rimaste 14, perche il resolver artwork ha
+comunque richiesto le gallerie. Sono stati verificati anche il percorso con
+chiave API e il fallback delle lingue.
+
+Sul dev client `Medium_phone_API_35`, con `EXPO_PUBLIC_PERF_TRACE=1`, i bundle
+locali aggiornati hanno aperto una scheda StreamingUnity con molte stagioni,
+cambiato stagione e aperto la scheda equivalente tramite StreamCenter. La
+scheda mostrava artwork, trama, cast, stagioni ed episodi; non sono stati
+avviati episodi e non sono emersi crash nelle tracce raccolte. Nel campione,
+`provider.meta` StreamingUnity completo ha richiesto 15,5 s; in una apertura
+fredda `metadata_ready` e arrivato dopo 15,9 s. Le riaperture con metadati
+gia in cache hanno raggiunto `metadata_ready` in 244-372 ms su StreamingUnity
+e in 310/307 ms su StreamCenter. Il massimo `js_lag` durante le prove e stato
+1,37 s. Questi tempi includono rete, cache e carico del dev client: il
+confronto deterministico delle richieste misura l'effetto del
+fix, mentre la prova sull'emulatore verifica l'integrazione senza isolare il
+suo contributo ai tempi di apertura. Tracce e schermate temporanee sono in
+`.codex/perf-provider-fix3-20261020/`.
