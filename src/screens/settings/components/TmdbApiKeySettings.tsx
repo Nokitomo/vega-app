@@ -43,7 +43,7 @@ const TmdbApiKeySettings = ({primary}: {primary: string}) => {
           {t('TMDB API key')}
         </Text>
         <Text className="text-gray-400 text-sm mt-1 mb-3">
-          {t('Optional. Shared by AnimeUnity, StreamingUnity and StreamCenter when installed.')}
+          {t('Optional. Used by compatible installed providers.')}
         </Text>
         <TextInput
           value={keyInput}
