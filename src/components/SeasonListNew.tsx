@@ -327,6 +327,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const {
     data: episodeList = [],
     isLoading: episodeLoading,
+    isFetching: episodeFetching,
     error: episodeError,
     refetch: refetchEpisodes,
   } = useEpisodes(
@@ -336,7 +337,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   );
 
   useEffect(() => {
-    if (type === 'movie' || !routeParams.link || !providerValue) {
+    if (type === 'movie' || !routeParams.link || !providerValue ||
+      (activeSeason?.episodesLink && (episodeLoading || episodeFetching))) {
       return;
     }
     syncSeriesCatalog({
@@ -348,7 +350,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     })
       .then(refreshHistory)
       .catch(error => console.warn('Failed to sync series catalog:', error));
-  }, [LinkList, activeSeason?.episodesLink, episodeList, providerValue, refreshHistory, routeParams.link, type]);
+  }, [LinkList, activeSeason?.episodesLink, episodeList, episodeLoading, episodeFetching, providerValue, refreshHistory, routeParams.link, type]);
 
   // UI state
   const [vlcLoading, setVlcLoading] = useState<boolean>(false);

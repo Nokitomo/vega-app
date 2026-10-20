@@ -74,3 +74,66 @@ anonimizzati. Le chiamate tramite `fetch` e WebView non passano negli
 interceptor Axios; le immagini native hanno una misura separata del caricamento.
 Le durate dei singoli span non vanno sommate se si sovrappongono. Ripetere i test
 con cache calda e vuota; `am start -W` misura l'Activity Android, non la Home.
+
+## Catalogo delle serie
+
+La scheda attende anche gli aggiornamenti della stagione attiva prima di avviare la
+sincronizzazione del catalogo completo. Per ogni serie e provider viene eseguita
+una scansione alla volta; se la stagione o l'elenco cambiano durante la scansione,
+si conserva solo l'ultima richiesta in coda. Le stagioni recuperate vengono
+salvate nella cache condivisa degli episodi e riutilizzate nelle aperture
+successive per quattro ore. Una stagione non disponibile mantiene il catalogo
+incompleto, quindi la serie non viene segnata come interamente vista.
+
+Con `EXPO_PUBLIC_PERF_TRACE=1`, `series.catalog` misura la scansione e
+`series_catalog_summary` riporta numero di gruppi, cache hit, fetch, esito
+completo e sostituzione da una richiesta piu recente. `series_catalog_coalesced`
+segnala una richiesta accodata. Nessuno di questi eventi registra link, titoli
+o identificativi. Per confrontare prima e dopo, aprire una serie con molte
+stagioni, cambiare stagione mentre il catalogo carica e riaprire la stessa
+scheda. Controllare che le richieste `provider.episodes` diminuiscano dopo il
+primo caricamento e che il catalogo completo, la continuazione e le azioni
+"segna come visto" restino corretti.
+
+Per la Home e i metadati confrontare separatamente `home.category`,
+`provider.posts`, `provider.meta` e `js_lag`, sia con cache fredda sia dopo un
+riavvio. Una pausa `js_lag` che precede `series.catalog` non puo essere attribuita
+alla sincronizzazione delle stagioni. Gli span `provider.meta` includono rete e
+codice del provider; per individuare la porzione sincrona responsabile di un
+blocco serve una traccia del thread JavaScript.
+
+### Misura del 20 ottobre 2026 (dev client, Medium_phone_API_35)
+
+I log temporanei sono in `.codex/perf-run-20261020/after-fix/` e restano fuori
+dal commit. Nessun episodio e stato avviato. Sono state percorse Home e schede
+dei tre provider, cambiate stagioni e riaperta l'app.
+
+- Scheda con 37 stagioni: la prima scansione ha recuperato 33 stagioni in
+  32,7 s, con una sola scansione attiva alla volta. Al cambio stagione e alla
+  riapertura successiva: 36 cache hit e **0 fetch** del catalogo; la scansione
+  a cache calda ha richiesto 36-41 ms. In una traccia precedente alla modifica
+  comparivano 11 richieste di episodi nei primi 12 s della scheda. La prima
+  apertura resta costosa e il confronto non e una misura controllata della rete.
+- Scheda con 29 stagioni: prima scansione con 26 fetch in 23,3 s; al cambio
+  stagione 28 cache hit e 0 fetch. Una scheda con 23 gruppi ha riportato 22
+  cache hit e 0 fetch al cambio saga. Il menu di pressione prolungata su un
+  episodio e il menu delle opzioni della scheda erano disponibili.
+- Home: le quattro sezioni misurate su AnimeUnity hanno richiesto 1,3-4,0 s
+  (`provider.posts` 1,2-3,9 s) e il massimo `js_lag` e stato 2,0 s. Su
+  StreamCenter tre sezioni hanno richiesto 1,7-2,9 s e il massimo `js_lag` e
+  stato 1,35 s. Le letture sincrone della cache Home hanno totalizzato
+  rispettivamente 19 ms e 11 ms nei campioni: da sole non spiegano le pause.
+- Metadati non presenti in cache: `provider.meta` ha richiesto 21,3 s su
+  StreamingUnity e 13,5 s su StreamCenter; i massimi `js_lag` durante quelle
+  aperture sono stati 2,76 s e 1,46 s. Nel primo caso la traccia comprende
+  12 richieste a TMDB web e 18 a TVDB, oltre alle richieste iniziali. La fase
+  dei metadati e stata misurata prima della scansione del catalogo. Anche una
+  scheda senza catalogo di stagioni ha mostrato pause JS mentre caricava i
+  metadati.
+
+Il riutilizzo degli episodi elimina i fetch ripetuti del catalogo finche la
+cache resta valida. Le pause della Home e dei metadati richiedono una verifica
+separata: tracciare il lavoro JS dei moduli provider, il numero e la concorrenza
+delle richieste dei metadati e il costo di rendering delle card. I dati di
+`gfxinfo` del dev client su questo emulatore includono il costo di rendering
+dell'emulatore stesso e non sono un benchmark di dispositivi reali.
