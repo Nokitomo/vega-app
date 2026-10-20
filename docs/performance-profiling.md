@@ -206,3 +206,38 @@ confronto deterministico delle richieste misura l'effetto del
 fix, mentre la prova sull'emulatore verifica l'integrazione senza isolare il
 suo contributo ai tempi di apertura. Tracce e schermate temporanee sono in
 `.codex/perf-provider-fix3-20261020/`.
+
+### Layout stagioni TMDB mirato di AnimeUnity del 21 ottobre 2026
+
+Il percorso che compone le stagioni e le saghe di AnimeUnity usa ora un resolver
+TMDB dedicato al layout delle stagioni. Mantiene l'ordine di preferenza delle
+stagioni API/web, i nomi localizzati, i conteggi, i link e i fallback. Evita in
+quel percorso le gallerie immagini e i credits API che non servono a costruire
+le stagioni. La risoluzione delle immagini della scheda
+resta separata e segue le preferenze esistenti. StreamCenter usa lo stesso
+percorso quando delega una scheda ad AnimeUnity.
+
+Nelle fixture deterministiche, gli array delle stagioni sono identici a quelli
+del resolver completo: le richieste del solo resolver sono passate da 15 a 6
+senza chiave API, da 20 a 3 con stagioni API disponibili e da 20 a 9 quando
+l'API non fornisce stagioni. L'oggetto `Info` completo di AnimeUnity e risultato
+identico al bundle precedente. Nella fixture `getMeta` le richieste complessive
+sono rimaste 19, perche il percorso artwork separato ha comunque richiesto le
+gallerie. Questo fix riduce il lavoro del lookup delle stagioni, ma non prova
+un miglioramento del tempo totale di apertura della scheda.
+
+Sul dev client `Medium_phone_API_35`, con `EXPO_PUBLIC_PERF_TRACE=1` e bundle
+locali aggiornati, sono state aperte schede One Piece tramite AnimeUnity e
+StreamCenter, cambiata saga, aperta una scheda film AnimeUnity e riaperta
+l'app. Artwork, testo, cast, stagioni ed episodi erano presenti; nessun episodio
+e stato avviato. Le tracce filtrate non mostrano `FATAL EXCEPTION`.
+Nel campione, la scheda completa AnimeUnity One Piece ha richiesto 19,4 s di
+`provider.meta`, mentre una scheda gia in cache ha raggiunto `metadata_ready`
+in circa 0,45 s; StreamCenter delegato in circa 0,45 s. Il massimo `js_lag`
+registrato e stato 3,57 s. Rete, cache, lavoro della Home ed emulatore non
+sono controllati in questa misura, quindi quei tempi non isolano l'effetto del
+fix. Restano pause JS da indagare separatamente.
+
+Log e schermate temporanei: `.codex/perf-anime-season-layout-20261021/`.
+La configurazione temporanea usata per caricare i bundle locali e stata
+rimossa dopo la prova.
