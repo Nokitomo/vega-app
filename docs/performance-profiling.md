@@ -58,6 +58,13 @@ sezioni restano invariati. Nei confronti prima/dopo controllare specialmente i
 conteggi `provider_modules.read` e `home_category_cache`, oltre ai picchi
 `js_lag`; non sommare tempi annidati.
 
+I moduli provider installati sono ora deserializzati una volta per revisione
+della chiave MMKV e poi riutilizzati in memoria. `provider_modules.read`
+continua a contare ogni richiesta del modulo, anche quando la copia e gia
+disponibile: per valutare questo intervento confrontare soprattutto il tempo
+totale e il massimo, non soltanto il numero delle chiamate. Il primo accesso
+dopo l'avvio o un aggiornamento del provider continua a leggere lo storage.
+
 Per analizzare un rallentamento ripetere il percorso Home -> Info su piu card,
 poi chiudere e riaprire l'app e riprovare. Confrontare i tempi sincroni, i picchi
 `js_lag`, i tempi di rete/provider e il tempo fino al primo layout. I log JS da

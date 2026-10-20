@@ -66,6 +66,24 @@ export enum ExtensionKeys {
  * Extension storage manager.
  */
 export class ExtensionStorage {
+  private providerModulesSnapshot?: {
+    revision: number;
+    modules: ProviderModule[];
+  };
+
+  private readProviderModules(): ProviderModule[] {
+    const revision = mainStorage.getKeyRevision(ExtensionKeys.PROVIDER_MODULES);
+    if (this.providerModulesSnapshot?.revision === revision) {
+      return this.providerModulesSnapshot.modules;
+    }
+
+    const modules =
+      mainStorage.getArray<ProviderModule>(ExtensionKeys.PROVIDER_MODULES) ||
+      [];
+    this.providerModulesSnapshot = {revision, modules};
+    return modules;
+  }
+
   private normalizeUrl(url: string): string {
     return url.trim().replace(/\/+$/, '');
   }
@@ -347,9 +365,7 @@ export class ExtensionStorage {
     sourceAuthor?: string,
   ): ProviderModule | undefined {
     return measurePerfSync('provider_modules.read', {provider: providerValue}, () => {
-      const allModules =
-        mainStorage.getArray<ProviderModule>(ExtensionKeys.PROVIDER_MODULES) ||
-        [];
+      const allModules = this.readProviderModules();
       const providerMatches = allModules.filter(m => m.value === providerValue);
 
       if (providerMatches.length === 0) {
@@ -412,6 +428,7 @@ export class ExtensionStorage {
     }
 
     mainStorage.setArray(ExtensionKeys.PROVIDER_MODULES, allModules);
+    this.providerModulesSnapshot = undefined;
   }
 
   /**
@@ -426,6 +443,7 @@ export class ExtensionStorage {
       m => !this.isModuleMatch(m, providerValue, sourceAuthor),
     );
     mainStorage.setArray(ExtensionKeys.PROVIDER_MODULES, filtered);
+    this.providerModulesSnapshot = undefined;
   }
 
   /**
@@ -519,6 +537,7 @@ export class ExtensionStorage {
     mainStorage.delete(ExtensionKeys.INSTALLED_PROVIDERS);
     mainStorage.delete(ExtensionKeys.AVAILABLE_PROVIDERS);
     mainStorage.delete(ExtensionKeys.PROVIDER_MODULES);
+    this.providerModulesSnapshot = undefined;
     mainStorage.delete(ExtensionKeys.MANIFEST_CACHE);
     mainStorage.delete(ExtensionKeys.LAST_MANIFEST_FETCH);
 

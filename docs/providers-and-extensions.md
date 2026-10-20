@@ -14,6 +14,11 @@ File: src/lib/services/ExtensionManager.ts
 - Migra i provider installati prima del supporto multi-sorgente associandoli alla sorgente di default.
 - Gestisce installazione, aggiornamento e cache dei moduli separando manifest e moduli per sorgente.
 - Supporta modalita test con baseUrl alternativo.
+- La lettura dei moduli installati riusa in memoria l'array gia deserializzato
+  finche la revisione della chiave MMKV non cambia. Installazione,
+  aggiornamento, rimozione e cancellazione invalidano la copia; la scelta
+  della sorgente attiva avviene a ogni lettura, anche quando la copia e valida.
+  La modalita test continua a usare la propria cache dei moduli.
 
 ## Struttura dei moduli provider
 
