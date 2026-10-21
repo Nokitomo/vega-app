@@ -1,5 +1,8 @@
 import {afterEach, beforeEach, expect, it, jest} from '@jest/globals';
-import {syncSeriesCatalog} from '../src/lib/services/seriesCatalogSync';
+import {
+  getSeriesCatalogSyncSignature,
+  syncSeriesCatalog,
+} from '../src/lib/services/seriesCatalogSync';
 import {providerManager} from '../src/lib/services/ProviderManager';
 import * as metadata from '../src/lib/storage/MetadataDatabase';
 import {getSeriesCatalog} from '../src/lib/storage/SeriesCompletionStorage';
@@ -69,21 +72,76 @@ it('coalesces overlapping scans and reuses fetched seasons on reopen', async () 
   expect(records.get(recordKey('episodes', 'fixture', 'season-1'))?.value)
     .toHaveLength(1);
 
-  await syncSeriesCatalog({
+  const reopened = await syncSeriesCatalog({
     contentLink: 'show', providerValue: 'fixture', groups,
     activeSeasonLink: 'season-2',
     activeEpisodes: [{title: 'Episode 1', link: 'season-2-episode', episodeNumber: 1}],
   });
   expect(request).toHaveBeenCalledTimes(1);
+  expect(reopened.complete).toBe(true);
+  expect(reopened.revalidateAt).toBeGreaterThan(Date.now());
 });
 
 it('keeps an unavailable season from marking a series complete', async () => {
   jest.spyOn(providerManager, 'getEpisodes').mockRejectedValue(new Error('offline'));
-  await syncSeriesCatalog({
+  const result = await syncSeriesCatalog({
     contentLink: 'show', providerValue: 'fixture', groups,
     activeSeasonLink: 'season-1',
     activeEpisodes: [{title: 'Episode 1', link: 'season-1-episode'}],
   });
   expect(getSeriesCatalog('show')?.episodeLinks).toEqual(['season-1-episode']);
   expect(getSeriesCatalog('show')?.complete).toBe(false);
+  expect(result).toEqual({complete: false, revalidateAt: 0});
+});
+
+it('revalidates when the oldest cached season reaches four hours', async () => {
+  const now = Date.now();
+  jest.spyOn(Date, 'now').mockReturnValue(now);
+  for (const [index, group] of groups.entries()) {
+    records.set(recordKey('episodes', 'fixture', group.episodesLink), {
+      value: [{title: 'Episode 1', link: `${group.episodesLink}-episode`}],
+      updatedAt: now,
+      checkedAt: index === 0 ? now - 3 * 60 * 60 * 1000 : now,
+      providerVersion: '',
+    });
+  }
+  const request = jest.spyOn(providerManager, 'getEpisodes');
+  const result = await syncSeriesCatalog({
+    contentLink: 'show', providerValue: 'fixture', groups,
+  });
+  expect(result).toEqual({complete: true, revalidateAt: now + 60 * 60 * 1000});
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('does not treat direct-link fallback after an empty fetch as fresh', async () => {
+  jest.spyOn(providerManager, 'getEpisodes').mockResolvedValue([]);
+  const result = await syncSeriesCatalog({
+    contentLink: 'show', providerValue: 'fixture',
+    groups: [{
+      title: 'Season 1', episodesLink: 'season-1',
+      directLinks: [{title: 'Episode 1', link: 'direct-episode'}],
+    }],
+  });
+  expect(getSeriesCatalog('show')?.episodeLinks).toEqual(['direct-episode']);
+  expect(result).toEqual({complete: true, revalidateAt: 0});
+});
+
+it('uses catalog fields to distinguish duplicate scans from changed episodes', () => {
+  const base = {
+    contentLink: 'show', providerValue: 'fixture', groups,
+    activeSeasonLink: 'season-1',
+    activeEpisodes: [{title: 'Episode 1', link: 'episode-1', episodeNumber: 1}],
+  };
+  const signature = getSeriesCatalogSyncSignature(base, 0, true);
+  expect(getSeriesCatalogSyncSignature({
+    ...base,
+    groups: groups.map(group => ({...group, title: 'New display title'})),
+    activeEpisodes: base.activeEpisodes.map(episode => ({...episode})),
+  }, 0, true)).toBe(signature);
+  expect(getSeriesCatalogSyncSignature({
+    ...base,
+    activeEpisodes: [{...base.activeEpisodes[0], title: 'Updated episode'}],
+  }, 0, true)).not.toBe(signature);
+  expect(getSeriesCatalogSyncSignature(base, 1, true)).not.toBe(signature);
+  expect(getSeriesCatalogSyncSignature(base, 0, false)).not.toBe(signature);
 });

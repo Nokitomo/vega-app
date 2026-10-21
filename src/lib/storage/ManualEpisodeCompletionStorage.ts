@@ -1,6 +1,7 @@
 import {cacheStorage, mainStorage} from './StorageService';
 import {watchHistoryStorage} from './WatchHistoryStorage';
 import {
+  createSharedWatchEpisodeKeyResolver,
   relatedWatchContentLinks,
   sharedWatchContentKey,
   sharedWatchEpisodeKey,
@@ -101,13 +102,14 @@ export const getEpisodeProgressSnapshot = (
   contentLink: string,
   episodeLinks: readonly string[],
 ): Map<string, number> => {
+  const episodeKeyFor = createSharedWatchEpisodeKeyResolver(contentLink);
   const manual = getManualSet(contentLink);
   const recorded = readSharedEpisodeProgress(contentLink);
   const tracked = new Set(watchHistoryStorage.getEpisodeKeys(contentLink).map(link =>
-    sharedWatchEpisodeKey(contentLink, link)));
+    episodeKeyFor(link)));
   const result = new Map<string, number>();
   for (const link of episodeLinks) {
-    const episodeKey = sharedWatchEpisodeKey(contentLink, link);
+    const episodeKey = episodeKeyFor(link);
     if (manual.has(episodeKey)) {
       result.set(link, 100);
     } else if (Number.isFinite(recorded[episodeKey])) {

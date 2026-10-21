@@ -5,6 +5,10 @@ import * as metadata from '../src/lib/storage/MetadataDatabase';
 import {getEpisodeProgressPercent, getEpisodeProgressSnapshot, markEpisodesManuallyWatched} from '../src/lib/storage/ManualEpisodeCompletionStorage';
 import {getSeriesCatalog, setSeriesCatalog} from '../src/lib/storage/SeriesCompletionStorage';
 import {cacheStorage, mainStorage} from '../src/lib/storage/StorageService';
+import {
+  createSharedWatchEpisodeKeyResolver,
+  sharedWatchEpisodeKey,
+} from '../src/lib/storage/SharedAnimeWatchIdentity';
 
 beforeEach(() => {
   mainStorage.clearAll();
@@ -94,4 +98,20 @@ it('reads bulk progress with the same values as individual progress reads', () =
   expect(links.map(link => snapshot.get(link))).toEqual(
     links.map(link => getEpisodeProgressPercent('show', link)),
   );
+});
+
+it('keeps AnimeUnity and StreamCenter episode progress identities unchanged', () => {
+  const source = 'https://www.animeunity.so/anime/123';
+  const wrappedContent = `streamcenter:v1:meta:animeunity:${encodeURIComponent(JSON.stringify({url: source}))}`;
+  const episode = 'https://www.animeunity.so/episode/456';
+  const wrappedEpisode = `streamcenter:v1:stream:animeunity:${encodeURIComponent(JSON.stringify({url: episode}))}`;
+  for (const content of [source, wrappedContent, 'https://www.streamingunity.so/titles/123']) {
+    const resolve = createSharedWatchEpisodeKeyResolver(content);
+    for (const link of [episode, wrappedEpisode]) {
+      expect(resolve(link)).toBe(sharedWatchEpisodeKey(content, link));
+    }
+  }
+  markEpisodesManuallyWatched(source, [episode]);
+  expect(getEpisodeProgressSnapshot(wrappedContent, [wrappedEpisode]).get(wrappedEpisode))
+    .toBe(100);
 });

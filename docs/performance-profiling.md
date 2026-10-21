@@ -279,3 +279,35 @@ va interpretato come prestazione di un dispositivo reale.
 Tracce, `gfxinfo`, `meminfo` e schermate sono in
 `.codex/perf-provider-hero-20261021/`; restano fuori dai commit. La
 configurazione temporanea per il server locale e stata rimossa.
+
+### Catalogo delle serie e progressi del 21 ottobre 2026
+
+Il calcolo in blocco dei progressi ora determina una sola volta se la serie usa
+identita episodio condivise fra AnimeUnity e StreamCenter. La scheda Info evita
+scansioni ripetute quando provider, gruppi, episodi attivi e versione di
+aggiornamento sono equivalenti e la cache degli episodi e ancora valida. Il
+controllo riparte dopo un risultato incompleto o un errore, alla successiva
+richiesta dopo la scadenza del record piu vecchio, oppure quando cambiano i
+dati rilevanti. Non cambiano i
+campi del catalogo, il significato di `complete` o le regole dei provider.
+
+Sul dev client `Medium_phone_API_35`, con `EXPO_PUBLIC_PERF_TRACE=1`, una
+lettura di prova dei progressi di 1.180 episodi di One Piece e passata da
+322-332 ms prima del fix a 9 ms dopo il fix. La lettura usa gli stessi dati
+salvati; la sonda temporanea non e presente nel codice finale. Nell'apertura
+AnimeUnity con cache calda e stata eseguita una scansione del catalogo di
+42 ms e la richiesta equivalente successiva e stata saltata; prima del fix
+erano state osservate piu scansioni nella stessa apertura. Su StreamCenter la
+scansione e stata di 120 ms e la successiva e stata saltata. Su StreamingUnity,
+Tulsa King ha richiesto tre letture di stagioni non ancora in cache; alla
+riapertura, tre gruppi erano in cache, nessuna lettura esterna era necessaria
+e il catalogo ha richiesto 3 ms. Un cambio stagione su AnimeUnity e uno su
+StreamingUnity hanno continuato ad aggiornare gli episodi visibili. Nessun
+player e stato avviato e nelle tracce filtrate non compaiono crash.
+
+Le pause JavaScript non sono scomparse: durante l'apertura AnimeUnity il
+campione ha registrato un `js_lag` di 858 ms, e la prima lettura della stagione
+di Tulsa King ha richiesto tempo di rete. Questi tempi del dev client non sono
+un benchmark controllato della fluidita complessiva della Home. Tracce e
+schermate temporanee sono in `.codex/series-catalog-analysis-20261021/` e
+restano fuori dai commit.

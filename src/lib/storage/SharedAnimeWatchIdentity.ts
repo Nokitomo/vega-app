@@ -21,6 +21,12 @@ export const sameWatchContent = (left: string, right: string): boolean =>
 export const sharedWatchEpisodeKey = (contentLink: string, episodeLink: string): string =>
   animeId(contentLink) ? episodeIdentity(episodeLink) : episodeLink;
 
+/** Resolve the content identity once when processing a whole season or series. */
+export const createSharedWatchEpisodeKeyResolver = (
+  contentLink: string,
+): ((episodeLink: string) => string) =>
+  animeId(contentLink) ? episodeIdentity : (episodeLink: string) => episodeLink;
+
 export const sameWatchEpisode = (
   contentLink: string, left: string, right: string,
 ): boolean => sharedWatchEpisodeKey(contentLink, left) ===

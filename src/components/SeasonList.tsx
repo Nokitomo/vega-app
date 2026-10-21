@@ -50,7 +50,10 @@ import {
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
-import {syncSeriesCatalog} from '../lib/services/seriesCatalogSync';
+import {
+  getSeriesCatalogSyncSignature,
+  syncSeriesCatalog,
+} from '../lib/services/seriesCatalogSync';
 import {resolveEpisodesThroughTarget} from '../lib/services/episodesThroughTarget';
 import {
   clearEpisodePlaybackProgress,
@@ -104,6 +107,7 @@ import {
   getInfoPlaybackSelection,
   type ContinueWatchingTarget,
 } from '../lib/utils/continueWatching';
+import {perfTrace} from '../lib/utils/perfTrace';
 
 interface SeasonListProps {
   LinkList: Link[];
@@ -744,21 +748,51 @@ const SeasonList: React.FC<SeasonListProps> = ({
     contentInfo,
   );
 
+  const lastCatalogSyncRef = useRef<{
+    signature: string;
+    pending: boolean;
+    revalidateAt: number;
+  } | undefined>(undefined);
+
   useEffect(() => {
     if (type === 'movie' || !routeParams.link || !providerValue ||
       (shouldFetchEpisodes && (episodeLoading || episodeFetching))) {
       return;
     }
-    syncSeriesCatalog({
+    const options = {
       contentLink: routeParams.link,
       providerValue,
       groups: LinkList,
       activeSeasonLink: activeSeason?.episodesLink,
       activeEpisodes: episodeList,
-    })
-      .then(refreshHistory)
-      .catch(error => console.warn('Failed to sync series catalog:', error));
-  }, [LinkList, activeSeason?.episodesLink, episodeList, episodeLoading, episodeFetching, providerValue, refreshHistory, routeParams.link, shouldFetchEpisodes, type]);
+    };
+    const signature = getSeriesCatalogSyncSignature(
+      options, refreshVersion, shouldFetchEpisodes,
+    );
+    const previous = lastCatalogSyncRef.current;
+    if (previous?.signature === signature &&
+      (previous.pending || Date.now() < previous.revalidateAt)) {
+      perfTrace('series_catalog_deduped', {provider: providerValue});
+      return;
+    }
+    lastCatalogSyncRef.current = {signature, pending: true, revalidateAt: 0};
+    syncSeriesCatalog(options)
+      .then(result => {
+        if (lastCatalogSyncRef.current?.signature !== signature) {
+          return;
+        }
+        lastCatalogSyncRef.current = result.complete
+          ? {signature, pending: false, revalidateAt: result.revalidateAt}
+          : undefined;
+        refreshHistory();
+      })
+      .catch(error => {
+        if (lastCatalogSyncRef.current?.signature === signature) {
+          lastCatalogSyncRef.current = undefined;
+        }
+        console.warn('Failed to sync series catalog:', error);
+      });
+  }, [LinkList, activeSeason?.episodesLink, episodeList, episodeLoading, episodeFetching, providerValue, refreshHistory, refreshVersion, routeParams.link, shouldFetchEpisodes, type]);
 
   useEffect(() => {
     if (!refreshVersion || !activeSeason?.episodesLink || !shouldFetchEpisodes) {
