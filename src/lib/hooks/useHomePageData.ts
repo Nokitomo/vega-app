@@ -24,6 +24,7 @@ import {getMetadataSourceProvider} from '../services/streamCenterMetadata';
 import {resolveAnimeExternalIds} from '../providers/externalIds';
 import {measurePerfSync, traceAsync} from '../utils/perfTrace';
 import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
+import {reconcileHomeSections} from '../utils/reconcileHomeSections';
 
 export interface HomePageData {
   title: string;
@@ -48,6 +49,7 @@ const HOME_INITIAL_SECTION_COUNT = 4;
 const HOME_STALE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 const HIDDEN_STREAMINGUNITY_TYPES = new Set(['movie', 'tv']);
 const HOME_CATEGORY_MAX_ITEMS = 30;
+const EMPTY_HOME_POSTS: Post[] = [];
 
 const buildHeroMetadataCacheKey = (heroLink: string, providerValue: string) => {
   if (!heroLink) {
@@ -467,9 +469,14 @@ export const useHomePageData = ({
     ).catch(() => undefined);
   }, [enabled, isScreenActive, providerValue, prioritizedStaleCategoryIndexes]);
 
+  const committedHomeDataRef = useRef<{
+    scope: string;
+    data: HomePageData[];
+  } | null>(null);
+  const homeDataScope = `${providerValue}:${providerCacheScope}`;
   const homeData = useMemo<HomePageData[]>(
-    () =>
-      categories.map((category, index) => {
+    () => {
+      const next = categories.map((category, index) => {
         const result = queryResults[index];
         const queryData = result?.data as CategoryQueryData | undefined;
 
@@ -477,7 +484,7 @@ export const useHomePageData = ({
           title: category.title,
           titleKey: category.titleKey,
           titleParams: category.titleParams,
-          Posts: queryData?.Posts || [],
+          Posts: queryData?.Posts || EMPTY_HOME_POSTS,
           filter: category.filter,
           isLoading:
             !queryData &&
@@ -486,9 +493,18 @@ export const useHomePageData = ({
           error:
             result?.error instanceof Error ? result.error.message : undefined,
         };
-      }),
-    [categories, queryResults],
+      });
+      return reconcileHomeSections(
+        committedHomeDataRef.current,
+        homeDataScope,
+        next,
+      );
+    },
+    [categories, queryResults, homeDataScope],
   );
+  useEffect(() => {
+    committedHomeDataRef.current = {scope: homeDataScope, data: homeData};
+  }, [homeData, homeDataScope]);
 
   const isLoading = queryResults.some(
     (result, index) =>

@@ -311,3 +311,30 @@ di Tulsa King ha richiesto tempo di rete. Questi tempi del dev client non sono
 un benchmark controllato della fluidita complessiva della Home. Tracce e
 schermate temporanee sono in `.codex/series-catalog-analysis-20261021/` e
 restano fuori dai commit.
+
+### Identita delle sezioni Home
+
+La Home conserva l'array vuoto delle card e riutilizza l'oggetto di una sezione
+quando filtro, titolo, card, stato di caricamento ed errore sono invariati. Se
+tutte le sezioni sono uguali conserva anche l'array verticale; al cambio di
+provider o versione del provider riparte con uno snapshot separato. Questo
+riduce il rendering ripetuto degli skeleton delle sezioni ancora vuote durante
+le risposte delle altre categorie. Non modifica `staleTimeMs`, richieste ai
+provider, cache SQLite/MMKV, refresh manuale, preferenze artwork o fallback.
+Per valutare il beneficio confrontare a parita di percorso e cache le pause
+`js_lag`, i commit React della Home e i frame Android. I tempi del dev client
+non equivalgono a quelli di una build release su dispositivo fisico.
+
+Nella prova del 21 ottobre 2026 sul dev client `Medium_phone_API_35`, le
+sezioni StreamingUnity ancora in loading hanno registrato 15 aggiornamenti
+React per 1298 ms prima della riconciliazione; dopo, 166 aggiornamenti hanno
+richiesto 2 ms complessivi. Il confronto conferma la rimozione del costo degli
+aggiornamenti inutili, ma non un miglioramento globale della fluidita: i nuovi
+montaggi degli skeleton hanno ancora richiesto 3099 ms, e lo stesso percorso
+ha avuto 219 frame lenti su 440. AnimeUnity e StreamCenter hanno mostrato
+rispettivamente 149/366 e 42/122 frame lenti; questi campioni variano con lo
+stato del caricamento e non sono benchmark controllati. Dopo reinstallazione,
+le tre Home e le schede di The Mentalist, One Piece, South Park e Detective
+Conan si sono caricate senza crash; su The Mentalist hanno funzionato cambio
+stagione, menu e pressione prolungata di un episodio. Le tracce locali sono in
+`.codex/home-section-fix-20261021/`, ignorata da Git.
