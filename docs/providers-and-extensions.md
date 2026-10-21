@@ -166,7 +166,7 @@ File: src/lib/providers/providerContext.ts
 ## Dipendenze DNS e rete
 
 - I provider eseguono chiamate HTTP direttamente dal device utente verso i domini target.
-- Per AnimeUnity l'app legge l'indirizzo da Pastebin, segue l'eventuale redirect della pagina principale e usa l'host HTTPS finale per le richieste del provider. Il risultato resta in cache per un'ora; la revisione della cache evita di riusare vecchi host. Se Pastebin non risponde o il vecchio host non si risolve via DNS, viene verificato l'indirizzo di recupero `https://www.animeunity.to`. Un redirect verso un host non riconducibile ad AnimeUnity non viene salvato.
+- Per AnimeUnity l'app legge l'indirizzo da Pastebin, segue l'eventuale redirect della pagina principale e usa l'host HTTPS finale per le richieste del provider. Il risultato resta in cache per un'ora; la revisione della cache evita di riusare vecchi host. Se Pastebin non risponde o il vecchio host non si risolve via DNS, viene verificato l'indirizzo di recupero `https://www.animeunity.co`. Un redirect verso un host non riconducibile ad AnimeUnity non viene salvato.
 - Il modulo stream AnimeUnity riconosce il formato del player dalla pagina embed (`window.masterPlaylist` o `window.streams`), indipendentemente dal suffisso del dominio VixCloud. StreamCenter riusa lo stesso modulo per i propri stream AnimeUnity.
 - Se il resolver DNS del device/rete restituisce `NXDOMAIN` o blocca un dominio provider, la chiamata fallisce prima della risposta HTTP.
 - In questo scenario e possibile vedere provider installato ma risultati vuoti, anche con moduli corretti.

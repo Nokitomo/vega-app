@@ -185,7 +185,7 @@ const classifyRequest = (url?: string, baseURL?: string) => {
     const parsed = new URL(url || '', baseURL || 'https://invalid.invalid');
     const host = parsed.hostname.toLowerCase();
     const path = parsed.pathname.toLowerCase();
-    if (host.endsWith('animeunity.so')) {
+    if (/(?:^|\.)animeunity\.[a-z]{2,}$/i.test(host)) {
       return {
         service: 'animeunity',
         route: path.startsWith('/info_api/')

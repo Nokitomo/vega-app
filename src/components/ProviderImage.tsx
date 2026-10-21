@@ -7,6 +7,7 @@ import {
 } from '../lib/services/ProviderArtwork';
 import type {Post} from '../lib/providers/types';
 import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
+import {resolveLegacyAnimeUnityImageUrl} from '../lib/utils/providerLinks';
 import {
   isPerfTraceEnabled,
   observePerfDuration,
@@ -214,7 +215,7 @@ const ProviderImage = ({
     <Image
       key={errorRetryKey}
       {...rest}
-      source={{uri: sourceUri}}
+      source={{uri: resolveLegacyAnimeUnityImageUrl(sourceUri)}}
       onError={handleError}
       onLoadStart={handleLoadStart}
       onLoad={handleLoad}

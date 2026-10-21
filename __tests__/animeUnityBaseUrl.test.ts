@@ -28,21 +28,22 @@ describe('AnimeUnity base URL', () => {
     const fetchMock = jest.fn(async (url: string) =>
       ({
         text: async () => 'https://www.animeunity.so',
+        ok: true,
         url: url.includes('pastebin')
           ? url
-          : 'https://www.animeunity.to/',
+          : 'https://www.animeunity.co/',
       }) as Response,
     );
     global.fetch = fetchMock as typeof fetch;
 
-    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.to');
+    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.co');
     expect(fetchMock).toHaveBeenCalledWith(
       'https://www.animeunity.so/',
       expect.objectContaining({signal: expect.anything()}),
     );
     expect(cacheStorageService.setString).toHaveBeenCalledWith(
-      'CacheBaseUrlanimeunity:v2',
-      'https://www.animeunity.to',
+      'CacheBaseUrlanimeunity:v3',
+      'https://www.animeunity.co',
     );
   });
 
@@ -50,6 +51,7 @@ describe('AnimeUnity base URL', () => {
     global.fetch = jest.fn(async (url: string) =>
       ({
         text: async () => 'https://www.animeunity.so',
+        ok: true,
         url: url.includes('pastebin') ? url : 'https://unrelated.example/',
       }) as Response,
     ) as typeof fetch;
@@ -63,10 +65,10 @@ describe('AnimeUnity base URL', () => {
       if (url.includes('pastebin')) {
         throw new Error('offline');
       }
-      return {url: 'https://www.animeunity.to/'} as Response;
+      return {ok: true, url: 'https://www.animeunity.co/'} as Response;
     }) as typeof fetch;
 
-    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.to');
+    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.co');
   });
 
   it('uses the current fallback when the old Pastebin host has no DNS', async () => {
@@ -77,17 +79,18 @@ describe('AnimeUnity base URL', () => {
       if (url.includes('animeunity.so')) {
         throw new Error('DNS unavailable');
       }
-      return {url: 'https://www.animeunity.to/'} as Response;
+      return {ok: true, url: 'https://www.animeunity.co/'} as Response;
     }) as typeof fetch;
 
-    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.to');
+    expect(await getBaseUrl('animeunity')).toBe('https://www.animeunity.co');
   });
 
   it('shares an unresolved host lookup between simultaneous callers', async () => {
     const fetchMock = jest.fn(async (url: string) =>
       ({
         text: async () => 'https://www.animeunity.so',
-        url: url.includes('pastebin') ? url : 'https://www.animeunity.to/',
+        ok: true,
+        url: url.includes('pastebin') ? url : 'https://www.animeunity.co/',
       }) as Response,
     );
     global.fetch = fetchMock as typeof fetch;
@@ -95,7 +98,7 @@ describe('AnimeUnity base URL', () => {
     expect(await Promise.all([
       getBaseUrl('animeunity'),
       getBaseUrl('animeunity'),
-    ])).toEqual(['https://www.animeunity.to', 'https://www.animeunity.to']);
+    ])).toEqual(['https://www.animeunity.co', 'https://www.animeunity.co']);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

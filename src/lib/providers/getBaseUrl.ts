@@ -6,7 +6,7 @@ const expireTime = 60 * 60 * 1000;
 
 const BASE_URL_CACHE_REVISIONS: Record<string, string> = {
   altadefinizionez: '2',
-  animeunity: '2',
+  animeunity: '3',
 };
 
 const getBaseUrlCacheRevision = (providerValue: string) =>
@@ -34,6 +34,9 @@ const resolveAnimeUnityBaseUrl = async (value: string): Promise<string> => {
     const response = await fetch(`${candidate.origin}/`, {
       signal: controller.signal,
     });
+    if (!response.ok) {
+      return '';
+    }
     const finalUrl = new URL(response.url || candidate.origin);
     if (finalUrl.protocol !== 'https:' || !ANIMEUNITY_HOST.test(finalUrl.hostname)) {
       return '';

@@ -38,5 +38,24 @@ const decodeStreamCenterRoute = (
 
 export const resolveWebViewLink = (value: string): string => {
   const normalized = String(value || '').trim();
-  return decodeStreamCenterRoute(normalized, 'meta') || normalized;
+  const resolved = decodeStreamCenterRoute(normalized, 'meta') || normalized;
+  try {
+    const url = new URL(resolved);
+    if (url.protocol === 'https:' && /^(?:www\.)?animeunity\.so$/i.test(url.hostname)) {
+      url.hostname = url.hostname.toLowerCase().startsWith('www.')
+        ? 'www.animeunity.co'
+        : 'animeunity.co';
+      return url.toString();
+    }
+  } catch {
+    // Keep non-URL provider links unchanged.
+  }
+  return resolved;
+};
+
+export const resolveLegacyAnimeUnityImageUrl = (value: string): string => {
+  if (!/^https:\/\/img\.animeunity\.so(?:[/?#]|$)/i.test(value)) {
+    return value;
+  }
+  return value.replace(/^https:\/\/img\.animeunity\.so/i, 'https://img.animeunity.co');
 };

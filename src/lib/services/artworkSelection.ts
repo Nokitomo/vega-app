@@ -3,6 +3,7 @@ import type {
   ArtworkSource,
   Info,
 } from '../providers/types';
+import {resolveLegacyAnimeUnityImageUrl} from '../utils/providerLinks';
 
 type EnhancedArtwork = {
   logo?: string;
@@ -18,7 +19,9 @@ export type ArtworkCandidates = {
 };
 
 const normalizeUrl = (value: unknown): string =>
-  typeof value === 'string' ? value.trim() : '';
+  typeof value === 'string'
+    ? resolveLegacyAnimeUnityImageUrl(value.trim())
+    : '';
 
 const uniqueUrls = (...values: unknown[]): string[] => {
   const seen = new Set<string>();
