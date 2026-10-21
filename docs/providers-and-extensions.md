@@ -115,7 +115,7 @@ Esempi: `archive?order=rating`, `archive?type=tv&status=ongoing&genres=Action,Fa
 - In assenza di metadati esterni, la UI usa i campi del provider (anno, durata, rating, generi, cast) per popolare le stesse sezioni mostrate con Stremio.
 - Per StreamingUnity lo sfondo segue sempre provider -> TMDB -> TVDB -> Cinemeta. AltadefinizioneZ dichiara il proprio artwork come `provider`, che resta prioritario rispetto al fallback Cinemeta.
 - In Home, per StreamingUnity l'hero viene estratto dall'archivio con filtro casuale (`archive?random=true`) per evitare una selezione limitata alle sole sezioni in pagina.
-- Se un artwork non e caricabile (es. 404), la UI prova in ordine i candidati disponibili; l'hero viene scartato soltanto quando tutti i background candidati falliscono.
+- Se un artwork non e caricabile (es. 404), la UI prova in ordine i candidati disponibili; l'hero viene scartato quando tutti i background candidati falliscono. Se la richiesta dei metadati termina con errore e non esistono dati gia utilizzabili, viene scelto un altro hero con lo stesso limite di tentativi delle immagini. L'aggiornamento manuale della Home non forza una nuova scelta dell'hero.
 - Se i metadati esterni falliscono ma il provider risponde correttamente, la scheda Info resta disponibile usando i dati del provider.
 
 ## ProviderManager

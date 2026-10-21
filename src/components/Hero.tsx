@@ -172,8 +172,11 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
   }, [heroData]);
 
   useEffect(() => {
-    setImageCandidateIndex(0);
     lastErrorLinkRef.current = null;
+  }, [hero?.link]);
+
+  useEffect(() => {
+    setImageCandidateIndex(0);
   }, [hero?.link, backgroundCandidates]);
 
   // Memoized image source
@@ -188,21 +191,36 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     [currentImageUri],
   );
 
+  const reportHeroFailure = useCallback(
+    (failedLink: string) => {
+      if (onImageError && lastErrorLinkRef.current !== failedLink) {
+        lastErrorLinkRef.current = failedLink;
+        onImageError(failedLink);
+      }
+    },
+    [onImageError],
+  );
+
+  useEffect(() => {
+    if (error && !heroData && hero?.link) {
+      reportHeroFailure(hero.link);
+    }
+  }, [error, heroData, hero?.link, reportHeroFailure]);
+
   const handleImageError = useCallback(() => {
     console.warn('Hero image failed to load');
     if (imageCandidateIndex + 1 < backgroundCandidates.length) {
       setImageCandidateIndex(index => index + 1);
       return;
     }
-    if (onImageError && hero?.link && lastErrorLinkRef.current !== hero.link) {
-      lastErrorLinkRef.current = hero.link;
-      onImageError(hero.link);
+    if (hero?.link) {
+      reportHeroFailure(hero.link);
     }
   }, [
     imageCandidateIndex,
     backgroundCandidates.length,
-    onImageError,
     hero?.link,
+    reportHeroFailure,
   ]);
 
   // Memoized genres
@@ -252,10 +270,6 @@ const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
     link: hero?.link || '',
     candidates: logoCandidates,
   });
-
-  if (error) {
-    console.error('Hero metadata error:', error);
-  }
 
   return (
     <View className="relative h-[55vh]">
