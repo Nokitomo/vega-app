@@ -1,4 +1,4 @@
-import {Pressable, Text, TouchableOpacity, View} from 'react-native';
+import {Pressable, Text, TouchableOpacity, View, useWindowDimensions} from 'react-native';
 import React, {memo, useCallback, useMemo, useState} from 'react';
 import type {Post} from '../lib/providers/types';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from './PostBadges';
 import {startPerfNavigation} from '../lib/utils/perfTrace';
+import {getSkeletonPlaceholderCount} from './sliderSkeleton';
 
 // import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import useThemeStore from '../lib/zustand/themeStore';
@@ -57,6 +58,8 @@ const Slider = ({
   const {provider} = useContentStore(state => state);
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
+  const {width: windowWidth} = useWindowDimensions();
+  const skeletonPlaceholderCount = getSkeletonPlaceholderCount(windowWidth);
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [isSelected, setSelected] = useState('');
@@ -212,7 +215,7 @@ const Slider = ({
       </View>
       {isLoading ? (
         <View className="flex flex-row gap-2 overflow-hidden">
-          {Array.from({length: 20}).map((_, index) => (
+          {Array.from({length: skeletonPlaceholderCount}).map((_, index) => (
             <View
               className="mx-3 gap-0 flex mb-3 justify-center items-center"
               style={{width: CARD_TITLE_WIDTH}}

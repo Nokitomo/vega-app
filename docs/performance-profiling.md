@@ -338,3 +338,33 @@ le tre Home e le schede di The Mentalist, One Piece, South Park e Detective
 Conan si sono caricate senza crash; su The Mentalist hanno funzionato cambio
 stagione, menu e pressione prolungata di un episodio. Le tracce locali sono in
 `.codex/home-section-fix-20261021/`, ignorata da Git.
+
+### Segnaposto responsive delle sezioni Home
+
+La riga di caricamento di `Slider` non e scorrevole: mostra soltanto i
+segnaposto che entrano nella larghezza disponibile. Il numero viene ora
+calcolato dalla larghezza della finestra, dalla larghezza della card, dai
+margini e dallo spazio tra card, con una card aggiuntiva per coprire il bordo
+durante un ridimensionamento. Una finestra da 393 dp crea 4 segnaposto
+anziche 20 (8 gradienti invece di 40); a 768 dp ne crea 7 e a 1024 dp 9.
+Le card vere, la lista FlashList, l'animazione condivisa, i dati e le
+preferenze non cambiano.
+
+Il 21 ottobre 2026, sul dev client `Medium_phone_API_35`, una sezione
+StreamCenter non ancora caricata ha mostrato gli skeleton fino al bordo della
+finestra. Una sonda React temporanea ha registrato 2 montaggi di sezioni in
+loading per 82 ms complessivi; gli aggiornamenti di quelle sezioni sono
+rimasti trascurabili. La sonda e stata rimossa. La prova con dimensione
+simulata da tablet (1600 x 2560 px, 300 dpi) ha mostrato la Home e le card
+popolate; l'emulatore e stato riportato a 1080 x 2400 px e 420 dpi. I test
+unitari verificano il conteggio per 320, 393, 768, 1024 e 2048 dp.
+
+Questo misura la riduzione certa dei componenti inutilmente creati, non un
+guadagno complessivo di FPS: i campioni prima e dopo hanno cache, sezioni e
+richieste diverse. Persistono frame lenti: durante lo scorrimento StreamCenter
+208/497, durante quello StreamingUnity 150/292 e AnimeUnity 164/390. Le
+tracce mostrano anche aggiornamenti delle sezioni popolate, caricamenti di
+bitmap e pause `js_lag` durante richieste ai provider. Sono necessari profili
+separati del disegno delle card e delle immagini prima di attribuire quei
+ritardi a un componente specifico. Tracce e schermate locali sono in
+`.codex/skeleton-fix-20261021/`, ignorata da Git.
