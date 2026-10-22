@@ -25,6 +25,7 @@ import {resolveAnimeExternalIds} from '../providers/externalIds';
 import {measurePerfSync, traceAsync} from '../utils/perfTrace';
 import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
 import {reconcileHomeSections} from '../utils/reconcileHomeSections';
+import i18n from '../../i18n';
 
 export interface HomePageData {
   title: string;
@@ -270,9 +271,10 @@ export const useHomePageData = ({
                 signal,
               }),
           );
-          const nextPosts = Array.isArray(posts)
-            ? posts.slice(0, HOME_CATEGORY_MAX_ITEMS)
-            : [];
+          if (!Array.isArray(posts)) {
+            throw new Error(i18n.t('Error: No data returned from provider'));
+          }
+          const nextPosts = posts.slice(0, HOME_CATEGORY_MAX_ITEMS);
           const nextSignature = buildPostsSignature(nextPosts);
           const previous =
             queryClient.getQueryData<CategoryQueryData>(queryKey);
