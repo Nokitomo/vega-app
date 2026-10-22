@@ -15,6 +15,7 @@ import {
   writeSharedAnimeInfo,
 } from '../src/lib/services/animeMetadataSharing';
 import {streamCenterEpisodesOrigin} from '../src/lib/services/streamCenterMetadata';
+import {getProviderCacheScope} from '../src/lib/utils/providerCacheScope';
 
 const sourceLink = 'https://www.animeunity.to/anime/42-example';
 const scLink = 'streamcenter:v1:meta:animeunity:' + encodeURIComponent(
@@ -43,9 +44,9 @@ beforeEach(() => {
   jest.spyOn(metadata, 'readMetadata').mockImplementation((kind, provider, link) =>
     records.get(recordKey(kind, provider, link)),
   );
-  jest.spyOn(metadata, 'writeMetadata').mockImplementation((kind, provider, link, value) => {
+  jest.spyOn(metadata, 'writeMetadata').mockImplementation((kind, provider, link, value, providerVersion = '') => {
     records.set(recordKey(kind, provider, link), {
-      value, updatedAt: ++timestamp, checkedAt: timestamp, providerVersion: '',
+      value, updatedAt: ++timestamp, checkedAt: timestamp, providerVersion,
     });
   });
 });
@@ -134,4 +135,33 @@ it('reuses resolved posters across AnimeUnity and StreamCenter in both direction
   expect(getCachedProviderPoster('streamcenter', scLink)?.value.poster)
     .toBe('https://image.example/second.jpg');
   expect(lookup).toHaveBeenCalledTimes(2);
+});
+
+it('invalidates old and expired SQLite posters before resolving artwork', async () => {
+  const key = recordKey('preferredPosterW300V2', 'animeunity', sourceLink);
+  const wrongPoster = 'https://image.example/big-bang.jpg';
+  records.set(key, {
+    value: {poster: wrongPoster}, updatedAt: Date.now(), checkedAt: Date.now(),
+    providerVersion: 'previous-provider-version',
+  });
+  expect(getCachedProviderPoster('animeunity', sourceLink)).toBeUndefined();
+
+  records.set(key, {
+    value: {poster: wrongPoster},
+    updatedAt: Date.now() - 25 * 60 * 60 * 1000,
+    checkedAt: Date.now(), providerVersion: getProviderCacheScope('animeunity'),
+  });
+  expect(getCachedProviderPoster('animeunity', sourceLink)).toBeUndefined();
+
+  const lookup = jest.spyOn(providerManager, 'getArtwork').mockResolvedValueOnce({
+    resolved: true, poster: 'https://image.example/dark-machine.jpg',
+  });
+  expect(await resolveProviderPoster({providerValue: 'animeunity', link: sourceLink}))
+    .toBe('https://image.example/dark-machine.jpg');
+  expect(lookup).toHaveBeenCalledTimes(1);
+  expect(metadata.writeMetadata).toHaveBeenCalledWith(
+    'preferredPosterW300V2', 'animeunity', sourceLink,
+    {poster: 'https://image.example/dark-machine.jpg'},
+    getProviderCacheScope('animeunity'),
+  );
 });

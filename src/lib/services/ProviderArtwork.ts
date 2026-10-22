@@ -1,5 +1,5 @@
 import {cacheStorage} from '../storage';
-import {buildProviderCacheKey} from '../utils/providerCacheScope';
+import {buildProviderCacheKey, getProviderCacheScope} from '../utils/providerCacheScope';
 import {
   readPersistedCache,
   writePersistedCache,
@@ -67,15 +67,21 @@ const posterCacheKey = (providerValue: string, link: string) =>
   buildProviderCacheKey('preferredPosterW300V2', providerValue, link);
 
 const posterDurable = (providerValue: string, link: string) => {
-  const own = readMetadata<ProviderPosterCacheValue>(
+  const ownRecord = readMetadata<ProviderPosterCacheValue>(
     'preferredPosterW300V2', providerValue, link,
   );
+  const own = ownRecord?.providerVersion === getProviderCacheScope(providerValue) &&
+    Date.now() - ownRecord.updatedAt <= ARTWORK_STALE_MS ? ownRecord : undefined;
   const sourceLink = animeMetaSourceLink(providerValue, link);
-  const shared = providerValue === 'streamcenter' && sourceLink
+  const sharedRecord = providerValue === 'streamcenter' && sourceLink
     ? readMetadata<ProviderPosterCacheValue>(
         'preferredPosterW300V2', 'animeunity', sourceLink,
       )
     : undefined;
+  const shared = sharedRecord &&
+    sharedRecord.providerVersion === getProviderCacheScope('animeunity') &&
+    Date.now() - sharedRecord.updatedAt <= ARTWORK_STALE_MS
+    ? sharedRecord : undefined;
   return shared?.value.poster && (!own?.value.poster || shared.updatedAt >= own.updatedAt)
     ? shared
     : own;
@@ -156,20 +162,17 @@ export const resolveProviderPoster = ({
   if (signal?.aborted) {
     return Promise.resolve(cached?.value.poster);
   }
-  const durable = posterDurable(providerValue, link);
   if (
     !forceRefresh &&
     cached &&
-    (durable?.value.poster || cached.ageMs <= ARTWORK_STALE_MS)
+    cached.ageMs <= ARTWORK_STALE_MS
   ) {
     const sourceLink = animeMetaSourceLink(providerValue, link);
     if (providerValue === 'streamcenter' && sourceLink && cached.value.poster &&
-      !readMetadata<ProviderPosterCacheValue>(
-        'preferredPosterW300V2', 'animeunity', sourceLink,
-      )) {
+      !posterDurable('animeunity', sourceLink)) {
       writeMetadata(
         'preferredPosterW300V2', 'animeunity', sourceLink,
-        {poster: cached.value.poster},
+        {poster: cached.value.poster}, getProviderCacheScope('animeunity'),
       );
     }
     // Count cache hits without flooding the JS bridge during Home rendering.
@@ -234,7 +237,8 @@ export const resolveProviderPoster = ({
       if (artwork?.resolved === true) {
         writePersistedCache(cacheStorage, key, {poster});
         if (poster) {
-          writeMetadata('preferredPosterW300V2', providerValue, link, {poster});
+          writeMetadata('preferredPosterW300V2', providerValue, link, {poster},
+            getProviderCacheScope(providerValue));
         } else if (forceRefresh) {
           removeMetadata('preferredPosterW300V2', providerValue, link);
         }
@@ -244,7 +248,8 @@ export const resolveProviderPoster = ({
             cacheStorage, posterCacheKey('animeunity', sourceLink), {poster},
           );
           if (poster) {
-            writeMetadata('preferredPosterW300V2', 'animeunity', sourceLink, {poster});
+            writeMetadata('preferredPosterW300V2', 'animeunity', sourceLink, {poster},
+              getProviderCacheScope('animeunity'));
           } else if (forceRefresh) {
             removeMetadata('preferredPosterW300V2', 'animeunity', sourceLink);
           }

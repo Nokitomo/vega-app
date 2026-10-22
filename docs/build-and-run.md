@@ -1,6 +1,6 @@
 # Build e Avvio
 
-Versione sorgente corrente: 3.3.19 (Android `versionCode` 178, iOS build 14). La release stabile si riferisce al commit usato come `ref` dal workflow Android Stable Release.
+Versione sorgente corrente: 3.3.20 (Android `versionCode` 179, iOS build 15). La release stabile si riferisce al commit usato come `ref` dal workflow Android Stable Release.
 
 ## Prerequisiti
 - Node >= 20.19.4 (vedi package.json -> volta).

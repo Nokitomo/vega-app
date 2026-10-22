@@ -73,8 +73,13 @@ export const useContentInfo = (link: string, providerValue: string) => {
   const initialRecord = readDurableInfo();
   const initialInfo = initialRecord?.value;
   const installedRecord = readMetadata<Info>('contentInfo', providerValue, link);
+  const sourceRecord = origin?.source === 'animeunity'
+    ? readMetadata<Info>('contentInfo', 'animeunity', origin.data.url)
+    : undefined;
   const providerUpdated =
-    !!installedRecord && installedRecord.providerVersion !== providerVersion;
+    (!!installedRecord && installedRecord.providerVersion !== providerVersion) ||
+    (!!sourceRecord && sourceRecord.providerVersion !==
+      (extensionManager.getProviderModules('animeunity')?.version || ''));
   const targetProvider =
     providerValue === 'animeunity' ||
     providerValue === 'streamingunity' ||
@@ -191,7 +196,7 @@ export const useContentInfo = (link: string, providerValue: string) => {
         ? (() => {
             const durable = readDurableInfo();
             if (durable) {
-              return origin || durable.providerVersion === providerVersion
+              return !providerUpdated && (origin || durable.providerVersion === providerVersion)
                 ? durable.checkedAt
                 : 0;
             }

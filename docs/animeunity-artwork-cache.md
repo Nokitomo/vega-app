@@ -1,8 +1,14 @@
 # Cache dell'indice AniBridge per AnimeUnity
 
 Le card AnimeUnity continuano a scegliere il poster TMDB prima di TVDB e del
-catalogo. L'app conserva il poster risolto per 24 ore. Se il poster non e in
-cache, il provider consulta le mappature AniBridge prima di cercarlo.
+catalogo. Quando AniBridge propone ID esterni diversi per lo stesso contenuto,
+il provider confronta i titoli delle schede con quelli di AnimeUnity. Usa solo
+un ID con corrispondenza univoca; se non riesce a verificarlo, ricade sul poster
+del catalogo. Le mappature degli episodi restano disponibili. L'app conserva il
+poster risolto per 24 ore e lo scarta quando cambia la versione o la revisione
+del provider, anche se esiste una precedente copia nel database SQLite. Se il
+poster non e in cache, il provider consulta le mappature AniBridge prima di
+cercarlo.
 
 `ProviderManager` riutilizza il contesto dello stesso provider e sorgente nella
 sessione corrente: le richieste contemporanee condividono l'indice e la
