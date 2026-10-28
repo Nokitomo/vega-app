@@ -30,6 +30,13 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (value: string) => value}),
 }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({top: 0, bottom: 0, left: 0, right: 0}),
+}));
+jest.mock('../src/lib/zustand/watchListStore', () => ({
+  __esModule: true,
+  default: () => ({watchList: [], addItem: jest.fn(), removeItem: jest.fn()}),
+}));
 jest.mock('react-native-linear-gradient', () => () => null);
 jest.mock('../src/components/RemoteLogo', () => () => null);
 jest.mock('../src/components/SearchSuggestions', () => () => null);
@@ -54,7 +61,7 @@ const selectorStoreMock = <State,>(state: State) =>
   (selector: (current: State) => unknown) => selector(state);
 
 const renderHero = (onImageError: (link?: string) => void) => (
-  <Hero isDrawerOpen={false} onOpenDrawer={() => undefined} onImageError={onImageError} />
+  <Hero posts={[]} isDrawerOpen={false} onImageError={onImageError} />
 );
 
 describe('Hero metadata failure', () => {

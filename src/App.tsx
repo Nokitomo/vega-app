@@ -35,6 +35,7 @@ import {
   PixelRatio,
   useWindowDimensions,
   ViewStyle,
+  View,
 } from 'react-native';
 import {EpisodeLink, Link, PostVariant} from './lib/providers/types';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -383,6 +384,9 @@ function TabStack() {
 
           return {
             title: t('Home'),
+            tabBarActiveTintColor: '#FF640A',
+            tabBarInactiveTintColor: '#DADADA',
+            tabBarBackground: () => <View style={{flex: 1, backgroundColor: '#23252B'}} />,
             tabBarStyle: hideTabBar
               ? ({display: 'none'} as const)
               : defaultTabBarStyle,

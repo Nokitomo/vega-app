@@ -8,6 +8,7 @@ import {
   AppState,
 } from 'react-native';
 import Slider from '../../components/Slider';
+import HomeHeader from '../../components/HomeHeader';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import HeroOptimized from '../../components/Hero';
 import {cacheStorage} from '../../lib/storage';
@@ -147,6 +148,7 @@ const Home = ({}: Props) => {
   const {t} = useTranslation();
   const [backgroundColor, setBackgroundColor] = useState('transparent');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
   const [isHorizontalListDragging, setIsHorizontalListDragging] =
     useState(false);
   const [heroRetryNonce, setHeroRetryNonce] = useState(0);
@@ -438,6 +440,7 @@ const Home = ({}: Props) => {
         className="relative z-20"
         style={index === 0 ? {marginTop: -24} : undefined}>
       <Slider
+        homeAppearance
         isLoading={!!item.isLoading}
         title={resolveCatalogTitle(item)}
         posts={item.Posts}
@@ -504,7 +507,7 @@ const Home = ({}: Props) => {
               ) : null
             }>
             <StatusBar
-              style="auto"
+              style="light"
               animated={true}
               translucent={true}
               backgroundColor={backgroundColor}
@@ -529,8 +532,10 @@ const Home = ({}: Props) => {
               ListHeaderComponent={
                 <>
                   <HeroOptimized
+                    posts={homeData.flatMap(section => section.Posts).slice(0, 20)}
+                    isActive={isHomeFocused && backgroundColor === 'transparent'}
                     isDrawerOpen={isDrawerOpen}
-                    onOpenDrawer={() => setIsDrawerOpen(true)}
+                    searchActive={searchActive}
                     onImageError={handleHeroImageError}
                   />
 
@@ -555,6 +560,13 @@ const Home = ({}: Props) => {
                   onRefresh={handleRefresh}
                 />
               }
+            />
+            <HomeHeader
+              isDrawerOpen={isDrawerOpen}
+              onOpenDrawer={() => setIsDrawerOpen(true)}
+              searchActive={searchActive}
+              setSearchActive={setSearchActive}
+              scrolled={backgroundColor !== 'transparent'}
             />
             {canOpenDrawerFromEdge ? (
               <View

@@ -1,470 +1,438 @@
-import Animated, {FadeIn} from 'react-native-reanimated';
 import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {
-  Keyboard,
-  Modal,
   Pressable,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   Image,
+  useWindowDimensions,
+  PanResponder,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome';
+import useWatchListStore from '../lib/zustand/watchListStore';
+import type {Post} from '../lib/providers/types';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {HomeStackParamList, SearchStackParamList} from '../App';
+import {HomeStackParamList} from '../App';
 import useContentStore from '../lib/zustand/contentStore';
 import useHeroStore from '../lib/zustand/herostore';
-import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
-import {Feather} from '@expo/vector-icons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
 import {useTranslation} from 'react-i18next';
 import RemoteLogo from './RemoteLogo';
 import type {ArtworkCandidates} from '../lib/services/artworkSelection';
-import SearchSuggestions from './SearchSuggestions';
-import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
-import {sanitizeSearchQuery} from '../lib/utils/helpers';
 import {useLogoFallback} from '../lib/hooks/useLogoFallback';
 import {startPerfNavigation} from '../lib/utils/perfTrace';
 import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 
 interface HeroProps {
+  posts?: Post[];
+  isActive?: boolean;
   isDrawerOpen: boolean;
-  onOpenDrawer: () => void;
+  searchActive?: boolean;
   onImageError?: (link?: string) => void;
 }
 
 const PLACEHOLDER_IMAGE =
   'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
 
-const Hero = memo(({isDrawerOpen, onOpenDrawer, onImageError}: HeroProps) => {
-  const [searchActive, setSearchActive] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [suggestionsSuppressed, setSuggestionsSuppressed] = useState(false);
-  const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
-  const {t} = useTranslation();
-  const {provider} = useContentStore(state => state);
-  const {hero} = useHeroStore(state => state);
-  const metadataProvider = getMetadataSourceProvider(
-    provider.value,
-    hero?.link || '',
-  );
+const Hero = memo(
+  ({
+    isDrawerOpen,
+    searchActive = false,
+    onImageError,
+    posts = [],
+    isActive = true,
+  }: HeroProps) => {
+    const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
+    const {t} = useTranslation();
+    const {provider} = useContentStore(state => state);
+    const {hero: initialHero} = useHeroStore(state => state);
+    const {width, height} = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+    const [page, setPage] = useState(0);
+    const slides = React.useMemo(() => {
+      const unique = new Map<string, Post>();
+      [initialHero, ...posts].forEach(post => {
+        if (post?.link && !unique.has(post.link)) {
+          unique.set(post.link, post);
+        }
+      });
+      return Array.from(unique.values()).slice(0, 6);
+    }, [initialHero, posts]);
+    const hero = slides[page] || initialHero;
+    const {watchList, addItem, removeItem} = useWatchListStore();
+    const isSaved = watchList.some(item => item.link === hero?.link);
+    useEffect(() => setPage(0), [initialHero?.link, provider.value]);
+    const swipe = React.useMemo(
+      () =>
+        PanResponder.create({
+          onMoveShouldSetPanResponder: (_, gesture) =>
+            Math.abs(gesture.dx) > 20 &&
+            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+          onPanResponderRelease: (_, gesture) => {
+            if (Math.abs(gesture.dx) > 40) {
+              setPage(value =>
+                Math.max(
+                  0,
+                  Math.min(
+                    slides.length - 1,
+                    value + (gesture.dx < 0 ? 1 : -1),
+                  ),
+                ),
+              );
+            }
+          },
+        }),
+      [slides.length],
+    );
+    const metadataProvider = getMetadataSourceProvider(
+      provider.value,
+      hero?.link || '',
+    );
 
-  const showHamburgerMenu = useUiSettingsStore(
-    state => state.showHamburgerMenu,
-  );
-  const isDrawerDisabled = useUiSettingsStore(state => state.disableDrawer);
+    const navigation =
+      useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
 
-  const navigation =
-    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
-  const searchNavigation =
-    useNavigation<NativeStackNavigationProp<SearchStackParamList>>();
-
-  // Use React Query for hero metadata
-  const {
-    data: heroData,
-    isLoading,
-    error,
-  } = useHeroMetadata(hero?.link || '', provider.value);
-
-  const closeSearch = useCallback(() => {
-    Keyboard.dismiss();
-    setSearchActive(false);
-    setSearchText('');
-    setSuggestionsSuppressed(false);
-  }, []);
-
-  const suggestions = useSearchSuggestions({
-    query: searchText,
-    enabled: searchActive,
-    suppressed: suggestionsSuppressed,
-  });
-
-  const handleSearchTextChange = useCallback((text: string) => {
-    setSuggestionsSuppressed(false);
-    setSearchText(text);
-  }, []);
-
-  // Memoized handlers
-  const handleSearchSubmit = useCallback(
-    (text: string) => {
-      const query = text.trim();
-      if (!query) {
+    // Use React Query for hero metadata
+    const {
+      data: heroData,
+      isLoading,
+      error,
+    } = useHeroMetadata(hero?.link || '', provider.value);
+    useEffect(() => {
+      if (isLoading || !isActive || searchActive || isDrawerOpen || slides.length < 2) {
         return;
       }
-      setSuggestionsSuppressed(true);
-      closeSearch();
-      if (/^https?:\/\//i.test(query)) {
-        navigation.navigate('Info', {link: query});
-      } else {
-        searchNavigation.navigate('ScrollList', {
-          providerValue: provider.value,
-          filter: query,
-          title: provider.display_name,
-          isSearch: true,
+      const timer = setTimeout(
+        () => setPage(value => (value + 1) % slides.length),
+        10500,
+      );
+      return () => clearTimeout(timer);
+    }, [page, slides.length, isActive, searchActive, isDrawerOpen, isLoading]);
+
+
+    const handlePlayPress = useCallback(() => {
+      if (hero?.link) {
+        startPerfNavigation(provider.value);
+        navigation.navigate('Info', {
+          link: hero.link,
+          provider: provider.value,
+          poster: heroData?.image || heroData?.poster || heroData?.background,
+          variants: hero?.variants,
+          dubStatus: hero?.dubStatus,
+          dubStatusKey: hero?.dubStatusKey,
         });
       }
-    },
-    [
-      closeSearch,
+    }, [
       navigation,
-      searchNavigation,
+      hero?.link,
+      hero?.variants,
+      hero?.dubStatus,
+      hero?.dubStatusKey,
       provider.value,
-      provider.display_name,
-    ],
-  );
+      heroData,
+    ]);
 
-  const handleSelectSuggestion = useCallback(
-    (title: string) => {
-      const cleanTitle = sanitizeSearchQuery(title);
-      setSuggestionsSuppressed(true);
-      handleSearchSubmit(cleanTitle);
-    },
-    [handleSearchSubmit],
-  );
+    const lastErrorLinkRef = useRef<string | null>(null);
 
-  const handlePlayPress = useCallback(() => {
-    if (hero?.link) {
-      startPerfNavigation(provider.value);
-      navigation.navigate('Info', {
-        link: hero.link,
-        provider: provider.value,
-        poster: heroData?.image || heroData?.poster || heroData?.background,
-        variants: hero?.variants,
-        dubStatus: hero?.dubStatus,
-        dubStatusKey: hero?.dubStatusKey,
-      });
-    }
-  }, [
-    navigation,
-    hero?.link,
-    hero?.variants,
-    hero?.dubStatus,
-    hero?.dubStatusKey,
-    provider.value,
-    heroData,
-  ]);
-
-  const lastErrorLinkRef = useRef<string | null>(null);
-
-  const backgroundCandidates = React.useMemo(() => {
-    const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
-      ?.artworkCandidates?.background;
-    const values = candidates?.length
-      ? candidates
-      : [heroData?.background, heroData?.image, heroData?.poster];
-    return Array.from(
-      new Set(values.filter((value): value is string => !!value?.trim())),
-    );
-  }, [heroData]);
-
-  const logoCandidates = React.useMemo(() => {
-    const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
-      ?.artworkCandidates?.logo;
-    const values = candidates?.length ? candidates : [heroData?.logo];
-    return Array.from(
-      new Set(values.filter((value): value is string => !!value?.trim())),
-    );
-  }, [heroData]);
-
-  useEffect(() => {
-    lastErrorLinkRef.current = null;
-  }, [hero?.link]);
-
-  useEffect(() => {
-    setImageCandidateIndex(0);
-  }, [hero?.link, backgroundCandidates]);
-
-  // Memoized image source
-  const currentImageUri = React.useMemo(() => {
-    if (!heroData) {
-      return PLACEHOLDER_IMAGE;
-    }
-    return backgroundCandidates[imageCandidateIndex] || PLACEHOLDER_IMAGE;
-  }, [heroData, backgroundCandidates, imageCandidateIndex]);
-  const imageSource = React.useMemo(
-    () => ({uri: currentImageUri}),
-    [currentImageUri],
-  );
-
-  const reportHeroFailure = useCallback(
-    (failedLink: string) => {
-      if (onImageError && lastErrorLinkRef.current !== failedLink) {
-        lastErrorLinkRef.current = failedLink;
-        onImageError(failedLink);
-      }
-    },
-    [onImageError],
-  );
-
-  useEffect(() => {
-    if (error && !heroData && hero?.link) {
-      reportHeroFailure(hero.link);
-    }
-  }, [error, heroData, hero?.link, reportHeroFailure]);
-
-  const handleImageError = useCallback(() => {
-    console.warn('Hero image failed to load');
-    if (imageCandidateIndex + 1 < backgroundCandidates.length) {
-      setImageCandidateIndex(index => index + 1);
-      return;
-    }
-    if (hero?.link) {
-      reportHeroFailure(hero.link);
-    }
-  }, [
-    imageCandidateIndex,
-    backgroundCandidates.length,
-    hero?.link,
-    reportHeroFailure,
-  ]);
-
-  // Memoized genres
-  const displayGenres = React.useMemo(() => {
-    if (!heroData) {
-      return [];
-    }
-    const tags = (heroData.genre || heroData.tags || []) as string[];
-    const tagKeys = (heroData as {tagKeys?: Record<string, string>}).tagKeys;
-    return tags.slice(0, 3).map(tag => {
-      const key = tagKeys?.[tag];
-      return key ? t(key) : tag;
-    });
-  }, [heroData, provider.value, t]);
-  const displayTitle = React.useMemo(() => {
-    if (!heroData) {
-      return '';
-    }
-    if (metadataProvider !== 'animeunity' && heroData.name) {
-      return heroData.name;
-    }
-    const titleKey = (
-      heroData as {
-        titleKey?: string;
-        titleParams?: Record<string, string | number>;
-      }
-    ).titleKey;
-    if (titleKey) {
-      return t(
-        titleKey,
-        (
-          heroData as {
-            titleParams?: Record<string, string | number>;
-          }
-        ).titleParams,
+    const backgroundCandidates = React.useMemo(() => {
+      const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
+        ?.artworkCandidates?.background;
+      const values = candidates?.length
+        ? candidates
+        : [heroData?.background, heroData?.image, heroData?.poster];
+      return Array.from(
+        new Set(values.filter((value): value is string => !!value?.trim())),
       );
-    }
-    return heroData.title || '';
-  }, [heroData, metadataProvider, t]);
+    }, [heroData]);
 
-  const {
-    uri: logoUri,
-    onError: handleLogoError,
-    onLoad: handleLogoLoad,
-  } = useLogoFallback({
-    providerValue: provider.value,
-    link: hero?.link || '',
-    candidates: logoCandidates,
-  });
+    const logoCandidates = React.useMemo(() => {
+      const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
+        ?.artworkCandidates?.logo;
+      const values = candidates?.length ? candidates : [heroData?.logo];
+      return Array.from(
+        new Set(values.filter((value): value is string => !!value?.trim())),
+      );
+    }, [heroData]);
 
-  return (
-    <View className="relative h-[55vh]">
-      {/* Header Controls */}
-      <View className="absolute pt-3 w-full top-6 px-3 mt-2 z-30 flex-row justify-between items-center">
-        {!searchActive && (
-          <View
-            className={`${
-              showHamburgerMenu && !isDrawerDisabled
-                ? 'opacity-100'
-                : 'opacity-0'
-            }`}>
-            <Pressable
-              className={`${isDrawerOpen ? 'opacity-0' : 'opacity-100'}`}
-              onPress={onOpenDrawer}>
-              <Ionicons name="menu-sharp" size={27} color="white" />
-            </Pressable>
-          </View>
-        )}
+    useEffect(() => {
+      lastErrorLinkRef.current = null;
+    }, [hero?.link]);
 
-        {!searchActive && (
+    useEffect(() => {
+      setImageCandidateIndex(0);
+    }, [hero?.link, backgroundCandidates]);
+
+    // Memoized image source
+    const currentImageUri = React.useMemo(() => {
+      if (!heroData) {
+        return hero?.image || PLACEHOLDER_IMAGE;
+      }
+      return backgroundCandidates[imageCandidateIndex] || hero?.image || PLACEHOLDER_IMAGE;
+    }, [heroData, backgroundCandidates, imageCandidateIndex, hero?.image]);
+    const imageSource = React.useMemo(
+      () => ({uri: currentImageUri}),
+      [currentImageUri],
+    );
+
+    const reportHeroFailure = useCallback(
+      (failedLink: string) => {
+        if (onImageError && lastErrorLinkRef.current !== failedLink) {
+          lastErrorLinkRef.current = failedLink;
+          onImageError(failedLink);
+        }
+      },
+      [onImageError],
+    );
+
+    useEffect(() => {
+      if (error && !heroData && hero?.link) {
+        reportHeroFailure(hero.link);
+      }
+    }, [error, heroData, hero?.link, reportHeroFailure]);
+
+    const handleImageError = useCallback(() => {
+      console.warn('Hero image failed to load');
+      if (imageCandidateIndex + 1 < backgroundCandidates.length) {
+        setImageCandidateIndex(index => index + 1);
+        return;
+      }
+      if (hero?.link) {
+        reportHeroFailure(hero.link);
+      }
+    }, [
+      imageCandidateIndex,
+      backgroundCandidates.length,
+      hero?.link,
+      reportHeroFailure,
+    ]);
+
+    // Memoized genres
+    const displayGenres = React.useMemo(() => {
+      if (!heroData) {
+        return [];
+      }
+      const tags = (heroData.genre || heroData.tags || []) as string[];
+      const tagKeys = (heroData as {tagKeys?: Record<string, string>}).tagKeys;
+      return tags.slice(0, 3).map(tag => {
+        const key = tagKeys?.[tag];
+        return key ? t(key) : tag;
+      });
+    }, [heroData, provider.value, t]);
+    const displayTitle = React.useMemo(() => {
+      if (!heroData) {
+        return '';
+      }
+      if (metadataProvider !== 'animeunity' && heroData.name) {
+        return heroData.name;
+      }
+      const titleKey = (
+        heroData as {
+          titleKey?: string;
+          titleParams?: Record<string, string | number>;
+        }
+      ).titleKey;
+      if (titleKey) {
+        return t(
+          titleKey,
+          (
+            heroData as {
+              titleParams?: Record<string, string | number>;
+            }
+          ).titleParams,
+        );
+      }
+      return heroData.title || '';
+    }, [heroData, metadataProvider, t]);
+
+    const {
+      uri: logoUri,
+      onError: handleLogoError,
+      onLoad: handleLogoLoad,
+    } = useLogoFallback({
+      providerValue: provider.value,
+      link: hero?.link || '',
+      candidates: logoCandidates,
+    });
+
+    return (
+      <View style={{backgroundColor: 'black'}}>
+        <View
+          style={{
+            minHeight: Math.max(560, height * 0.69),
+            paddingTop: insets.top + 56,
+          }}
+          {...swipe.panHandlers}>
           <Pressable
+            onPress={handlePlayPress}
             accessibilityRole="button"
-            accessibilityLabel={t('Search in {{provider}}', {
-              provider: provider.display_name,
-            })}
-            onPress={() => setSearchActive(true)}>
-            <Feather name="search" size={24} color="white" />
+            accessibilityLabel={displayTitle || hero?.title}
+            style={{position: 'absolute', width: '100%', height: '100%'}}>
+            {isLoading && !hero?.image ? (
+              <View style={{flex: 1, backgroundColor: '#141519'}} />
+            ) : (
+              <Image
+                source={imageSource}
+                onError={handleImageError}
+                style={{width: '100%', height: '100%', resizeMode: 'cover'}}
+              />
+            )}
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                'rgba(0,0,0,0.65)',
+                'transparent',
+                'rgba(0,0,0,0.25)',
+                'black',
+              ]}
+              locations={[0, 0.24, 0.5, 1]}
+              style={{position: 'absolute', width: '100%', height: '100%'}}
+            />
           </Pressable>
-        )}
-      </View>
 
-      {/* Hero Image */}
-      {isLoading ? (
-        <View className="h-full w-full bg-gray-800" />
-      ) : (
-        <Image
-          source={imageSource}
-          onError={handleImageError}
-          className="h-full w-full"
-          style={{resizeMode: 'cover'}}
-        />
-      )}
-
-      {/* Hero Content */}
-      <View className="absolute bottom-12 w-full z-20 px-6">
-        {!isLoading && heroData && (
-          <View className="gap-4 items-center">
-            {/* Title/Logo */}
+          <View style={{flex: 1, minHeight: width * 0.65}} />
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: 20,
+              paddingBottom: 12,
+              gap: 12,
+            }}>
             {logoUri ? (
               <RemoteLogo
                 uri={logoUri}
-                width={200}
+                width={Math.min(width - 32, 360)}
                 height={100}
                 onError={handleLogoError}
                 onLoad={handleLogoLoad}
               />
             ) : (
-              <Text className="text-white text-center text-2xl font-bold">
-                {displayTitle}
+              <Text
+                numberOfLines={3}
+                style={{
+                  color: 'white',
+                  fontSize: 30,
+                  lineHeight: 34,
+                  fontWeight: '800',
+                }}>
+                {displayTitle || hero?.title || t('Home')}
               </Text>
             )}
-
-            {/* Genres */}
             {displayGenres.length > 0 && (
-              <View className="flex-row items-center justify-center space-x-2">
-                {displayGenres.map((genre: string, index: number) => (
-                  <Text
-                    key={index}
-                    className="text-white text-sm font-semibold">
-                    • {genre}
-                  </Text>
-                ))}
-              </View>
+              <Text numberOfLines={1} style={{color: '#DADADA', fontSize: 12}}>
+                {displayGenres.join(' · ')}
+              </Text>
             )}
-
-            {/* Play Button */}
-            <View className="flex-1 items-center justify-center">
-              {hero?.link && (
+            {!!heroData?.synopsis && (
+              <Text
+                numberOfLines={3}
+                style={{color: '#F8F8F8', fontSize: 14, lineHeight: 20}}>
+                {heroData.synopsis}
+              </Text>
+            )}
+            {error && !isLoading && (
+              <Text style={{color: '#A0A0A0'}}>
+                {t('Unable to load details')}
+              </Text>
+            )}
+            {!!hero?.link && (
+              <View style={{flexDirection: 'row', gap: 12, marginTop: 12}}>
                 <TouchableOpacity
-                  className="bg-white px-10 py-2 rounded-lg flex-row items-center space-x-2"
+                  accessibilityRole="button"
                   onPress={handlePlayPress}
-                  activeOpacity={0.8}>
-                  <FontAwesome6 name="play" size={20} color="black" />
-                  <Text className="text-black font-bold text-lg">
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    borderRadius: 24,
+                    backgroundColor: '#FF640A',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    padding: 10,
+                  }}>
+                  <Ionicons name="play-outline" size={24} color="black" />
+                  <Text
+                    style={{color: 'black', fontSize: 16, fontWeight: '700'}}>
                     {t('Play')}
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Loading state */}
-        {isLoading && (
-          <View className="items-center">
-            <View className="h-[45px] w-[140px] bg-gray-700 rounded" />
-          </View>
-        )}
-
-        {/* Error state */}
-        {error && !isLoading && (
-          <View className="items-center">
-            <Text className="text-white text-center text-xl font-bold">
-              {hero?.title || t('Content Unavailable')}
-            </Text>
-            <Text className="text-gray-400 text-sm mt-2">
-              {t('Unable to load details')}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Gradients */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)', 'black']}
-        locations={[0, 0.7, 1]}
-        className="absolute h-full w-full"
-      />
-
-      {searchActive && (
-        <LinearGradient
-          colors={['black', 'transparent']}
-          locations={[0, 0.3]}
-          className="absolute h-[30%] w-full"
-        />
-      )}
-
-      <Modal
-        visible={searchActive}
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={closeSearch}>
-        <SafeAreaView className="flex-1 bg-black">
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            className="px-4 pt-4 flex-row items-center">
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('Close search')}
-              onPress={closeSearch}
-              className="p-2 mr-2">
-              <Ionicons name="arrow-back" size={26} color="white" />
-            </TouchableOpacity>
-            <View className="flex-1 flex-row items-center rounded-xl bg-[#141414] px-3">
-              <Feather name="search" size={21} color="#999" />
-              <TextInput
-                testID="provider-search-input"
-                autoFocus
-                value={searchText}
-                onChangeText={handleSearchTextChange}
-                onSubmitEditing={event =>
-                  handleSearchSubmit(event.nativeEvent.text)
-                }
-                placeholder={t('Search in {{provider}}', {
-                  provider: provider.display_name,
-                })}
-                placeholderTextColor="#777"
-                returnKeyType="search"
-                className="flex-1 h-12 px-3 text-white text-base"
-              />
-              {searchText.length > 0 && (
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityLabel={t('Clear search')}
+                  accessibilityLabel={t(
+                    isSaved ? 'Remove from watch list' : 'Add to watch list',
+                  )}
+                  accessibilityState={{selected: isSaved}}
                   onPress={() => {
-                    setSuggestionsSuppressed(false);
-                    setSearchText('');
+                    if (isSaved) {
+                      removeItem(hero.link);
+                    } else {
+                      addItem({
+                        title: displayTitle || hero.title,
+                        poster:
+                          heroData?.poster || heroData?.image || hero.image,
+                        link: hero.link,
+                        provider: provider.value,
+                      });
+                    }
                   }}
-                  className="p-2">
-                  <Feather name="x" size={18} color="#999" />
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 24,
+                    borderWidth: 2,
+                    borderColor: '#FF640A',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Ionicons
+                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                    size={24}
+                    color="#FF640A"
+                  />
                 </TouchableOpacity>
-              )}
-            </View>
-          </Animated.View>
-          <View className="flex-1 pt-2">
-            {suggestions.length > 0 ? (
-              <SearchSuggestions
-                suggestions={suggestions}
-                onSelectSuggestion={handleSelectSuggestion}
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center px-8">
-                <Ionicons name="search" size={34} color="#666" />
-                <Text className="text-white/50 text-sm text-center mt-3">
-                  {t('Type at least two characters for suggestions')}
-                </Text>
               </View>
             )}
           </View>
-        </SafeAreaView>
-      </Modal>
-    </View>
-  );
-});
+        </View>
+        {slides.length > 1 && (
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 8,
+              paddingHorizontal: 16,
+              paddingTop: 6,
+              paddingBottom: 18,
+            }}>
+            {slides.map((item, index) => (
+              <Pressable
+                key={item.link}
+                onPress={() => setPage(index)}
+                accessibilityRole="button"
+                accessibilityLabel={t('Home slide', {
+                  number: index + 1,
+                  total: slides.length,
+                })}
+                accessibilityState={{selected: page === index}}
+                style={{width: 39, height: 28, justifyContent: 'center'}}>
+                <View
+                  style={{
+                    height: 7,
+                    borderRadius: 4,
+                    backgroundColor: index === page ? '#FF640A' : '#DADADA',
+                  }}
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  },
+);
 
 Hero.displayName = 'Hero';
 

@@ -1,4 +1,8 @@
 {
+  "Remove from watch list": "Rimuovi dalla lista",
+  "Add to watch list": "Aggiungi alla lista",
+  "Home slide": "Titolo {{number}} di {{total}}",
+  "Home providers": "Seleziona provider",
   "Home": "Home",
   "Search": "Cerca",
   "Watch List": "Lista da guardare",
