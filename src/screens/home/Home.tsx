@@ -154,6 +154,7 @@ const Home = ({}: Props) => {
   const [isHorizontalListDragging, setIsHorizontalListDragging] =
     useState(false);
   const [heroRetryNonce, setHeroRetryNonce] = useState(0);
+  const [heroRefreshNonce, setHeroRefreshNonce] = useState(0);
   const heroImageErrorCountRef = useRef(0);
   const drawerUnlockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -330,11 +331,11 @@ const Home = ({}: Props) => {
 
     const setHeroData = (hero: Post | null) => {
       if (!provider?.value) {
-        setHero({link: '', image: '', title: ''});
+        setHero({link: '', image: '', title: ''}, providerCacheScope);
         return;
       }
       if (hero?.link) {
-        setHero(hero);
+        setHero(hero, providerCacheScope);
         const cacheKey = getHeroCacheKey(provider.value);
         cacheStorage.setString(
           cacheKey,
@@ -345,11 +346,11 @@ const Home = ({}: Props) => {
         }
         return;
       }
-      setHero({link: '', image: '', title: ''});
+      setHero({link: '', image: '', title: ''}, providerCacheScope);
     };
 
     if (!provider?.value) {
-      setHero({link: '', image: '', title: ''});
+      setHero({link: '', image: '', title: ''}, providerCacheScope);
       return;
     }
 
@@ -364,7 +365,7 @@ const Home = ({}: Props) => {
         const isFresh =
           parsed?.timestamp && Date.now() - parsed.timestamp < heroCacheTtlMs;
         if (isFresh && parsed?.hero?.link && parsed.hero.link !== badHeroLink) {
-          setHero(parsed.hero);
+          setHero(parsed.hero, providerCacheScope);
           return;
         }
       } catch {
@@ -423,6 +424,9 @@ const Home = ({}: Props) => {
       await refetch();
     } catch (refreshError) {
       console.error('Error refreshing home data:', refreshError);
+    } finally {
+      // A user refresh retries artwork and slides excluded in this session.
+      setHeroRefreshNonce(value => value + 1);
     }
   }, [refetch]);
 
@@ -539,6 +543,7 @@ const Home = ({}: Props) => {
               ListHeaderComponent={
                 <>
                   <HeroOptimized
+                    key={`${providerCacheScope}:${heroRefreshNonce}`}
                     posts={homeData
                       .flatMap(section => section.Posts)
                       .slice(0, 20)}

@@ -7,6 +7,7 @@ import {
   Image,
   useWindowDimensions,
   PanResponder,
+  AppState,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -25,6 +26,7 @@ import type {ArtworkCandidates} from '../lib/services/artworkSelection';
 import {useLogoFallback} from '../lib/hooks/useLogoFallback';
 import {startPerfNavigation} from '../lib/utils/perfTrace';
 import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
+import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 
 interface HeroProps {
   posts?: Post[];
@@ -34,9 +36,6 @@ interface HeroProps {
   onImageError?: (link?: string) => void;
 }
 
-const PLACEHOLDER_IMAGE =
-  'https://placehold.jp/24/363636/ffffff/500x500.png?text=Vega';
-
 const Hero = memo(
   ({
     isDrawerOpen,
@@ -45,26 +44,51 @@ const Hero = memo(
     posts = [],
     isActive = true,
   }: HeroProps) => {
-    const [imageCandidateIndex, setImageCandidateIndex] = useState(0);
+    const [failedImages, setFailedImages] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const [failedSlides, setFailedSlides] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const [appState, setAppState] = useState(AppState.currentState);
+    useEffect(() => {
+      const subscription = AppState.addEventListener('change', setAppState);
+      return () => subscription.remove();
+    }, []);
     const {t} = useTranslation();
     const {provider} = useContentStore(state => state);
-    const {hero: initialHero} = useHeroStore(state => state);
+    const {hero: storedHero, providerScope} = useHeroStore(state => state);
+    const scope = getProviderCacheScope(provider.value);
+    const initialHero = providerScope === scope ? storedHero : undefined;
     const {width, height} = useWindowDimensions();
     const insets = useSafeAreaInsets();
-    const [page, setPage] = useState(0);
+    const [selectedLink, setSelectedLink] = useState('');
     const slides = React.useMemo(() => {
       const unique = new Map<string, Post>();
       [initialHero, ...posts].forEach(post => {
-        if (post?.link && !unique.has(post.link)) {
+        if (
+          post?.link &&
+          !failedSlides.has(post.link) &&
+          !unique.has(post.link)
+        ) {
           unique.set(post.link, post);
         }
       });
       return Array.from(unique.values()).slice(0, 6);
-    }, [initialHero, posts]);
-    const hero = slides[page] || initialHero;
+    }, [initialHero, posts, failedSlides]);
+    const page = Math.max(
+      0,
+      slides.findIndex(post => post.link === selectedLink),
+    );
+    const hero = slides[page];
+    const setPage = useCallback(
+      (index: number) => {
+        setSelectedLink(slides[index]?.link || '');
+      },
+      [slides],
+    );
     const {watchList, addItem, removeItem} = useWatchListStore();
     const isSaved = watchList.some(item => item.link === hero?.link);
-    useEffect(() => setPage(0), [initialHero?.link, provider.value]);
     const swipe = React.useMemo(
       () =>
         PanResponder.create({
@@ -73,19 +97,16 @@ const Hero = memo(
             Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
           onPanResponderRelease: (_, gesture) => {
             if (Math.abs(gesture.dx) > 40) {
-              setPage(value =>
+              setPage(
                 Math.max(
                   0,
-                  Math.min(
-                    slides.length - 1,
-                    value + (gesture.dx < 0 ? 1 : -1),
-                  ),
+                  Math.min(slides.length - 1, page + (gesture.dx < 0 ? 1 : -1)),
                 ),
               );
             }
           },
         }),
-      [slides.length],
+      [slides.length, page, setPage],
     );
     const metadataProvider = getMetadataSourceProvider(
       provider.value,
@@ -102,16 +123,31 @@ const Hero = memo(
       error,
     } = useHeroMetadata(hero?.link || '', provider.value);
     useEffect(() => {
-      if (isLoading || !isActive || searchActive || isDrawerOpen || slides.length < 2) {
+      if (
+        appState !== 'active' ||
+        isLoading ||
+        !isActive ||
+        searchActive ||
+        isDrawerOpen ||
+        slides.length < 2
+      ) {
         return;
       }
       const timer = setTimeout(
-        () => setPage(value => (value + 1) % slides.length),
+        () => setPage((page + 1) % slides.length),
         10500,
       );
       return () => clearTimeout(timer);
-    }, [page, slides.length, isActive, searchActive, isDrawerOpen, isLoading]);
-
+    }, [
+      page,
+      slides.length,
+      isActive,
+      searchActive,
+      isDrawerOpen,
+      isLoading,
+      appState,
+      setPage,
+    ]);
 
     const handlePlayPress = useCallback(() => {
       if (hero?.link) {
@@ -135,7 +171,7 @@ const Hero = memo(
       heroData,
     ]);
 
-    const lastErrorLinkRef = useRef<string | null>(null);
+    const reportedLinks = useRef(new Set<string>());
 
     const backgroundCandidates = React.useMemo(() => {
       const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
@@ -144,9 +180,13 @@ const Hero = memo(
         ? candidates
         : [heroData?.background, heroData?.image, heroData?.poster];
       return Array.from(
-        new Set(values.filter((value): value is string => !!value?.trim())),
+        new Set(
+          [...values, hero?.image].filter(
+            (value): value is string => !!value?.trim(),
+          ),
+        ),
       );
-    }, [heroData]);
+    }, [heroData, hero?.image]);
 
     const logoCandidates = React.useMemo(() => {
       const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
@@ -157,21 +197,12 @@ const Hero = memo(
       );
     }, [heroData]);
 
-    useEffect(() => {
-      lastErrorLinkRef.current = null;
-    }, [hero?.link]);
-
-    useEffect(() => {
-      setImageCandidateIndex(0);
-    }, [hero?.link, backgroundCandidates]);
-
     // Memoized image source
     const currentImageUri = React.useMemo(() => {
-      if (!heroData) {
-        return hero?.image || PLACEHOLDER_IMAGE;
-      }
-      return backgroundCandidates[imageCandidateIndex] || hero?.image || PLACEHOLDER_IMAGE;
-    }, [heroData, backgroundCandidates, imageCandidateIndex, hero?.image]);
+      return backgroundCandidates.find(
+        uri => !failedImages.has(`${hero?.link}|${uri}`),
+      );
+    }, [backgroundCandidates, failedImages, hero?.link]);
     const imageSource = React.useMemo(
       () => ({uri: currentImageUri}),
       [currentImageUri],
@@ -179,35 +210,40 @@ const Hero = memo(
 
     const reportHeroFailure = useCallback(
       (failedLink: string) => {
-        if (onImageError && lastErrorLinkRef.current !== failedLink) {
-          lastErrorLinkRef.current = failedLink;
-          onImageError(failedLink);
+        if (!reportedLinks.current.has(failedLink)) {
+          reportedLinks.current.add(failedLink);
+          setFailedSlides(previous => new Set(previous).add(failedLink));
+          if (failedLink === initialHero?.link) {
+            onImageError?.(failedLink);
+          }
         }
       },
-      [onImageError],
+      [onImageError, initialHero?.link],
     );
 
     useEffect(() => {
-      if (error && !heroData && hero?.link) {
-        reportHeroFailure(hero.link);
-      }
-    }, [error, heroData, hero?.link, reportHeroFailure]);
-
-    const handleImageError = useCallback(() => {
-      console.warn('Hero image failed to load');
-      if (imageCandidateIndex + 1 < backgroundCandidates.length) {
-        setImageCandidateIndex(index => index + 1);
-        return;
-      }
-      if (hero?.link) {
+      if (
+        !isLoading &&
+        hero?.link &&
+        ((error && !heroData) || !currentImageUri)
+      ) {
         reportHeroFailure(hero.link);
       }
     }, [
-      imageCandidateIndex,
-      backgroundCandidates.length,
+      error,
+      heroData,
       hero?.link,
       reportHeroFailure,
+      isLoading,
+      currentImageUri,
     ]);
+
+    const handleImageError = useCallback(() => {
+      if (hero?.link && currentImageUri) {
+        const imageKey = `${hero.link}|${currentImageUri}`;
+        setFailedImages(previous => new Set(previous).add(imageKey));
+      }
+    }, [currentImageUri, hero?.link]);
 
     // Memoized genres
     const displayGenres = React.useMemo(() => {
@@ -270,10 +306,11 @@ const Hero = memo(
             accessibilityRole="button"
             accessibilityLabel={displayTitle || hero?.title}
             style={{position: 'absolute', width: '100%', height: '100%'}}>
-            {isLoading && !hero?.image ? (
+            {!currentImageUri ? (
               <View style={{flex: 1, backgroundColor: '#141519'}} />
             ) : (
               <Image
+                key={`${hero?.link}|${currentImageUri}`}
                 source={imageSource}
                 onError={handleImageError}
                 style={{width: '100%', height: '100%', resizeMode: 'cover'}}
@@ -332,11 +369,12 @@ const Hero = memo(
                 {heroData.synopsis}
               </Text>
             )}
-            {error && !isLoading && (
-              <Text style={{color: '#A0A0A0'}}>
-                {t('Unable to load details')}
-              </Text>
-            )}
+            {(error || (!slides.length && failedSlides.size > 0)) &&
+              !isLoading && (
+                <Text style={{color: '#A0A0A0'}}>
+                  {t('Unable to load details')}
+                </Text>
+              )}
             {!!hero?.link && (
               <View style={{flexDirection: 'row', gap: 12, marginTop: 12}}>
                 <TouchableOpacity

@@ -41,4 +41,14 @@ Gli screenshot di revisione vengono salvati in `.codex/screenshots/cruncy-ui/`, 
 - Emulatore Medium_Phone_API_35: controllo visivo dei componenti reali con fixture temporanea in memoria per cronologia, caricamento, vuoto ed errore. Catture `step1-qa-cards.png` e `step1-qa-states.png` nella directory screenshot ignorata. Harness rimosso prima del commit; non rappresenta un test end-to-end del provider. Prova aggiuntiva del catalogo reale dopo il ripristino.
 - Catalogo reale: verificati scorrimento verticale con toolbar fissa, scorrimento orizzontale dei poster e apertura del dettaglio di una card. Evidenze locali `step1-real.png`, `step1-nav.png` e `step1-return.png`. Il dev client installato riporta 3.3.19/build 178, mentre i sorgenti sono 3.3.20/build 179: Metro aggiorna JavaScript, non la versione nativa; da qui l'avviso di aggiornamento.
 
-I punti 2 (robustezza carosello), 3 (transizioni/indicatori/ritorno in cima) e 4 (matrice dispositivi/provider/accessibilita) restano da completare in quest'ordine, con verifica e commit separati. L'analisi estetica finale deve includere il selettore provider nell'header.
+### Punto 2 — robustezza del carosello
+
+- La selezione segue il link del titolo quando le sezioni si riordinano; se il titolo scompare, torna a una slide valida.
+- Lo store associa il hero al contesto del provider (inclusa la revisione dell'estensione). Il carosello si ricrea al cambio contesto, senza interrogare i metadati del hero precedente con il nuovo provider.
+- Un errore di una slide secondaria esclude quella slide senza invalidare il hero principale. I fallimenti vengono ricordati nella sessione per evitare cicli; il refresh manuale consente un nuovo tentativo.
+- Le immagini provano tutti i candidati, incluso il poster del catalogo. Gli eventi tardivi di un'immagine precedente non fanno fallire la slide corrente. Se i metadati sono ancora in caricamento, il fallimento del poster preliminare non esclude il titolo. Rimosso il placeholder remoto; il fondo di caricamento e locale.
+- Rotazione sospesa anche con app in background; alla riapertura parte un nuovo intervallo completo. Restano le pause per ricerca, drawer, scorrimento e caricamento metadati.
+- Verifiche: TypeScript e lint senza errori o warning; 15 test tra regressioni hero, interazioni Continua a guardare e riconciliazione sezioni. Otto casi del hero coprono errori, fallback, eventi tardivi, riordinamento/rimozione, contesto provider, background, ricerca, attesa metadati e recupero dopo refresh.
+- Emulatore: catalogo reale, selezione tramite indicatori, swipe al bordo finale, pausa in background (slide 3 prima/dopo) e ripresa della rotazione. Evidenze ignorate in Git: `step2-top.png`, `step2-boundary.png` e dump `step2-before.xml`, `step2-after.xml`, `step2-resumed.xml`. Errori di rete e cambio contesto sono verificati dai test controllati; la matrice di provider reali resta nel punto 4.
+
+I punti 3 (transizioni/indicatori/ritorno in cima) e 4 (matrice dispositivi/provider/accessibilita) restano da completare in quest'ordine, con verifica e commit separati. L'analisi estetica finale deve includere il selettore provider nell'header.

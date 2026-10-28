@@ -3,12 +3,14 @@ import {Post} from '../providers/types';
 
 export interface Hero {
   hero: Post;
-  setHero: (hero: Hero['hero']) => void;
+  providerScope: string;
+  setHero: (hero: Hero['hero'], providerScope: string) => void;
 }
 
 const useHeroStore = create<Hero>(set => ({
   hero: {title: '', link: '', image: ''},
-  setHero: hero => set({hero}),
+  providerScope: '',
+  setHero: (hero, providerScope) => set({hero, providerScope}),
 }));
 
 export default useHeroStore;
