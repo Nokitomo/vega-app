@@ -45,6 +45,20 @@ describe('Hero artwork transitions', () => {
     await act(async () => tree.unmount());
   });
 
+  it('does not run a hidden image fade when the carousel owns the whole-card transition', async () => {
+    const timing = jest.spyOn(Animated, 'timing');
+    const loaded = jest.fn();
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<HeroArtwork uri="poster" reducedMotion={false}
+        animateOnLoad={false} onError={() => {}} onLoad={loaded} />);
+    });
+    await act(async () => tree.root.findByType(Image).props.onLoad());
+    expect(loaded).toHaveBeenCalledTimes(1);
+    expect(timing).not.toHaveBeenCalled();
+    await act(async () => tree.unmount());
+  });
+
   it('ignores a late load after the artwork has been removed', async () => {
     const timing = jest.spyOn(Animated, 'timing');
     let tree!: renderer.ReactTestRenderer;

@@ -30,6 +30,7 @@ import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
+import {HERO_INTERVAL_MS, heroSwipeTarget, useHeroCarouselMotion} from '../lib/hooks/useHeroCarouselMotion';
 import {uniqueHeroPosts} from '../lib/utils/heroPolicy';
 import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
 
@@ -232,6 +233,7 @@ const HeroCard = memo(
                 key={`${hero?.link}|${currentImageUri}`}
                 uri={currentImageUri}
                 reducedMotion={reducedMotion}
+                animateOnLoad={false}
                 onError={handleImageError}
                 onLoad={size => {
                   setLoadedBackground(currentImageUri);
@@ -449,7 +451,15 @@ const Hero = memo(
     );
     const requested = slides[page];
     const [readyLinks, setReadyLinks] = useState<Set<string>>(() => new Set());
-    const [displayedLink, setDisplayedLink] = useState('');
+    const motionActive = appState !== 'background' && appState !== 'inactive' &&
+      isActive && !searchActive && !isDrawerOpen;
+    const motion = useHeroCarouselMotion({
+      requestedLink: requested?.link || '',
+      ready: !!requested && readyLinks.has(requested.link),
+      active: motionActive,
+      reducedMotion,
+    });
+    const {displayedLink, beginDrag, moveDrag, endDrag} = motion;
     const [preparationExpired, setPreparationExpired] = useState(false);
     const [retryGeneration, setRetryGeneration] = useState(0);
     const requestedAt = useRef(perfNow());
@@ -474,25 +484,22 @@ const Hero = memo(
       });
     }, []);
     useEffect(() => {
-      if (
-        requested &&
-        readyLinks.has(requested.link) &&
-        requested.link !== displayedLink
-      ) {
+      if (displayedLink) {
         perfTrace('hero_presented', {
           provider: provider.value,
           waitMs: Math.round(perfNow() - requestedAt.current),
         });
-        setDisplayedLink(requested.link);
       }
-    }, [requested, readyLinks, displayedLink, provider.value]);
+    }, [displayedLink, provider.value]);
     // Keep the current card mounted while preparing the requested and next card.
     const mountedSlides = preparationExpired && !visible ? [] : slides.filter(
       post =>
         post.link === visible?.link ||
+        post.link === motion.outgoing?.link ||
         post.link === requested?.link ||
         (!!visible &&
           requested?.link === displayedLink &&
+          !motion.transitioning &&
           appState === 'active' &&
           isActive &&
           !searchActive &&
@@ -507,25 +514,31 @@ const Hero = memo(
       [slides],
     );
     const swipe = React.useMemo(
-      () =>
-        PanResponder.create({
-          onMoveShouldSetPanResponder: (_, gesture) =>
-            Math.abs(gesture.dx) > 20 &&
-            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
-          onPanResponderRelease: (_, gesture) => {
-            if (Math.abs(gesture.dx) > 40) {
-              setPage(
-                Math.max(
-                  0,
-                  Math.min(slides.length - 1, page + (gesture.dx < 0 ? 1 : -1)),
-                ),
-              );
-            }
-          },
-        }),
-      [slides.length, page, setPage],
+      () => PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          motionActive && !!visible && !motion.transitioning &&
+          Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+        onPanResponderGrant: beginDrag,
+        onPanResponderMove: (_, gesture) => {
+          const neighbor = displayedPage + (gesture.dx < 0 ? 1 : -1);
+          moveDrag(gesture.dx, width, neighbor >= 0 && neighbor < slides.length);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          endDrag();
+          const next = heroSwipeTarget(displayedPage, slides.length, width, gesture.dx, gesture.vx);
+          setPage(next);
+        },
+        onPanResponderTerminate: endDrag,
+      }),
+      [motionActive, !!visible, motion.transitioning, displayedPage, slides.length,
+        width, beginDrag, moveDrag, endDrag, setPage],
     );
     useEffect(() => {
+      if (motion.transitioning) {
+        progress.setValue(reducedMotion ? 1 : 0);
+        return;
+      }
+      if (motion.dragging) {return;}
       if (
         appState !== 'active' ||
         isLoading ||
@@ -540,11 +553,11 @@ const Hero = memo(
       progress.setValue(reducedMotion ? 1 : 0);
       const timer = setTimeout(
         () => setPage((page + 1) % slides.length),
-        10500,
+        HERO_INTERVAL_MS,
       );
       const animation = Animated.timing(progress, {
         toValue: 1,
-        duration: 10500,
+        duration: HERO_INTERVAL_MS,
         easing: Easing.linear,
         useNativeDriver: true,
       });
@@ -557,6 +570,8 @@ const Hero = memo(
       };
     }, [
       page,
+      motion.transitioning,
+      motion.dragging,
       slides.length,
       isActive,
       searchActive,
@@ -595,7 +610,7 @@ const Hero = memo(
     );
 
     return (
-      <View style={{backgroundColor: 'black'}} {...swipe.panHandlers}>
+      <View testID="hero-carousel" style={{backgroundColor: 'black'}} {...swipe.panHandlers}>
         {!visible && (
           <View
             testID="hero-loading"
@@ -625,24 +640,24 @@ const Hero = memo(
         )}
         {mountedSlides.map(post => {
           const shown = post.link === visible?.link;
+          const leaving = post.link === motion.outgoing?.link;
           return (
-            <View
+            <Animated.View
               key={`${scope}:${post.link}`}
-              testID={shown ? 'hero-visible' : 'hero-preparing'}
-              pointerEvents={shown ? 'auto' : 'none'}
-              accessibilityElementsHidden={!shown}
-              importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}
-              style={
-                shown
-                  ? undefined
-                  : {
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      opacity: 0,
-                    }
-              }>
+              testID={shown ? 'hero-visible' : leaving ? 'hero-outgoing' : 'hero-preparing'}
+              pointerEvents={shown && !motion.transitioning && !motion.dragging ? 'auto' : 'none'}
+              accessibilityElementsHidden={!shown || motion.transitioning}
+              importantForAccessibility={shown && !motion.transitioning ? 'auto' : 'no-hide-descendants'}
+              style={[
+                shown ? {opacity: Animated.multiply(motion.blend, motion.dragOpacity)} : {
+                  position: 'absolute', left: 0, right: 0, top: 0,
+                  opacity: leaving
+                    ? Animated.multiply(motion.outgoing!.opacity,
+                        motion.blend.interpolate({inputRange: [0, 1], outputRange: [1, 0]}))
+                    : 0,
+                },
+                {zIndex: shown ? 1 : 0},
+              ]}>
               <HeroCard
                 hero={post}
                 provider={provider}
@@ -650,7 +665,7 @@ const Hero = memo(
                 onFailure={reportHeroFailure}
                 onReady={onReady}
               />
-            </View>
+            </Animated.View>
           );
         })}
         {slides.length > 1 && (

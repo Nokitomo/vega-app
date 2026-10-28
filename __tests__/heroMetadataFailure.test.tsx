@@ -1,6 +1,6 @@
 import 'react-native';
 import React, {act} from 'react';
-import {AppState, Image} from 'react-native';
+import {AppState, Image, PanResponder} from 'react-native';
 import {beforeEach, afterEach, describe, expect, it, jest} from '@jest/globals';
 import renderer from 'react-test-renderer';
 import Hero from '../src/components/Hero';
@@ -194,6 +194,7 @@ describe('Hero carousel resilience', () => {
   const second = {link: 'second', title: 'Second', image: 'second.jpg'};
   const third = {link: 'third', title: 'Third', image: 'third.jpg'};
   let changeAppState: (state: 'active' | 'background') => void;
+  let gestures: Parameters<typeof PanResponder.create>[0];
   let tree: renderer.ReactTestRenderer;
   const onError = jest.fn();
   const slides = () =>
@@ -254,6 +255,11 @@ describe('Hero carousel resilience', () => {
       }) as unknown as typeof useHeroStore,
     );
     metadataMock.mockImplementation(metadata);
+    const createResponder = PanResponder.create;
+    jest.spyOn(PanResponder, 'create').mockImplementation(config => {
+      gestures = config;
+      return createResponder(config);
+    });
     jest
       .spyOn(AppState, 'addEventListener')
       .mockImplementation((_event, listener) => {
@@ -340,10 +346,38 @@ describe('Hero carousel resilience', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it('starts the automatic change at ten seconds, and pauses while a gesture is held', async () => {
+    await render();
+    await act(async () => changeAppState('active'));
+    await act(async () => jest.advanceTimersByTime(9999));
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+    await act(async () => jest.advanceTimersByTime(1));
+    expect(currentImage().props.source.uri).toBe('second.jpg');
+    await act(async () => jest.advanceTimersByTime(1000));
+    await act(async () => gestures.onPanResponderGrant?.({} as any, {} as any));
+    await act(async () => jest.advanceTimersByTime(20000));
+    expect(currentImage().props.source.uri).toBe('second.jpg');
+    await act(async () => gestures.onPanResponderTerminate?.({} as any, {} as any));
+  });
+
+  it('captures only horizontal intent, switches on a deliberate swipe and bounds the first page', async () => {
+    await render();
+    await act(async () => changeAppState('active'));
+    expect(gestures.onMoveShouldSetPanResponder?.({} as any, {dx: 30, dy: 60} as any)).toBe(false);
+    expect(gestures.onMoveShouldSetPanResponder?.({} as any, {dx: 30, dy: 2} as any)).toBe(true);
+    await act(async () => gestures.onPanResponderGrant?.({} as any, {} as any));
+    await act(async () => gestures.onPanResponderRelease?.({} as any, {dx: 200, vx: 1} as any));
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+    await act(async () => gestures.onPanResponderGrant?.({} as any, {} as any));
+    await act(async () => gestures.onPanResponderMove?.({} as any, {dx: -200} as any));
+    await act(async () => gestures.onPanResponderRelease?.({} as any, {dx: -200, vx: -1} as any));
+    expect(currentImage().props.source.uri).toBe('second.jpg');
+  });
+
   it('stops automatic progression in background, during search and while loading', async () => {
     await render();
     await act(async () => changeAppState('active'));
-    await act(async () => jest.advanceTimersByTime(10500));
+    await act(async () => jest.advanceTimersByTime(10000));
     expect(currentImage().props.source.uri).toBe('second.jpg');
     await act(async () => changeAppState('background'));
     await act(async () => jest.advanceTimersByTime(60000));
@@ -362,7 +396,7 @@ describe('Hero carousel resilience', () => {
     expect(currentImage().props.source.uri).toBe('second.jpg');
     metadataMock.mockImplementation(metadata);
     await render();
-    await act(async () => jest.advanceTimersByTime(10500));
+    await act(async () => jest.advanceTimersByTime(10000));
     expect(currentImage().props.source.uri).toBe('third.jpg');
   });
 

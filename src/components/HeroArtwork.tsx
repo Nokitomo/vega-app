@@ -5,20 +5,22 @@ import {Animated, Image} from 'react-native';
 export default function HeroArtwork({
   uri,
   reducedMotion,
+  animateOnLoad = true,
   onError,
   onLoad,
 }: {
   uri: string;
   reducedMotion: boolean;
+  animateOnLoad?: boolean;
   onError: () => void;
   onLoad?: (size?: {width: number; height: number}) => void;
 }) {
-  const opacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const opacity = useRef(new Animated.Value(reducedMotion || !animateOnLoad ? 1 : 0)).current;
   const loaded = useRef(false);
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
-    if (reducedMotion) {
+    if (reducedMotion || !animateOnLoad) {
       opacity.stopAnimation();
       opacity.setValue(1);
     }
@@ -26,7 +28,7 @@ export default function HeroArtwork({
       active.current = false;
       opacity.stopAnimation();
     };
-  }, [opacity, reducedMotion]);
+  }, [opacity, reducedMotion, animateOnLoad]);
   return (
     <Animated.View style={{width: '100%', height: '100%', opacity}}>
       <Image
@@ -38,6 +40,7 @@ export default function HeroArtwork({
           }
           loaded.current = true;
           onLoad?.(event?.nativeEvent?.source);
+          if (!animateOnLoad) {return;}
           Animated.timing(opacity, {
             toValue: 1,
             duration: reducedMotion ? 0 : 240,

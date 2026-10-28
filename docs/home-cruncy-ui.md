@@ -250,3 +250,74 @@ Verifiche del fix:
 - Screenshot e registrazioni in `.codex/screenshots/hero-fix-20261028/`, ignorati
   da Git. La registrazione StreamingUnity iniziale comprende il dialogo di
   aggiornamento del dev client. Nessun benchmark di velocita; iOS non verificato.
+
+
+### Animazioni del carosello (2026-10-28)
+
+Il confronto Android registrato in `hero-analysis-20261028` mostra attenuazione
+congiunta di immagine, logo, testi e CTA; non uno scorrimento orizzontale evidente.
+Il nuovo livello di presentazione applica la dissolvenza all'intera scheda, usando
+un blend fra uscente ed entrante solo dopo la preparazione completa di metadata,
+sfondo e logo. La dissolvenza autonoma dell'immagine al caricamento e disattivata
+nel hero per evitare che si consumi durante il precaricamento o si sommi al blend.
+
+- Intervallo nominale 10.000 ms (prima 10.500), seguito dalla transizione a molla.
+  Parametri nominali del riferimento: stiffness 1500, massa 1 e smorzamento critico.
+  Il tempo percepito comprende assestamento e, se necessario, attesa dei dati:
+  non e un cambio forzato ogni dieci secondi a prescindere dalla disponibilita.
+- Gesto orizzontale: opacita proporzionale alla distanza (con visibilita minima
+  del 15% finche il gesto non e rilasciato); ritorno a piena opacita se annullato.
+  Soglia di cambio 18% della larghezza o flick coerente di almeno 20 dp e
+  0,5 dp/ms. Ai bordi lo swipe non ricomincia dall'altra estremita; l'autoplay
+  mantiene invece il ciclo. Scroll verticale e tap sulla scheda conservati.
+- Timer fermo mentre si trascina o si completa la transizione; nuovo intervallo
+  dopo l'assestamento. Pausa anche con menu, ricerca, home non visibile e app in
+  background. La barra non lampeggia piena all'ingresso della nuova scheda.
+- Una selezione rapida invalida le callback della transizione precedente. La
+  scheda uscente e esclusa da tocchi e accessibilita; durante il blend non si
+  aprono accidentalmente dettagli. Nessuna modifica a routing o watchlist.
+- Con movimento ridotto: cambi immediati, senza molle o attenuazione al gesto;
+  barra statica. L'avanzamento automatico resta attivo come nel comportamento
+  precedente. Primo caricamento e richieste lente mantengono la barriera di
+  preparazione e il recupero Riprova introdotti nel fix precedente.
+
+Sono parametri e composizione coerenti con il riferimento acquisito; gesture e
+motori di animazione React Native/Compose non vengono dichiarati identici pixel
+per pixel su ogni dispositivo. Preferenze metadata, fallback e deduplicazione
+restano invariati. La verifica iOS resta da eseguire su dispositivo reale.
+
+
+Verifiche delle animazioni:
+
+- 50 test passati nelle suite heroCarouselMotion, heroMetadataFailure,
+  heroArtwork, heroMetadataCache, heroPolicy, homeResponsiveLayout e providerSheet.
+  Verificati timer prima/dopo 10 secondi, pausa durante un gesto, ritorno da
+  background, annullamento, bordi, intenti verticali, cambio rapido di selezione,
+  completamenti obsoleti, movimento ridotto e conservazione della barriera metadata.
+- TypeScript ed ESLint puliti. I primi test di integrazione hanno evidenziato
+  AppState inizialmente non valorizzato: la presentazione ora attende solo un
+  effettivo stato background/inactive, senza nascondere contenuti gia pronti.
+- Medium_Phone_API_35, dev client 3.3.19 e bundle corrente. Nessun prebuild.
+  Registrati avanzamento automatico AnimeUnity, swipe lento/veloce, gesto corto,
+  indicatori e limite dell'ultima pagina. I fotogrammi della transizione mostrano
+  attenuazione dell'intera card con header e righe fermi. StreamingUnity verifica
+  anche l'attesa della slide richiesta e apertura/chiusura del selettore provider.
+- La prima acquisizione StreamCenter comprende il caricamento e l'uscita verso
+  Home Android, non una transizione pronta. Dopo il ritorno e stato verificato
+  il recupero di una scheda completa. Gli errori di rete dei provider durante i
+  caricamenti non sono errori delle animazioni; avvisi Legacy Architecture,
+  SafeAreaView e require cycle rimangono quelli preesistenti.
+- Registrazioni e provini in `.codex/screenshots/hero-motion-20261028/`, esclusi
+  dal commit. Screenrecord sull'emulatore produce frame rate variabile: utile
+  per composizione e comportamento, non per certificare FPS o tempi assoluti.
+  Un breve banner Fast Refresh compare all'inizio del filmato gesti AnimeUnity.
+
+- Seconda acquisizione StreamCenter con schede pronte: indicatori e swipe cambiano
+  correttamente opere da entrambe le sorgenti. Movimento ridotto provato mediante
+  `transition_animation_scale=0` (impostazione letta dal modulo AccessibilityInfo
+  Android di React Native): barra statica e cambi immediati. Valore originale
+  `1.0` ripristinato e transizioni normali nuovamente registrate.
+
+- Verificata la CTA del hero verso il dettaglio StreamCenter e il ritorno alla
+  home, senza avviare playback. Nessuna regressione rilevata nei percorsi provati;
+  la verifica non certifica nuovamente player, download, cast o iOS.
