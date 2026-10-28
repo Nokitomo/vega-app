@@ -3,11 +3,11 @@ import {
   FlatList,
   RefreshControl,
   View,
-  Text,
   PanResponder,
   AppState,
 } from 'react-native';
 import Slider from '../../components/Slider';
+import HomeRowState from '../../components/HomeRowState';
 import HomeHeader from '../../components/HomeHeader';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import HeroOptimized from '../../components/Hero';
@@ -77,7 +77,9 @@ const parseHeroHistory = (raw: string | null): string[] => {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed.filter(item => typeof item === 'string' && item.trim().length > 0);
+    return parsed.filter(
+      item => typeof item === 'string' && item.trim().length > 0,
+    );
   } catch {
     return [];
   }
@@ -167,14 +169,13 @@ const Home = ({}: Props) => {
 
   const checkSeries = useCallback(() => {
     const state = useWatchHistoryStore.getState();
-    checkContinueWatchingSeries(
-      state.history,
-      state.hiddenFromContinueWatching,
-    ).then(changed => {
-      if (changed) {
-        useWatchHistoryStore.getState().refreshHistory();
-      }
-    }).catch(() => undefined);
+    checkContinueWatchingSeries(state.history, state.hiddenFromContinueWatching)
+      .then(changed => {
+        if (changed) {
+          useWatchHistoryStore.getState().refreshHistory();
+        }
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -191,8 +192,11 @@ const Home = ({}: Props) => {
   }, [checkSeries, installedProviders?.length, isHomeFocused]);
 
   const resolveCatalogTitle = useCallback(
-    (item: {title: string; titleKey?: string; titleParams?: Record<string, string | number>}) =>
-      item.titleKey ? t(item.titleKey, item.titleParams) : item.title,
+    (item: {
+      title: string;
+      titleKey?: string;
+      titleParams?: Record<string, string | number>;
+    }) => (item.titleKey ? t(item.titleKey, item.titleParams) : item.title),
     [t],
   );
 
@@ -274,7 +278,10 @@ const Home = ({}: Props) => {
           const verticalDriftInRange =
             Math.abs(dy) <= DRAWER_EDGE_MAX_VERTICAL_DRIFT;
 
-          if ((shouldOpenByDistance || shouldOpenByVelocity) && verticalDriftInRange) {
+          if (
+            (shouldOpenByDistance || shouldOpenByVelocity) &&
+            verticalDriftInRange
+          ) {
             setIsDrawerOpen(true);
           }
         },
@@ -346,15 +353,16 @@ const Home = ({}: Props) => {
       return;
     }
 
-    const badHeroLink = cacheStorage.getString(getHeroBadLinkKey(provider.value));
+    const badHeroLink = cacheStorage.getString(
+      getHeroBadLinkKey(provider.value),
+    );
     const cacheKey = getHeroCacheKey(provider.value);
     const cached = cacheStorage.getString(cacheKey);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         const isFresh =
-          parsed?.timestamp &&
-          Date.now() - parsed.timestamp < heroCacheTtlMs;
+          parsed?.timestamp && Date.now() - parsed.timestamp < heroCacheTtlMs;
         if (isFresh && parsed?.hero?.link && parsed.hero.link !== badHeroLink) {
           setHero(parsed.hero);
           return;
@@ -435,25 +443,28 @@ const Home = ({}: Props) => {
   );
 
   const renderSliderItem = useCallback(
-    ({item, index}: {item: HomePageData; index: number}) => (
-      <View
-        className="relative z-20"
-        style={index === 0 ? {marginTop: -24} : undefined}>
-      <Slider
-        homeAppearance
-        isLoading={!!item.isLoading}
-        title={resolveCatalogTitle(item)}
-        posts={item.Posts}
-        filter={item.filter}
-        onHorizontalDragStart={lockDrawerDuringHorizontalDrag}
-        onHorizontalDragEnd={releaseDrawerAfterHorizontalDrag}
-      />
+    ({item}: {item: HomePageData}) => (
+      <View className="relative z-20">
+        <Slider
+          homeAppearance
+          error={item.error}
+          onRetry={handleRefresh}
+          retrying={isRefetching}
+          isLoading={!!item.isLoading}
+          title={resolveCatalogTitle(item)}
+          posts={item.Posts}
+          filter={item.filter}
+          onHorizontalDragStart={lockDrawerDuringHorizontalDrag}
+          onHorizontalDragEnd={releaseDrawerAfterHorizontalDrag}
+        />
       </View>
     ),
     [
       lockDrawerDuringHorizontalDrag,
       releaseDrawerAfterHorizontalDrag,
       resolveCatalogTitle,
+      handleRefresh,
+      isRefetching,
     ],
   );
 
@@ -463,21 +474,17 @@ const Home = ({}: Props) => {
 
   // Memoized error message
   const errorComponent = useMemo(() => {
-    if (!error && (isLoading || homeData.length > 0)) {
+    if (isLoading || homeData.length > 0) {
       return null;
     }
-
     return (
-      <View className="p-4 m-4 bg-red-500/20 rounded-lg min-h-64 flex-1 justify-center items-center">
-        <Text className="text-red-400 text-center font-medium">
-          {error?.message || t('Failed to load content')}
-        </Text>
-        <Text className="text-gray-400 text-center text-sm mt-1">
-          {t('Pull to refresh and try again')}
-        </Text>
-      </View>
+      <HomeRowState
+        error={!!error}
+        onRetry={handleRefresh}
+        retrying={isRefetching}
+      />
     );
-  }, [error, isLoading, homeData.length]);
+  }, [error, isLoading, homeData.length, handleRefresh, isRefetching]);
 
   // Early return for no providers
   if (
@@ -532,8 +539,12 @@ const Home = ({}: Props) => {
               ListHeaderComponent={
                 <>
                   <HeroOptimized
-                    posts={homeData.flatMap(section => section.Posts).slice(0, 20)}
-                    isActive={isHomeFocused && backgroundColor === 'transparent'}
+                    posts={homeData
+                      .flatMap(section => section.Posts)
+                      .slice(0, 20)}
+                    isActive={
+                      isHomeFocused && backgroundColor === 'transparent'
+                    }
                     isDrawerOpen={isDrawerOpen}
                     searchActive={searchActive}
                     onImageError={handleHeroImageError}

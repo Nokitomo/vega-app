@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   FlatList,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {useNavigation} from '@react-navigation/native';
-import useThemeStore from '../lib/zustand/themeStore';
+import {getHomeCardWidth, HOME_ACCENT} from './homePresentation';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../App';
 import AntDesign from '@expo/vector-icons/AntDesign';
@@ -43,13 +44,18 @@ const ContinueWatching = ({
   onHorizontalDragStart?: () => void;
   onHorizontalDragEnd?: () => void;
 }) => {
-  const {primary} = useThemeStore(state => state);
+  const primary = HOME_ACCENT;
+  const {width} = useWindowDimensions();
+  const cardWidth = getHomeCardWidth(width);
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
-  const {history, hiddenFromContinueWatching, hideContinueWatchingItem, migrateDisplayTitles} = useWatchHistoryStore(
-    state => state,
-  );
+  const {
+    history,
+    hiddenFromContinueWatching,
+    hideContinueWatchingItem,
+    migrateDisplayTitles,
+  } = useWatchHistoryStore(state => state);
   const showRecentlyWatched = useUiSettingsStore(
     state => state.showRecentlyWatched,
   );
@@ -87,7 +93,11 @@ const ContinueWatching = ({
 
   // Exclude completed movies before applying the Home limit.
   const recentItems = React.useMemo(() => {
-    return selectContinueWatchingItems(history, CONTINUE_WATCHING_LIMIT, hiddenFromContinueWatching);
+    return selectContinueWatchingItems(
+      history,
+      CONTINUE_WATCHING_LIMIT,
+      hiddenFromContinueWatching,
+    );
   }, [history, hiddenFromContinueWatching]);
 
   const handleNavigateToInfo = (item: any) => {
@@ -184,8 +194,8 @@ const ContinueWatching = ({
     <Pressable
       onPress={() => selectionMode && exitSelectionMode()}
       className="mt-3 mb-8">
-      <View className="flex flex-row justify-between items-center px-2 mb-3">
-        <Text className="text-2xl font-semibold" style={{color: primary}}>
+      <View className="flex flex-row justify-between items-center px-4 mb-3">
+        <Text className="text-2xl font-bold flex-1" style={{color: 'white'}}>
           {t('Continue Watching')}
         </Text>
 
@@ -203,6 +213,9 @@ const ContinueWatching = ({
               </Text>
               <TouchableOpacity
                 onPress={deleteSelectedItems}
+                accessibilityRole="button"
+                accessibilityLabel={t('Hide selected from continue watching')}
+                hitSlop={10}
                 className="rounded-full mr-2">
                 <MaterialCommunityIcons
                   name="delete-outline"
@@ -224,26 +237,33 @@ const ContinueWatching = ({
         onMomentumScrollEnd={onHorizontalDragEnd}
         showsHorizontalScrollIndicator={false}
         keyExtractor={item => item.link}
-        contentContainerStyle={{paddingHorizontal: 12}}
+        contentContainerStyle={{paddingHorizontal: 8}}
         renderItem={({item}) => {
           const presentation = getContinueWatchingPresentation(item);
           const progress = presentation.progressPercent;
           const isSelected = selectedItems.has(item.link);
           const displayTitle = item.displayTitle || item.title;
           const episodeLabel = getEpisodeLabel({
-            episodeTitle:
-              presentation.target ? presentation.target.title : item.episodeTitle,
-            episodeNumber:
-              presentation.target ? presentation.target.episodeNumber : item.episodeNumber,
-            seasonNumber:
-              presentation.target ? presentation.target.seasonNumber : item.seasonNumber,
+            episodeTitle: presentation.target
+              ? presentation.target.title
+              : item.episodeTitle,
+            episodeNumber: presentation.target
+              ? presentation.target.episodeNumber
+              : item.episodeNumber,
+            seasonNumber: presentation.target
+              ? presentation.target.seasonNumber
+              : item.seasonNumber,
           });
           const showItaBadge = hasItaBadge(displayTitle);
 
           return (
             <TouchableOpacity
               activeOpacity={0.8}
-              className="max-w-[100px] mx-2"
+              className="mx-2"
+              style={{width: cardWidth}}
+              accessibilityRole="button"
+              accessibilityLabel={displayTitle}
+              accessibilityState={{selected: isSelected}}
               onLongPress={e => {
                 e.stopPropagation();
                 handleLongPress(item.link);
@@ -256,8 +276,11 @@ const ContinueWatching = ({
                 {/* Poster Image */}
                 <Image
                   source={{uri: item?.poster}}
-                  className="rounded-md"
-                  style={{width: 100, height: 150}}
+                  style={{
+                    width: cardWidth,
+                    height: cardWidth * 1.5,
+                    backgroundColor: '#23252B',
+                  }}
                 />
                 {showItaBadge ? (
                   <View
@@ -310,7 +333,7 @@ const ContinueWatching = ({
 
                 {/* Selection Overlay */}
                 {isSelected && (
-                  <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/30 rounded-lg" />
+                  <View className="absolute top-0 left-0 right-0 bottom-0 bg-black/30" />
                 )}
 
                 {/* Progress Bar */}
@@ -330,7 +353,13 @@ const ContinueWatching = ({
                 </View>
               </View>
               <Text
-                className="text-white text-center truncate w-24 text-xs"
+                style={{
+                  color: 'white',
+                  fontSize: 14,
+                  lineHeight: 19,
+                  marginTop: 8,
+                  minHeight: 38,
+                }}
                 numberOfLines={2}>
                 {displayTitle}
               </Text>

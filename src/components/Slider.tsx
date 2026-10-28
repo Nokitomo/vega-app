@@ -14,6 +14,8 @@ import useContentStore from '../lib/zustand/contentStore';
 import {FlashList} from '@shopify/flash-list';
 import type {FlashListProps} from '@shopify/flash-list';
 import SkeletonLoader from './Skeleton';
+import HomeRowState from './HomeRowState';
+import {getHomeCardWidth} from './homePresentation';
 import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from './PostBadges';
@@ -42,6 +44,8 @@ const SafeFlashList = <T,>({style, ...rest}: FlashListProps<T>) => (
 
 const Slider = ({
   homeAppearance = false,
+  onRetry,
+  retrying = false,
   isLoading,
   title,
   posts,
@@ -53,6 +57,8 @@ const Slider = ({
   error,
 }: {
   homeAppearance?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
   isLoading: boolean;
   title: string;
   posts: Post[];
@@ -68,11 +74,13 @@ const Slider = ({
   const {t} = useTranslation();
   const {width: windowWidth} = useWindowDimensions();
   const cardWidth = homeAppearance
-    ? Math.min(154, windowWidth * 0.37)
+    ? getHomeCardWidth(windowWidth)
     : CARD_TITLE_WIDTH;
   const imageWidth = homeAppearance ? cardWidth : CARD_IMAGE_WIDTH;
   const imageHeight = homeAppearance ? cardWidth * 1.5 : CARD_IMAGE_HEIGHT;
-  const skeletonPlaceholderCount = getSkeletonPlaceholderCount(windowWidth);
+  const skeletonPlaceholderCount = homeAppearance
+    ? Math.ceil(windowWidth / (cardWidth + 16)) + 1
+    : getSkeletonPlaceholderCount(windowWidth);
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [isSelected, setSelected] = useState('');
@@ -192,7 +200,7 @@ const Slider = ({
             textAlign: homeAppearance ? 'left' : 'center',
             fontSize: homeAppearance ? 14 : 12,
             marginTop: homeAppearance ? 8 : 0,
-            lineHeight: CARD_TITLE_LINE_HEIGHT,
+            lineHeight: homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT,
             minHeight: CARD_TITLE_LINE_HEIGHT * CARD_TITLE_LINES,
           }}
           numberOfLines={CARD_TITLE_LINES}
@@ -236,7 +244,7 @@ const Slider = ({
           style={{
             color: homeAppearance ? 'white' : primary,
             paddingLeft: homeAppearance ? 8 : 0,
-            fontWeight: '700',
+            fontWeight: homeAppearance ? '700' : '600',
           }}>
           {title}
         </Text>
@@ -247,20 +255,40 @@ const Slider = ({
         )}
       </View>
       {isLoading ? (
-        <View className="flex flex-row gap-2 overflow-hidden">
+        <View
+          className={
+            homeAppearance
+              ? 'flex flex-row overflow-hidden'
+              : 'flex flex-row gap-2 overflow-hidden'
+          }
+          style={
+            homeAppearance ? {paddingHorizontal: 3, paddingTop: 7} : undefined
+          }>
           {Array.from({length: skeletonPlaceholderCount}).map((_, index) => (
             <View
-              className="mx-3 gap-0 flex mb-3 justify-center items-center"
-              style={{width: CARD_TITLE_WIDTH}}
+              className={
+                homeAppearance
+                  ? 'mx-2'
+                  : 'mx-3 gap-0 flex mb-3 justify-center items-center'
+              }
+              style={{width: cardWidth}}
               key={index}>
               <SkeletonLoader
-                height={CARD_IMAGE_HEIGHT}
-                width={CARD_IMAGE_WIDTH}
+                height={imageHeight}
+                width={imageWidth}
+                marginVertical={homeAppearance ? 0 : 8}
+                style={homeAppearance ? {borderRadius: 0} : undefined}
               />
-              <SkeletonLoader height={12} width={CARD_TITLE_WIDTH} />
+              <SkeletonLoader
+                height={homeAppearance ? 19 : 12}
+                width={cardWidth}
+              />
+              {homeAppearance ? <View style={{height: 30}} /> : null}
             </View>
           ))}
         </View>
+      ) : homeAppearance && posts.length === 0 ? (
+        <HomeRowState error={!!error} onRetry={onRetry} retrying={retrying} />
       ) : (
         <SafeFlashList
           estimatedItemSize={
@@ -279,7 +307,7 @@ const Slider = ({
           contentContainerStyle={{paddingHorizontal: 3, paddingTop: 7}}
           renderItem={renderItem}
           ListFooterComponent={
-            !isLoading && error ? (
+            !isLoading && error && !homeAppearance ? (
               <View className="flex flex-row w-96 justify-center h-10 items-center">
                 <Text className="text-red-500 text-center">{error}</Text>
               </View>
@@ -294,6 +322,9 @@ const Slider = ({
           keyExtractor={keyExtractor}
         />
       )}
+      {homeAppearance && !isLoading && posts.length > 0 && !!error ? (
+        <HomeRowState error onRetry={onRetry} retrying={retrying} />
+      ) : null}
     </Pressable>
   );
 };
