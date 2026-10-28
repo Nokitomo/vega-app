@@ -60,4 +60,20 @@ Gli screenshot di revisione vengono salvati in `.codex/screenshots/cruncy-ui/`, 
 - Emulatore: verificati ritorno in cima (`step3-scrolled.png`, `step3-top.png`) e riempimento crescente sulla stessa slide (`step3-progress-start.png`, `step3-progress-later.png`). Catture nella cartella ignorata. La dissolvenza e verificata dai test di ciclo di vita; i campioni statici non ne misurano la fluidita.
 - Undici test coprono carosello e caricamento delle immagini, inclusi eventi tardivi, caricamenti duplicati e riduzione del movimento. TypeScript e lint completati senza errori o warning prima del commit.
 
-Resta il punto 4 (matrice dispositivi/provider/accessibilita), seguito dall'analisi estetica finale, che deve includere il selettore provider nell'header.
+### Punto 4 — matrice di verifica completata su Android
+
+- Regressione ampliata: 70 test superati in 10 suite (hero, artwork, Continua a guardare, refresh, skeleton, riconciliazione sezioni, ProviderImage e riuso del contesto provider).
+- Android Medium_Phone_API_35: prova con densita 540 (larghezza equivalente a 320 dp) e `font_scale=1.5`, ripetuta dopo arresto completo e riapertura dell'app. CTA, bookmark, indicatori, intestazioni e poster rimangono utilizzabili; i titoli delle card occupano piu righe. Evidenze finali `step4-cold-small3.png` e `step4-cold-small-scroll.png`. Il contenuto sotto la barra fissa resta raggiungibile scorrendo.
+- Il cambio di densita a caldo aveva mantenuto temporaneamente dimensioni obsolete nel dev client: per questo la verifica finale usa un avvio completo. Ripristinati densita fisica 420 e font scale 1.0 al termine. Durante la sessione Metro si e arrestato e il dev launcher ha mostrato errore di connessione/ANR; dopo riavvio di Metro e dell'app il bundle si e caricato. Nessuna modifica al codice per questo problema dell'ambiente di sviluppo.
+- Installato StreamingUnity 1.0.32 nel solo profilo QA e verificato il passaggio da AnimeUnity alla sua home con catalogo reale (`step4-streamingunity.png`). La CTA apre la schermata dettaglio; la cattura `step4-streamingunity-detail.png` mostra ancora lo skeleton, quindi non certifica il completamento dei metadati ne la riproduzione. La prova a caratteri grandi usa il catalogo StreamingUnity.
+- Accessibilita: controllo statico di ruoli/etichette per provider, ricerca, bookmark e indicatori e degli stati selezionati. La riduzione del movimento e coperta dai test. Non eseguita una sessione completa con TalkBack/VoiceOver: questa verifica non costituisce una certificazione di accessibilita.
+- TypeScript (`npx tsc --noEmit`) ed ESLint (`npm run lint`) completati senza errori o warning prima del commit. Nessuna ulteriore modifica al codice necessaria per i casi controllati del punto 4.
+- iOS: non verificato, come concordato. L'utente dispone di un iPhone, ma non e stata ancora preparata/installata una development build iOS di Vega. I test React non sostituiscono una prova sul runtime iOS. Restano fuori da questa matrice riproduzione video e verifica esaustiva di tutti i provider.
+
+## Confronto estetico finale: rifiniture consigliate
+
+Il campione `home-hero-swipe-before.png` del report mostra marchio compatto a sinistra e azioni allineate a destra. In Vega il menu hamburger subito accanto alla scritta crea un gruppo visivamente sbilanciato. La proposta e spostare il selettore provider nel gruppo di destra, prima della ricerca, con icona coerente con le fonti e area toccabile almeno 44 dp, mantenendo invariata l'apertura del drawer. Questa proposta non e stata implementata.
+
+Restano differenze visibili rispetto al campione: font/pesi delle intestazioni, posizione verticale e dimensioni dei loghi dei titoli, spazio tra indicatori e prima sezione, e icone/etichette della barra inferiore. Inoltre alcuni poster del catalogo contengono gia il titolo e producono una duplicazione visiva quando sopra viene mostrato il logo. La scelta artwork del provider va considerata nella rifinitura, senza fissare immagini o titoli del campione.
+
+Le quattro destinazioni Vega, l'assenza del banner Premium e i metadati disponibili nei provider restano differenze funzionali rispetto a Crunchyroll. Non vanno aggiunte destinazioni o azioni fittizie per simulare la parita. La home e vicina nella struttura, ma non e ancora una replica estetica 1:1 verificata.
