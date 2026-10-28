@@ -18,6 +18,7 @@ import {HomeStackParamList, SearchStackParamList} from '../App';
 import useContentStore from '../lib/zustand/contentStore';
 import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
 import SearchSuggestions from './SearchSuggestions';
+import {HOME_FONT} from './homePresentation';
 import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
 
@@ -128,7 +129,7 @@ export default function HomeHeader({
             style={{
               color: '#FF640A',
               fontSize: 29,
-              fontWeight: '900',
+              fontFamily: HOME_FONT.heading,
               letterSpacing: -1,
             }}>
             vega

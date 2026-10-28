@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {useNavigation} from '@react-navigation/native';
-import {getHomeCardWidth, HOME_ACCENT} from './homePresentation';
+import {getHomeCardWidth, HOME_ACCENT, HOME_FONT} from './homePresentation';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../App';
 import AntDesign from '@expo/vector-icons/AntDesign';
@@ -195,14 +195,33 @@ const ContinueWatching = ({
       onPress={() => selectionMode && exitSelectionMode()}
       className="mt-3 mb-8">
       <View className="flex flex-row justify-between items-center px-4 mb-3">
-        <Text className="text-2xl font-bold flex-1" style={{color: 'white'}}>
+        <Text
+          className="flex-1"
+          style={{
+            color: 'white',
+            fontFamily: HOME_FONT.heading,
+            fontSize: 20,
+            lineHeight: 26,
+          }}>
           {t('Continue Watching')}
         </Text>
 
         <View className="flex flex-row items-center">
           {!selectionMode && (
-            <TouchableOpacity onPress={handleSeeAllPress} className="mr-2">
-              <Text className="text-white text-sm">{t('More')}</Text>
+            <TouchableOpacity
+              onPress={handleSeeAllPress}
+              className="mr-2"
+              style={{
+                minWidth: 44,
+                minHeight: 44,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Text
+                className="text-white text-sm"
+                style={{fontFamily: HOME_FONT.medium}}>
+                {t('More')}
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -230,6 +249,7 @@ const ContinueWatching = ({
 
       <FlatList
         data={recentItems}
+        extraData={cardWidth}
         horizontal
         onScrollBeginDrag={onHorizontalDragStart}
         onMomentumScrollBegin={onHorizontalDragStart}
@@ -356,6 +376,7 @@ const ContinueWatching = ({
                 style={{
                   color: 'white',
                   fontSize: 14,
+                  fontFamily: HOME_FONT.regular,
                   lineHeight: 19,
                   marginTop: 8,
                   minHeight: 38,

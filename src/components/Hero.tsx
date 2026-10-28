@@ -30,6 +30,7 @@ import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
+import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
 
 type HeroCardProps = {
   hero: Post;
@@ -44,11 +45,17 @@ const HeroCard = memo(
     const {t} = useTranslation();
     const navigationSize = useWindowDimensions();
     const {width, height} = navigationSize;
+    const layout = getHomeHeroLayout(width, height);
     const insets = useSafeAreaInsets();
     const [failedImages, setFailedImages] = useState<Set<string>>(
       () => new Set(),
     );
     const [loadedBackground, setLoadedBackground] = useState('');
+    const [artworkSize, setArtworkSize] = useState<{
+      uri: string;
+      width: number;
+      height: number;
+    } | null>(null);
     const [loadedLogo, setLoadedLogo] = useState('');
     const preparationStarted = useRef(perfNow());
     const reportedReady = useRef(false);
@@ -209,7 +216,7 @@ const HeroCard = memo(
       <View style={{backgroundColor: 'black'}}>
         <View
           style={{
-            minHeight: Math.max(560, height * 0.69),
+            minHeight: layout.minHeight,
             paddingTop: insets.top + 56,
           }}>
           <Pressable
@@ -225,35 +232,57 @@ const HeroCard = memo(
                 uri={currentImageUri}
                 reducedMotion={reducedMotion}
                 onError={handleImageError}
-                onLoad={() => setLoadedBackground(currentImageUri)}
+                onLoad={size => {
+                  setLoadedBackground(currentImageUri);
+                  if (size) {
+                    setArtworkSize({uri: currentImageUri, ...size});
+                  }
+                }}
               />
             )}
             <LinearGradient
               pointerEvents="none"
               colors={[
-                'rgba(0,0,0,0.65)',
+                'rgba(0,0,0,0.78)',
                 'transparent',
-                'rgba(0,0,0,0.25)',
+                'rgba(0,0,0,0.45)',
                 'black',
               ]}
-              locations={[0, 0.24, 0.5, 1]}
+              locations={[0, 0.22, 0.54, 0.94]}
               style={{position: 'absolute', width: '100%', height: '100%'}}
             />
           </Pressable>
 
-          <View style={{flex: 1, minHeight: width * 0.65}} />
+          <View style={{flex: 1, minHeight: layout.spacer}} />
           <View
             style={{
-              paddingHorizontal: 16,
-              paddingTop: 20,
+              paddingHorizontal: layout.inset,
+              maxWidth: layout.tablet
+                ? layout.contentWidth + layout.inset * 2
+                : undefined,
+              // Poster fallback may contain lettering. Separate its title block
+              // instead of overlapping another logo over the same image text.
+              backgroundColor:
+                (artworkSize?.uri === currentImageUri &&
+                  artworkSize &&
+                  artworkSize.width < artworkSize.height * 0.85) ||
+                (currentImageUri !== heroData?.background &&
+                  (currentImageUri === heroData?.poster ||
+                    currentImageUri === hero?.image))
+                  ? 'black'
+                  : undefined,
+              paddingTop: 16,
               paddingBottom: 12,
               gap: 12,
             }}>
             {logoUri ? (
               <RemoteLogo
                 uri={logoUri}
-                width={Math.min(width - 32, 360)}
-                height={100}
+                width={Math.min(
+                  layout.contentWidth - layout.inset * 2,
+                  layout.tablet ? 480 : 380,
+                )}
+                height={layout.logoHeight}
                 onError={handleLogoError}
                 onLoad={() => {
                   handleLogoLoad();
@@ -267,20 +296,31 @@ const HeroCard = memo(
                   color: 'white',
                   fontSize: 30,
                   lineHeight: 34,
-                  fontWeight: '800',
+                  fontFamily: HOME_FONT.heading,
                 }}>
                 {displayTitle || hero?.title || t('Home')}
               </Text>
             )}
             {displayGenres.length > 0 && (
-              <Text numberOfLines={1} style={{color: '#DADADA', fontSize: 12}}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: '#DADADA',
+                  fontSize: 12,
+                  fontFamily: HOME_FONT.regular,
+                }}>
                 {displayGenres.join(' · ')}
               </Text>
             )}
             {!!heroData?.synopsis && (
               <Text
                 numberOfLines={3}
-                style={{color: '#F8F8F8', fontSize: 14, lineHeight: 20}}>
+                style={{
+                  color: '#F8F8F8',
+                  fontSize: 14,
+                  lineHeight: 20,
+                  fontFamily: HOME_FONT.regular,
+                }}>
                 {heroData.synopsis}
               </Text>
             )}
@@ -308,7 +348,13 @@ const HeroCard = memo(
                   }}>
                   <Ionicons name="play-outline" size={24} color="black" />
                   <Text
-                    style={{color: 'black', fontSize: 16, fontWeight: '700'}}>
+                    style={{
+                      color: 'black',
+                      fontSize: 16,
+                      fontFamily: HOME_FONT.bold,
+                      flexShrink: 1,
+                      textAlign: 'center',
+                    }}>
                     {t('Play')}
                   </Text>
                 </TouchableOpacity>
@@ -387,7 +433,8 @@ const Hero = memo(
     const {hero: storedHero, providerScope} = useHeroStore(state => state);
     const scope = getProviderCacheScope(provider.value);
     const initialHero = providerScope === scope ? storedHero : undefined;
-    const {height} = useWindowDimensions();
+    const {width, height} = useWindowDimensions();
+    const layout = getHomeHeroLayout(width, height);
     const [selectedLink, setSelectedLink] = useState('');
     const slides = React.useMemo(() => {
       const unique = new Map<string, Post>();
@@ -546,7 +593,7 @@ const Hero = memo(
             testID="hero-loading"
             accessibilityState={{busy: true}}
             style={{
-              height: Math.max(560, height * 0.69),
+              minHeight: layout.minHeight,
               backgroundColor: '#141519',
               justifyContent: 'flex-end',
               padding: 16,
@@ -599,9 +646,9 @@ const Hero = memo(
             style={{
               flexDirection: 'row',
               gap: 8,
-              paddingHorizontal: 16,
-              paddingTop: 6,
-              paddingBottom: 18,
+              paddingHorizontal: layout.inset,
+              paddingTop: 4,
+              paddingBottom: 16,
             }}>
             {slides.map((item, index) => (
               <Pressable
@@ -613,7 +660,11 @@ const Hero = memo(
                   total: slides.length,
                 })}
                 accessibilityState={{selected: displayedPage === index}}
-                style={{width: 39, height: 28, justifyContent: 'center'}}>
+                style={{
+                  width: layout.indicatorWidth,
+                  height: 36,
+                  justifyContent: 'center',
+                }}>
                 <View
                   style={{
                     height: 7,
@@ -624,7 +675,7 @@ const Hero = memo(
                   {index === displayedPage && (
                     <Animated.View
                       style={{
-                        width: 39,
+                        width: layout.indicatorWidth,
                         height: 7,
                         borderRadius: 4,
                         backgroundColor: '#FF640A',
@@ -632,7 +683,7 @@ const Hero = memo(
                           {
                             translateX: progress.interpolate({
                               inputRange: [0, 1],
-                              outputRange: [-39, 0],
+                              outputRange: [-layout.indicatorWidth, 0],
                             }),
                           },
                         ],

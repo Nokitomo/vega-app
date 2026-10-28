@@ -15,7 +15,7 @@ import {FlashList} from '@shopify/flash-list';
 import type {FlashListProps} from '@shopify/flash-list';
 import SkeletonLoader from './Skeleton';
 import HomeRowState from './HomeRowState';
-import {getHomeCardWidth} from './homePresentation';
+import {getHomeCardWidth, HOME_FONT} from './homePresentation';
 import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from './PostBadges';
@@ -199,6 +199,7 @@ const Slider = ({
             width: cardWidth,
             textAlign: homeAppearance ? 'left' : 'center',
             fontSize: homeAppearance ? 14 : 12,
+            fontFamily: homeAppearance ? HOME_FONT.regular : undefined,
             marginTop: homeAppearance ? 8 : 0,
             lineHeight: homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT,
             minHeight: CARD_TITLE_LINE_HEIGHT * CARD_TITLE_LINES,
@@ -228,8 +229,8 @@ const Slider = ({
     [],
   );
   const listExtraData = useMemo(
-    () => ({isSelected, visiblePostKeys}),
-    [isSelected, visiblePostKeys],
+    () => ({isSelected, visiblePostKeys, cardWidth}),
+    [isSelected, visiblePostKeys, cardWidth],
   );
 
   return (
@@ -244,13 +245,35 @@ const Slider = ({
           style={{
             color: homeAppearance ? 'white' : primary,
             paddingLeft: homeAppearance ? 8 : 0,
-            fontWeight: homeAppearance ? '700' : '600',
+            fontWeight: homeAppearance ? undefined : '600',
+            fontFamily: homeAppearance ? HOME_FONT.heading : undefined,
+            fontSize: homeAppearance ? 20 : undefined,
+            lineHeight: homeAppearance ? 26 : undefined,
           }}>
           {title}
         </Text>
         {filter !== 'recent' && (
-          <TouchableOpacity onPress={handleMorePress}>
-            <Text className="text-white text-sm">{t('More')}</Text>
+          <TouchableOpacity
+            onPress={handleMorePress}
+            accessibilityRole="button"
+            style={
+              homeAppearance
+                ? {
+                    minWidth: 44,
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginLeft: 8,
+                  }
+                : undefined
+            }>
+            <Text
+              className="text-white text-sm"
+              style={
+                homeAppearance ? {fontFamily: HOME_FONT.medium} : undefined
+              }>
+              {t('More')}
+            </Text>
           </TouchableOpacity>
         )}
       </View>

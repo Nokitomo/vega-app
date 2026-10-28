@@ -2,7 +2,7 @@ import React from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
-import {HOME_ACCENT} from './homePresentation';
+import {HOME_ACCENT, HOME_FONT} from './homePresentation';
 
 export default function HomeRowState({
   error,
@@ -36,6 +36,7 @@ export default function HomeRowState({
           color: '#DADADA',
           textAlign: 'center',
           fontSize: 14,
+          fontFamily: HOME_FONT.regular,
           lineHeight: 20,
         }}>
         {t(error ? 'Failed to load content' : 'No Content Found')}
@@ -52,7 +53,7 @@ export default function HomeRowState({
             paddingHorizontal: 24,
             opacity: retrying ? 0.5 : 1,
           }}>
-          <Text style={{color: HOME_ACCENT, fontWeight: '700'}}>
+          <Text style={{color: HOME_ACCENT, fontFamily: HOME_FONT.bold}}>
             {t('Retry')}
           </Text>
         </TouchableOpacity>

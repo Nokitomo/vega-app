@@ -15,16 +15,22 @@ describe('Hero artwork transitions', () => {
       .spyOn(Animated, 'timing')
       .mockReturnValue({start, stop: jest.fn(), reset: jest.fn()});
     const failure = jest.fn();
+    const loaded = jest.fn();
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {
       tree = renderer.create(
-        <HeroArtwork uri="poster" reducedMotion={false} onError={failure} />,
+        <HeroArtwork
+          uri="poster"
+          reducedMotion={false}
+          onError={failure}
+          onLoad={loaded}
+        />,
       );
     });
     expect(timing).not.toHaveBeenCalled();
     const image = tree.root.findByType(Image);
     await act(async () => {
-      image.props.onLoad();
+      image.props.onLoad({nativeEvent: {source: {width: 600, height: 900}}});
       image.props.onLoad();
     });
     expect(timing).toHaveBeenCalledTimes(1);
@@ -33,6 +39,7 @@ describe('Hero artwork transitions', () => {
       expect.objectContaining({duration: 240, useNativeDriver: true}),
     );
     expect(start).toHaveBeenCalledTimes(1);
+    expect(loaded).toHaveBeenCalledWith({width: 600, height: 900});
     await act(async () => image.props.onError());
     expect(failure).toHaveBeenCalledTimes(1);
     await act(async () => tree.unmount());

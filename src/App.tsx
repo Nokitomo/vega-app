@@ -1,4 +1,6 @@
 import React, {useCallback, useEffect, useRef} from 'react';
+import {useFonts} from 'expo-font';
+import {HOME_FONT} from './components/homePresentation';
 import './global.css';
 import Home from './screens/home/Home';
 import Info from './screens/home/Info';
@@ -341,6 +343,7 @@ function TabStack() {
       screenOptions={{
         animation: 'shift',
         tabBarLabelPosition: 'below-icon',
+        tabBarLabelStyle: {fontFamily: HOME_FONT.regular, fontSize: 11},
         tabBarVariant: useSideTabLayout ? 'material' : 'uikit',
         popToTopOnBlur: false,
         tabBarPosition: useSideTabLayout ? 'left' : 'bottom',
@@ -475,6 +478,12 @@ function TabStack() {
 }
 
 const AppContent = () => {
+  const [homeFontsLoaded, homeFontError] = useFonts({
+    VegaAtypBold: require('../assets/fonts/atyp_bold.ttf'),
+    VegaDMSansRegular: require('../assets/fonts/dmsans_regular.ttf'),
+    VegaDMSansMedium: require('../assets/fonts/dmsans_medium.ttf'),
+    VegaDMSansBold: require('../assets/fonts/dmsans_bold.ttf'),
+  });
   useEffect(() => {
     perfTrace('app_content_mounted');
     return startPerfHeartbeat();
@@ -676,8 +685,16 @@ const AppContent = () => {
   }, []);
 
   useEffect(() => {
-    applyOrientationForRoute(navigationRef.getCurrentRoute()?.name);
+    if (navigationRef.isReady()) {
+      applyOrientationForRoute(navigationRef.getCurrentRoute()?.name);
+    }
   }, [applyOrientationForRoute]);
+
+  // Retain the native splash while local fonts load; a font failure must not
+  // prevent navigation from starting with the platform fallback.
+  if (!homeFontsLoaded && !homeFontError) {
+    return null;
+  }
 
   return (
     <GlobalErrorBoundary>

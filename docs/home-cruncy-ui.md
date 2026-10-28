@@ -15,7 +15,7 @@ Il branch `cruncy-ui` introduce la prima revisione della home smartphone, basata
 
 Provider, cache, aggiornamento tramite trascinamento, continua a guardare e navigazione al dettaglio restano quelli di Vega. Il pulsante Play continua ad aprire il dettaglio, come prima della revisione. Il bookmark usa lo stesso storage della lista esistente. Le immagini e i metadati provengono dai provider: non sono fissati ai titoli del campione Crunchyroll.
 
-Questa implementazione non costituisce una replica pixel-perfect verificata: mantiene marchio, font di sistema e quattro destinazioni Vega; non introduce Store, Premium o controlli senza funzione equivalente. La revisione riguarda la home, non le altre schermate.
+Questa implementazione non costituisce una replica pixel-perfect verificata: mantiene marchio e quattro destinazioni Vega; non introduce Store, Premium o controlli senza funzione equivalente. La home usa ora Atyp Bold e DM Sans dai riferimenti locali (provenienza e limiti di distribuzione in `assets/fonts/README.md`). La revisione riguarda la home, non le altre schermate.
 
 ## Verifica locale
 
@@ -88,36 +88,38 @@ Restano invariati query, merge Cinemeta, priorita artwork/lingua, fallback del l
 Verifica Android su Medium_Phone_API_35: arresto del processo e rimozione delle sole cache QA (SQLite dei metadati, MMKV cache, cache immagini/HTTP e file provider), mantenendo provider installati e impostazioni. Il normale comando Cancella cache non elimina tutte queste copie. Controllati AnimeUnity, StreamingUnity e StreamCenter, navigazione al dettaglio e cambio slide. Evidenze in `.codex/screenshots/cruncy-ui/hero-*.png` e video locale, esclusi da Git. iOS resta non verificato.
 
 
-## Lista delle differenze residue rispetto al campione smartphone
+## Checklist del confronto con il campione smartphone
 
 Riferimenti: `05-authenticated-navigation.md`, `08-reconstruction-notes.md` e
 `artifacts/home-hero-swipe-before.png` della ricerca Crunchyroll mobile 3.126.0.
 La parita va verificata a stessa risoluzione, densita e scala caratteri; il report
 non definisce tutte le misure o tutti gli stati possibili dell'app originale.
 
-1. Tipografia: famiglia, pesi, dimensioni, interlinea e troncamenti di titoli,
-   metadati, sinossi, CTA e intestazioni. Vega usa ancora font di sistema.
-2. Hero: rifinire altezza, ritaglio/focalizzazione dell'immagine e gradienti
-   superiore/inferiore, allineamento e dimensione massima del logo, distanze tra
-   logo, metadati, sinossi, azioni e indicatori. Nel campione il gradiente superiore
-   assicura contrasto alle icone anche sopra immagini chiare.
-3. Artwork: gestire visivamente immagini che contengono gia il titolo senza
-   sovrapporre un secondo titolo. Non cambiare implicitamente le priorita dei
-   servizi o delle lingue; serve una strategia basata su dati affidabili, non
-   sull'ipotesi che tutti i poster siano privi di scritte.
-4. Controlli del hero: verificare geometria, spessore icone, bordi del bookmark,
-   segmenti/progresso e transizioni. Il timer e i bordi sono gia implementati;
-   la dissolvenza da 240 ms non e una misura certificata del riferimento.
-5. Sezioni: confrontare margine dopo indicatori, intestazioni, azione Altro,
-   dimensioni/aspect ratio e distanza delle card, titoli e badge; confrontare
-   anche Continua a guardare e i relativi progressi con evidenze equivalenti.
-6. Shell: rifinire proporzioni del marchio Vega, altezza toolbar, safe area e
-   barra inferiore (icone, dimensioni, spaziature, etichette). Le etichette restano
-   soggette alla preferenza Vega e le quattro destinazioni non diventano cinque.
-7. Verifica finale: confronto visivo con screenshot equivalenti in cima e dopo
-   scroll, su piu dimensioni/font, con loghi larghi/alti/assenti e nomi lunghi;
-   controllare caricamento, vuoto, errore, menu e ritorno dal dettaglio. Gli stati
-   privi di evidenza nel report non possono essere dichiarati identici.
+1. Tipografia: applicati Atyp Bold a titoli e intestazioni, DM Sans a testi e
+   controlli; sinossi 14/20 dp, metadati 12 dp, intestazioni 20/26 dp. Font locali
+   caricati prima della navigazione, con fallback in caso di errore. L'effetto di
+   orientamento attende che il navigator sia pronto.
+2. Hero: gradienti rivisti, logo limitato a 78 dp sul telefono e 100 dp sul tablet,
+   spaziature uniformate. Il layout del tablet limita larghezza dei testi e
+   altezza dell'artwork in orizzontale; in verticale lascia piu spazio all'immagine.
+   Il crop resta cover centrato: non sono disponibili punti focali affidabili.
+3. Artwork: per poster/fallback e immagini effettivamente verticali, il blocco
+   titolo ha un fondo nero che evita la sovrapposizione diretta con scritte.
+   Non e OCR: non riconosce ogni scritta incorporata e non elimina ogni possibile
+   duplicazione. Priorita di servizi, lingue e immagini selezionate invariate.
+4. Controlli: CTA e bookmark conservano target di almeno 44 dp, indicatori con
+   larghezza adattiva e target verticale ampliato. Timer 10,5 s, pausa, selezione,
+   preparazione completa e Riduci movimento conservati. La dissolvenza di 240 ms
+   resta un'approssimazione, non una misura certificata del riferimento.
+5. Sezioni: tipografia e azione Altro uniformate, poster 2:3; larghezza delle card
+   adattiva sul tablet, aggiornamento esplicito delle liste dopo rotazione. Stessa
+   presentazione in Continua a guardare, senza cambiare progresso o azioni.
+6. Shell: marchio Vega con nuova tipografia, font delle etichette inferiori
+   coerente. Preferenze di visibilita delle etichette e quattro destinazioni
+   mantenute. Il selettore provider resta un adattamento esclusivo di Vega.
+7. Verifica: confronto visivo del campione smartphone e controlli su telefono e
+   tablet, anche ruotato e con font al 150%. Gli stati privi di evidenza nel report
+   e il layout tablet non possono essere dichiarati identici a Crunchyroll.
 
 Differenze intenzionali: brand Vega, selettore provider, cataloghi/metadati,
 assenza di Store/Premium e CTA che apre il dettaglio invece di avviare direttamente
@@ -142,3 +144,45 @@ Cast nella toolbar: non va aggiunta un'icona senza una funzione reale collegata.
   `provider-menu-close.png` in `.codex/screenshots/cruncy-ui/`.
 - iOS, TalkBack/VoiceOver e la matrice completa di dimensioni/font non verificati
   per questo intervento; il gesto dal bordo conserva il riconoscitore precedente.
+
+## Rifinitura responsive (28 ottobre 2026)
+
+- TypeScript (`npx tsc --noEmit`) ed ESLint (`npm run lint`) senza errori o warning.
+  58 test passati nelle sette suite homeResponsiveLayout, heroArtwork,
+  heroMetadataFailure, providerSheet, sliderSkeleton, continueWatchingHome e
+  continueWatchingFixes. Corretto anche il passaggio di `key` nell'helper del test
+  del hero: l'avviso React non proveniva dall'app.
+- Medium_Phone_API_35: home con AnimeUnity, StreamingUnity e StreamCenter,
+  cambio provider, apertura ricerca, dettaglio dalla CTA e ritorno. Controllati
+  loghi larghi e alti, fallback testuale, sinossi corta/lunga e font al 150%.
+  Le intestazioni lunghe si troncano conservando l'azione Altro; il hero cresce
+  quanto necessario senza sovrapporre testo e pulsanti.
+- Medium_Tablet_API_35: 1280x800 e 800x1280 dp, rotazione del sensore emulato,
+  scroll, ridimensionamento delle card, etichette delle schede e pannello provider
+  centrato con larghezza massima 560 dp. Controllati anche caratteri al 150%.
+  Verificati ricerca, apertura del dettaglio e ritorno, poi rotazione inversa.
+  Il tablet usa una copia isolata dell'AVD in `D:/codex-temp/vega-tablet-ui-avd`,
+  dev client gia disponibile e bundle Metro corrente. Nessun prebuild.
+- Durante gli avvii di sviluppo si sono verificati timeout di Metro e un ANR
+  della schermata di errore DevLauncher. Riavviato Metro e completata la
+  compilazione della variante Hermes richiesta dal client, l'avvio pulito e i
+  percorsi finali sono riusciti. Usato inoltro ADB della porta 8081 sul tablet.
+  Questi tentativi non sono una misura delle prestazioni di una build release.
+- Gli screenshot `refined-*.png` sono in `.codex/screenshots/cruncy-ui/`, ignorati.
+  Il dev client Android installato resta 3.3.19: l'avviso di aggiornamento 3.3.20
+  riguarda il binario nativo, non indica un rollback del codice JavaScript.
+- La verifica riguarda la presentazione e i percorsi interessati, non una nuova
+  certificazione di player, download, cast o iOS. Nessun cambio ai servizi o alle
+  preferenze dei metadati. Non sono stati misurati miglioramenti di FPS in questa
+  sessione; la diagnostica eventualmente attiva resta quella opt-in esistente.
+
+### Limiti residui
+
+La fedelta pixel per pixel richiede campioni equivalenti per tutti gli stati,
+mentre la ricerca fornita riguarda soprattutto lo smartphone. Restano da validare
+iOS e lettori di schermo. La separazione dei poster non riconosce tutte le scritte
+incorporate; loghi molto scuri forniti dai servizi possono avere contrasto ridotto.
+Per eliminare questi casi servono informazioni affidabili sull'artwork senza
+alterare le priorita concordate. Il timer e la dissolvenza restano approssimazioni.
+Prima della distribuzione dei font di riferimento occorre disporre delle relative
+licenze: l'estrazione dall'APK documenta la provenienza, non i diritti di riuso.

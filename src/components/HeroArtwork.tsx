@@ -11,7 +11,7 @@ export default function HeroArtwork({
   uri: string;
   reducedMotion: boolean;
   onError: () => void;
-  onLoad?: () => void;
+  onLoad?: (size?: {width: number; height: number}) => void;
 }) {
   const opacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const loaded = useRef(false);
@@ -32,12 +32,12 @@ export default function HeroArtwork({
       <Image
         source={{uri}}
         onError={onError}
-        onLoad={() => {
+        onLoad={event => {
           if (!active.current || loaded.current) {
             return;
           }
           loaded.current = true;
-          onLoad?.();
+          onLoad?.(event?.nativeEvent?.source);
           Animated.timing(opacity, {
             toValue: 1,
             duration: reducedMotion ? 0 : 240,

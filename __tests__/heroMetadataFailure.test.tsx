@@ -213,14 +213,19 @@ describe('Hero carousel resilience', () => {
       error: null,
       data: {title: link, background: `${link}.jpg`},
     }) as ReturnType<typeof useHeroMetadata>;
-  const render = async (posts = [second, third], extra = {}) => {
+  const render = async (
+    posts = [second, third],
+    extra: Partial<React.ComponentProps<typeof Hero>> & {key?: React.Key} = {},
+  ) => {
+    const {key, ...props} = extra;
     await act(async () => {
       const element = (
         <Hero
+          key={key}
           posts={posts}
           isDrawerOpen={false}
           onImageError={link => onError(link)}
-          {...extra}
+          {...props}
         />
       );
       if (tree) {

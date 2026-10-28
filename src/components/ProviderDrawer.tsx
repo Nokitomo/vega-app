@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
 import useContentStore from '../lib/zustand/contentStore';
 import {ProviderExtension, extensionStorage} from '../lib/storage';
+import {HOME_FONT} from './homePresentation';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 
 const getProviderKey = (item: ProviderExtension) =>
@@ -146,8 +147,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#383A40',
   },
   headingText: {flex: 1},
-  title: {color: '#FFFFFF', fontSize: 22, fontWeight: '700'},
-  subtitle: {color: '#A0A0A0', fontSize: 14, marginTop: 6},
+  title: {color: '#FFFFFF', fontSize: 22, fontFamily: HOME_FONT.heading},
+  subtitle: {
+    color: '#A0A0A0',
+    fontSize: 14,
+    marginTop: 6,
+    fontFamily: HOME_FONT.regular,
+  },
   close: {
     width: 44,
     height: 44,
@@ -168,8 +174,13 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   selectedRow: {backgroundColor: '#25262C'},
-  providerName: {flex: 1, color: '#DADADA', fontSize: 16},
-  selectedName: {color: '#FFFFFF', fontWeight: '600'},
+  providerName: {
+    flex: 1,
+    color: '#DADADA',
+    fontSize: 16,
+    fontFamily: HOME_FONT.regular,
+  },
+  selectedName: {color: '#FFFFFF', fontFamily: HOME_FONT.bold},
 });
 
 export default ProviderDrawer;
