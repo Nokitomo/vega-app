@@ -9,6 +9,25 @@ import useContentStore from '../src/lib/zustand/contentStore';
 import useHeroStore from '../src/lib/zustand/herostore';
 import useUiSettingsStore from '../src/lib/zustand/uiSettingsStore';
 
+let mockAutoLoadArtwork = true;
+let mockLogoUri = '';
+let mockLogoResolving = false;
+jest.mock('../src/components/HeroArtwork', () => {
+  const ReactModule = require('react');
+  const {Image: NativeImage} = require('react-native');
+  return {
+    __esModule: true,
+    default: ({uri, onLoad, onError}: any) => {
+      ReactModule.useEffect(() => {
+        if (mockAutoLoadArtwork) {
+          onLoad?.();
+        }
+      }, [uri]);
+      return <NativeImage source={{uri}} onLoad={onLoad} onError={onError} />;
+    },
+  };
+});
+
 jest.mock('../src/lib/hooks/useReducedMotion', () => ({
   useReducedMotion: () => false,
 }));
@@ -46,16 +65,33 @@ jest.mock('../src/lib/zustand/watchListStore', () => ({
   default: () => ({watchList: [], addItem: jest.fn(), removeItem: jest.fn()}),
 }));
 jest.mock('react-native-linear-gradient', () => () => null);
-jest.mock('../src/components/RemoteLogo', () => () => null);
+jest.mock('../src/components/RemoteLogo', () => {
+  const {Image: NativeImage} = require('react-native');
+  return ({uri, onLoad, onError}: any) => (
+    <NativeImage
+      testID="test-logo"
+      source={{uri}}
+      onLoad={onLoad}
+      onError={onError}
+    />
+  );
+});
 jest.mock('../src/components/SearchSuggestions', () => () => null);
 jest.mock('../src/lib/hooks/useSearchSuggestions', () => ({
   useSearchSuggestions: () => ({suggestions: []}),
 }));
 jest.mock('../src/lib/hooks/useLogoFallback', () => ({
-  useLogoFallback: () => ({uri: null, onError: jest.fn(), onLoad: jest.fn()}),
+  useLogoFallback: () => ({
+    uri: mockLogoUri,
+    isResolving: mockLogoResolving,
+    onError: jest.fn(),
+    onLoad: jest.fn(),
+  }),
 }));
 jest.mock('../src/lib/utils/perfTrace', () => ({
   startPerfNavigation: jest.fn(),
+  perfNow: () => Date.now(),
+  perfTrace: jest.fn(),
 }));
 jest.mock('../src/lib/services/streamCenterMetadata', () => ({
   getMetadataSourceProvider: (providerValue: string) => providerValue,
@@ -166,7 +202,11 @@ describe('Hero carousel resilience', () => {
         node.props.accessibilityLabel === 'Home slide' &&
         typeof node.props.onPress === 'function',
     );
-  const currentImage = () => tree.root.findByType(Image);
+  const currentImage = () =>
+    tree.root
+      .findByProps({testID: 'hero-visible'})
+      .findAllByType(Image)
+      .find(node => !node.props.testID)!;
   const metadata = (link: string) =>
     ({
       isLoading: false,
@@ -179,7 +219,7 @@ describe('Hero carousel resilience', () => {
         <Hero
           posts={posts}
           isDrawerOpen={false}
-          onImageError={onError}
+          onImageError={link => onError(link)}
           {...extra}
         />
       );
@@ -191,6 +231,9 @@ describe('Hero carousel resilience', () => {
     });
   };
   beforeEach(() => {
+    mockAutoLoadArtwork = true;
+    mockLogoUri = '';
+    mockLogoResolving = false;
     jest.useFakeTimers();
     tree = undefined as unknown as renderer.ReactTestRenderer;
     onError.mockClear();
@@ -276,7 +319,7 @@ describe('Hero carousel resilience', () => {
       data: undefined,
     } as unknown as ReturnType<typeof useHeroMetadata>);
     await render();
-    await act(async () => currentImage().props.onError());
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
     expect(onError).not.toHaveBeenCalled();
     metadataMock.mockImplementation(metadata);
     // A different, successfully resolved artwork becomes available.
@@ -335,6 +378,73 @@ describe('Hero carousel resilience', () => {
     expect(slides()).toHaveLength(3);
   });
 
+  it('keeps the complete visible card until the requested artwork loads', async () => {
+    await render();
+    mockAutoLoadArtwork = false;
+    await act(async () => slides()[2].props.onPress());
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+    const pending = tree.root
+      .findAllByType(Image)
+      .find(node => node.props.source.uri === 'third.jpg')!;
+    await act(async () => pending.props.onLoad());
+    expect(currentImage().props.source.uri).toBe('third.jpg');
+  });
+
+  it('shows a skeleton without catalog text before the first artwork is ready', async () => {
+    mockAutoLoadArtwork = false;
+    await render();
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({testID: 'hero-loading'}).length,
+    ).toBeGreaterThan(0);
+    const pending = tree.root
+      .findAllByType(Image)
+      .find(node => node.props.source.uri === 'first.jpg')!;
+    await act(async () => pending.props.onLoad());
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+  });
+
+  it('waits for the selected logo to load as well as the background', async () => {
+    mockLogoUri = 'preferred-logo.png';
+    await render();
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
+    await act(async () =>
+      tree.root
+        .findAllByType(Image)
+        .filter(node => node.props.testID === 'test-logo')
+        .forEach(node => node.props.onLoad()),
+    );
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+  });
+
+  it('does not publish a text fallback while logo recovery is pending', async () => {
+    mockLogoResolving = true;
+    await render();
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
+    mockLogoResolving = false;
+    await render();
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+  });
+
+  it('ignores an artwork completion after the requested slide changes again', async () => {
+    await render();
+    mockAutoLoadArtwork = false;
+    await act(async () => slides()[2].props.onPress());
+    const oldLoad = tree.root
+      .findAllByType(Image)
+      .find(node => node.props.source.uri === 'third.jpg')!.props.onLoad;
+    await act(async () => slides()[1].props.onPress());
+    await act(async () => oldLoad());
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+    await act(async () =>
+      tree.root
+        .findAllByType(Image)
+        .find(node => node.props.source.uri === 'second.jpg')!
+        .props.onLoad(),
+    );
+    expect(currentImage().props.source.uri).toBe('second.jpg');
+  });
+
   it('does not request metadata for a hero belonging to the previous provider', async () => {
     contentStoreMock.mockImplementation(
       selectorStoreMock({
@@ -343,7 +453,7 @@ describe('Hero carousel resilience', () => {
     );
     metadataMock.mockClear();
     await render([]);
-    expect(metadataMock).toHaveBeenLastCalledWith('', 'new-provider');
+    expect(metadataMock).not.toHaveBeenCalled();
     expect(onError).not.toHaveBeenCalled();
   });
 });

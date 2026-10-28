@@ -25,94 +25,35 @@ import {useTranslation} from 'react-i18next';
 import RemoteLogo from './RemoteLogo';
 import type {ArtworkCandidates} from '../lib/services/artworkSelection';
 import {useLogoFallback} from '../lib/hooks/useLogoFallback';
-import {startPerfNavigation} from '../lib/utils/perfTrace';
+import {perfNow, perfTrace, startPerfNavigation} from '../lib/utils/perfTrace';
 import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
 
-interface HeroProps {
-  posts?: Post[];
-  isActive?: boolean;
-  isDrawerOpen: boolean;
-  searchActive?: boolean;
-  onImageError?: (link?: string) => void;
-}
+type HeroCardProps = {
+  hero: Post;
+  provider: {value: string};
+  reducedMotion: boolean;
+  onFailure: (link: string) => void;
+  onReady: (link: string, ready: boolean) => void;
+};
 
-const Hero = memo(
-  ({
-    isDrawerOpen,
-    searchActive = false,
-    onImageError,
-    posts = [],
-    isActive = true,
-  }: HeroProps) => {
-    const reducedMotion = useReducedMotion();
-    const progress = useRef(new Animated.Value(0)).current;
+const HeroCard = memo(
+  ({hero, provider, reducedMotion, onFailure, onReady}: HeroCardProps) => {
+    const {t} = useTranslation();
+    const navigationSize = useWindowDimensions();
+    const {width, height} = navigationSize;
+    const insets = useSafeAreaInsets();
     const [failedImages, setFailedImages] = useState<Set<string>>(
       () => new Set(),
     );
-    const [failedSlides, setFailedSlides] = useState<Set<string>>(
-      () => new Set(),
-    );
-    const [appState, setAppState] = useState(AppState.currentState);
-    useEffect(() => {
-      const subscription = AppState.addEventListener('change', setAppState);
-      return () => subscription.remove();
-    }, []);
-    const {t} = useTranslation();
-    const {provider} = useContentStore(state => state);
-    const {hero: storedHero, providerScope} = useHeroStore(state => state);
-    const scope = getProviderCacheScope(provider.value);
-    const initialHero = providerScope === scope ? storedHero : undefined;
-    const {width, height} = useWindowDimensions();
-    const insets = useSafeAreaInsets();
-    const [selectedLink, setSelectedLink] = useState('');
-    const slides = React.useMemo(() => {
-      const unique = new Map<string, Post>();
-      [initialHero, ...posts].forEach(post => {
-        if (
-          post?.link &&
-          !failedSlides.has(post.link) &&
-          !unique.has(post.link)
-        ) {
-          unique.set(post.link, post);
-        }
-      });
-      return Array.from(unique.values()).slice(0, 6);
-    }, [initialHero, posts, failedSlides]);
-    const page = Math.max(
-      0,
-      slides.findIndex(post => post.link === selectedLink),
-    );
-    const hero = slides[page];
-    const setPage = useCallback(
-      (index: number) => {
-        setSelectedLink(slides[index]?.link || '');
-      },
-      [slides],
-    );
+    const [loadedBackground, setLoadedBackground] = useState('');
+    const [loadedLogo, setLoadedLogo] = useState('');
+    const preparationStarted = useRef(perfNow());
+    const reportedReady = useRef(false);
     const {watchList, addItem, removeItem} = useWatchListStore();
     const isSaved = watchList.some(item => item.link === hero?.link);
-    const swipe = React.useMemo(
-      () =>
-        PanResponder.create({
-          onMoveShouldSetPanResponder: (_, gesture) =>
-            Math.abs(gesture.dx) > 20 &&
-            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
-          onPanResponderRelease: (_, gesture) => {
-            if (Math.abs(gesture.dx) > 40) {
-              setPage(
-                Math.max(
-                  0,
-                  Math.min(slides.length - 1, page + (gesture.dx < 0 ? 1 : -1)),
-                ),
-              );
-            }
-          },
-        }),
-      [slides.length, page, setPage],
-    );
     const metadataProvider = getMetadataSourceProvider(
       provider.value,
       hero?.link || '',
@@ -127,49 +68,6 @@ const Hero = memo(
       isLoading,
       error,
     } = useHeroMetadata(hero?.link || '', provider.value);
-    useEffect(() => {
-      if (
-        appState !== 'active' ||
-        isLoading ||
-        !isActive ||
-        searchActive ||
-        isDrawerOpen ||
-        slides.length < 2
-      ) {
-        progress.setValue(1);
-        return;
-      }
-      progress.setValue(reducedMotion ? 1 : 0);
-      const timer = setTimeout(
-        () => setPage((page + 1) % slides.length),
-        10500,
-      );
-      const animation = Animated.timing(progress, {
-        toValue: 1,
-        duration: 10500,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      });
-      if (!reducedMotion) {
-        animation.start();
-      }
-      return () => {
-        clearTimeout(timer);
-        animation.stop();
-      };
-    }, [
-      page,
-      slides.length,
-      isActive,
-      searchActive,
-      isDrawerOpen,
-      isLoading,
-      appState,
-      setPage,
-      progress,
-      reducedMotion,
-    ]);
-
     const handlePlayPress = useCallback(() => {
       if (hero?.link) {
         startPerfNavigation(provider.value);
@@ -191,8 +89,6 @@ const Hero = memo(
       provider.value,
       heroData,
     ]);
-
-    const reportedLinks = useRef(new Set<string>());
 
     const backgroundCandidates = React.useMemo(() => {
       const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
@@ -225,35 +121,15 @@ const Hero = memo(
       );
     }, [backgroundCandidates, failedImages, hero?.link]);
 
-    const reportHeroFailure = useCallback(
-      (failedLink: string) => {
-        if (!reportedLinks.current.has(failedLink)) {
-          reportedLinks.current.add(failedLink);
-          setFailedSlides(previous => new Set(previous).add(failedLink));
-          if (failedLink === initialHero?.link) {
-            onImageError?.(failedLink);
-          }
-        }
-      },
-      [onImageError, initialHero?.link],
-    );
-
     useEffect(() => {
       if (
         !isLoading &&
         hero?.link &&
         ((error && !heroData) || !currentImageUri)
       ) {
-        reportHeroFailure(hero.link);
+        onFailure(hero.link);
       }
-    }, [
-      error,
-      heroData,
-      hero?.link,
-      reportHeroFailure,
-      isLoading,
-      currentImageUri,
-    ]);
+    }, [error, heroData, hero?.link, onFailure, isLoading, currentImageUri]);
 
     const handleImageError = useCallback(() => {
       if (hero?.link && currentImageUri) {
@@ -304,20 +180,38 @@ const Hero = memo(
       uri: logoUri,
       onError: handleLogoError,
       onLoad: handleLogoLoad,
+      isResolving: resolvingLogo,
     } = useLogoFallback({
       providerValue: provider.value,
       link: hero?.link || '',
       candidates: logoCandidates,
     });
 
+    const ready =
+      !!heroData &&
+      !isLoading &&
+      !!currentImageUri &&
+      loadedBackground === currentImageUri &&
+      !resolvingLogo &&
+      (!logoUri || loadedLogo === logoUri);
+    useEffect(() => {
+      if (ready && !reportedReady.current) {
+        reportedReady.current = true;
+        perfTrace('hero_ready', {
+          provider: provider.value,
+          durationMs: Math.round(perfNow() - preparationStarted.current),
+        });
+      }
+      onReady(hero.link, ready);
+      return () => onReady(hero.link, false);
+    }, [hero.link, ready, onReady, provider.value]);
     return (
       <View style={{backgroundColor: 'black'}}>
         <View
           style={{
             minHeight: Math.max(560, height * 0.69),
             paddingTop: insets.top + 56,
-          }}
-          {...swipe.panHandlers}>
+          }}>
           <Pressable
             onPress={handlePlayPress}
             accessibilityRole="button"
@@ -331,6 +225,7 @@ const Hero = memo(
                 uri={currentImageUri}
                 reducedMotion={reducedMotion}
                 onError={handleImageError}
+                onLoad={() => setLoadedBackground(currentImageUri)}
               />
             )}
             <LinearGradient
@@ -360,7 +255,10 @@ const Hero = memo(
                 width={Math.min(width - 32, 360)}
                 height={100}
                 onError={handleLogoError}
-                onLoad={handleLogoLoad}
+                onLoad={() => {
+                  handleLogoLoad();
+                  setLoadedLogo(logoUri);
+                }}
               />
             ) : (
               <Text
@@ -386,12 +284,11 @@ const Hero = memo(
                 {heroData.synopsis}
               </Text>
             )}
-            {(error || (!slides.length && failedSlides.size > 0)) &&
-              !isLoading && (
-                <Text style={{color: '#A0A0A0'}}>
-                  {t('Unable to load details')}
-                </Text>
-              )}
+            {error && !isLoading && (
+              <Text style={{color: '#A0A0A0'}}>
+                {t('Unable to load details')}
+              </Text>
+            )}
             {!!hero?.link && (
               <View style={{flexDirection: 'row', gap: 12, marginTop: 12}}>
                 <TouchableOpacity
@@ -453,6 +350,250 @@ const Hero = memo(
             )}
           </View>
         </View>
+      </View>
+    );
+  },
+);
+HeroCard.displayName = 'HeroCard';
+
+interface HeroProps {
+  posts?: Post[];
+  isActive?: boolean;
+  isDrawerOpen: boolean;
+  searchActive?: boolean;
+  onImageError?: (link?: string) => void;
+}
+
+const Hero = memo(
+  ({
+    isDrawerOpen,
+    searchActive = false,
+    onImageError,
+    posts = [],
+    isActive = true,
+  }: HeroProps) => {
+    const reducedMotion = useReducedMotion();
+    const progress = useRef(new Animated.Value(0)).current;
+    const [failedSlides, setFailedSlides] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const [appState, setAppState] = useState(AppState.currentState);
+    useEffect(() => {
+      const subscription = AppState.addEventListener('change', setAppState);
+      return () => subscription.remove();
+    }, []);
+    const {t} = useTranslation();
+    const {provider} = useContentStore(state => state);
+    const {hero: storedHero, providerScope} = useHeroStore(state => state);
+    const scope = getProviderCacheScope(provider.value);
+    const initialHero = providerScope === scope ? storedHero : undefined;
+    const {height} = useWindowDimensions();
+    const [selectedLink, setSelectedLink] = useState('');
+    const slides = React.useMemo(() => {
+      const unique = new Map<string, Post>();
+      [initialHero, ...posts].forEach(post => {
+        if (
+          post?.link &&
+          !failedSlides.has(post.link) &&
+          !unique.has(post.link)
+        ) {
+          unique.set(post.link, post);
+        }
+      });
+      return Array.from(unique.values()).slice(0, 6);
+    }, [initialHero, posts, failedSlides]);
+    const page = Math.max(
+      0,
+      slides.findIndex(post => post.link === selectedLink),
+    );
+    const requested = slides[page];
+    const [readyLinks, setReadyLinks] = useState<Set<string>>(() => new Set());
+    const [displayedLink, setDisplayedLink] = useState('');
+    const requestedAt = useRef(perfNow());
+    const visible = slides.find(post => post.link === displayedLink);
+    const displayedPage = slides.findIndex(post => post.link === displayedLink);
+    const isLoading =
+      !visible ||
+      requested?.link !== displayedLink ||
+      !readyLinks.has(displayedLink);
+    const onReady = useCallback((link: string, ready: boolean) => {
+      setReadyLinks(previous => {
+        if (previous.has(link) === ready) {
+          return previous;
+        }
+        const next = new Set(previous);
+        if (ready) {
+          next.add(link);
+        } else {
+          next.delete(link);
+        }
+        return next;
+      });
+    }, []);
+    useEffect(() => {
+      if (
+        requested &&
+        readyLinks.has(requested.link) &&
+        requested.link !== displayedLink
+      ) {
+        perfTrace('hero_presented', {
+          provider: provider.value,
+          waitMs: Math.round(perfNow() - requestedAt.current),
+        });
+        setDisplayedLink(requested.link);
+      }
+    }, [requested, readyLinks, displayedLink, provider.value]);
+    // Keep the current card mounted while preparing the requested and next card.
+    const mountedSlides = slides.filter(
+      post =>
+        post.link === visible?.link ||
+        post.link === requested?.link ||
+        (!!visible &&
+          requested?.link === displayedLink &&
+          appState === 'active' &&
+          isActive &&
+          !searchActive &&
+          !isDrawerOpen &&
+          post.link === slides[(page + 1) % slides.length]?.link),
+    );
+    const setPage = useCallback(
+      (index: number) => {
+        requestedAt.current = perfNow();
+        setSelectedLink(slides[index]?.link || '');
+      },
+      [slides],
+    );
+    const swipe = React.useMemo(
+      () =>
+        PanResponder.create({
+          onMoveShouldSetPanResponder: (_, gesture) =>
+            Math.abs(gesture.dx) > 20 &&
+            Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+          onPanResponderRelease: (_, gesture) => {
+            if (Math.abs(gesture.dx) > 40) {
+              setPage(
+                Math.max(
+                  0,
+                  Math.min(slides.length - 1, page + (gesture.dx < 0 ? 1 : -1)),
+                ),
+              );
+            }
+          },
+        }),
+      [slides.length, page, setPage],
+    );
+    useEffect(() => {
+      if (
+        appState !== 'active' ||
+        isLoading ||
+        !isActive ||
+        searchActive ||
+        isDrawerOpen ||
+        slides.length < 2
+      ) {
+        progress.setValue(1);
+        return;
+      }
+      progress.setValue(reducedMotion ? 1 : 0);
+      const timer = setTimeout(
+        () => setPage((page + 1) % slides.length),
+        10500,
+      );
+      const animation = Animated.timing(progress, {
+        toValue: 1,
+        duration: 10500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      if (!reducedMotion) {
+        animation.start();
+      }
+      return () => {
+        clearTimeout(timer);
+        animation.stop();
+      };
+    }, [
+      page,
+      slides.length,
+      isActive,
+      searchActive,
+      isDrawerOpen,
+      isLoading,
+      appState,
+      setPage,
+      progress,
+      reducedMotion,
+    ]);
+
+    const reportedLinks = useRef(new Set<string>());
+    const reportHeroFailure = useCallback(
+      (failedLink: string) => {
+        if (!reportedLinks.current.has(failedLink)) {
+          reportedLinks.current.add(failedLink);
+          setFailedSlides(previous => new Set(previous).add(failedLink));
+          if (failedLink === initialHero?.link) {
+            onImageError?.(failedLink);
+          }
+        }
+      },
+      [onImageError, initialHero?.link],
+    );
+
+    return (
+      <View style={{backgroundColor: 'black'}} {...swipe.panHandlers}>
+        {!visible && (
+          <View
+            testID="hero-loading"
+            accessibilityState={{busy: true}}
+            style={{
+              height: Math.max(560, height * 0.69),
+              backgroundColor: '#141519',
+              justifyContent: 'flex-end',
+              padding: 16,
+              gap: 12,
+            }}>
+            <View
+              style={{width: '60%', height: 60, backgroundColor: '#23252B'}}
+            />
+            <View style={{height: 16, backgroundColor: '#23252B'}} />
+            <View style={{height: 40, backgroundColor: '#23252B'}} />
+            {!slides.length && failedSlides.size > 0 && (
+              <Text style={{color: '#DADADA'}}>
+                {t('Unable to load details')}
+              </Text>
+            )}
+          </View>
+        )}
+        {mountedSlides.map(post => {
+          const shown = post.link === visible?.link;
+          return (
+            <View
+              key={`${scope}:${post.link}`}
+              testID={shown ? 'hero-visible' : 'hero-preparing'}
+              pointerEvents={shown ? 'auto' : 'none'}
+              accessibilityElementsHidden={!shown}
+              importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}
+              style={
+                shown
+                  ? undefined
+                  : {
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      opacity: 0,
+                    }
+              }>
+              <HeroCard
+                hero={post}
+                provider={provider}
+                reducedMotion={reducedMotion}
+                onFailure={reportHeroFailure}
+                onReady={onReady}
+              />
+            </View>
+          );
+        })}
         {slides.length > 1 && (
           <View
             style={{
@@ -471,7 +612,7 @@ const Hero = memo(
                   number: index + 1,
                   total: slides.length,
                 })}
-                accessibilityState={{selected: page === index}}
+                accessibilityState={{selected: displayedPage === index}}
                 style={{width: 39, height: 28, justifyContent: 'center'}}>
                 <View
                   style={{
@@ -480,7 +621,7 @@ const Hero = memo(
                     backgroundColor: '#DADADA',
                     overflow: 'hidden',
                   }}>
-                  {index === page && (
+                  {index === displayedPage && (
                     <Animated.View
                       style={{
                         width: 39,

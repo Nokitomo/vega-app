@@ -368,3 +368,8 @@ bitmap e pause `js_lag` durante richieste ai provider. Sono necessari profili
 separati del disegno delle card e delle immagini prima di attribuire quei
 ritardi a un componente specifico. Tracce e schermate locali sono in
 `.codex/skeleton-fix-20261021/`, ignorata da Git.
+
+
+## Presentazione del hero
+
+`hero_ready` misura dal montaggio della card al completamento dei metadati e dei caricamenti nativi di sfondo/logo; `hero_presented` riporta l'attesa dalla richiesta di selezione alla pubblicazione della card. Contengono soltanto provider e durata, senza identificativi o URL. Il primo evento puo riguardare una slide preparata fuori vista; non equivale alla sua presentazione. La prima selezione include l'attesa del catalogo dal montaggio del carosello. Per i test a freddo chiudere il processo e svuotare anche il database SQLite dei metadati e le cache immagini nel solo profilo QA: Cancella cache nelle impostazioni non basta. Conservare provider e impostazioni per confronti equivalenti.

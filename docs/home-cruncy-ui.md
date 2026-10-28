@@ -77,3 +77,13 @@ Il campione `home-hero-swipe-before.png` del report mostra marchio compatto a si
 Restano differenze visibili rispetto al campione: font/pesi delle intestazioni, posizione verticale e dimensioni dei loghi dei titoli, spazio tra indicatori e prima sezione, e icone/etichette della barra inferiore. Inoltre alcuni poster del catalogo contengono gia il titolo e producono una duplicazione visiva quando sopra viene mostrato il logo. La scelta artwork del provider va considerata nella rifinitura, senza fissare immagini o titoli del campione.
 
 Le quattro destinazioni Vega, l'assenza del banner Premium e i metadati disponibili nei provider restano differenze funzionali rispetto a Crunchyroll. Non vanno aggiunte destinazioni o azioni fittizie per simulare la parita. La home e vicina nella struttura, ma non e ancora una replica estetica 1:1 verificata.
+
+## Hero: presentazione completa e preparazione anticipata
+
+Il carosello distingue la slide richiesta da quella visibile. Al primo avvio mostra uno skeleton finche la query completa dei metadati e il caricamento nativo dello sfondo e del logo selezionati sono terminati. Durante un cambio conserva la slide precedente, incluse le azioni legate al suo titolo. Gli indicatori seguono la slide effettivamente visibile e il timer riparte dopo la presentazione.
+
+Dopo la prima presentazione prepara una sola slide successiva. Non avvia il pre-caricamento successivo durante background, ricerca, drawer o quando la home non e attiva. Le card preparate sono escluse dai tocchi e dall'accessibilita. Richieste gia partite possono terminare nella cache React Query. Una selezione rapida sostituisce la preparazione precedente senza pubblicarne gli eventi tardivi.
+
+Restano invariati query, merge Cinemeta, priorita artwork/lingua, fallback del logo e navigazione. Un logo assente dopo la risoluzione usa il titolo testuale; durante il recupero asincrono del logo la card resta in preparazione. Il pre-caricamento non riduce la latenza di rete della prima slide: evita presentazioni parziali e anticipa il lavoro per le successive.
+
+Verifica Android su Medium_Phone_API_35: arresto del processo e rimozione delle sole cache QA (SQLite dei metadati, MMKV cache, cache immagini/HTTP e file provider), mantenendo provider installati e impostazioni. Il normale comando Cancella cache non elimina tutte queste copie. Controllati AnimeUnity, StreamingUnity e StreamCenter, navigazione al dettaglio e cambio slide. Evidenze in `.codex/screenshots/cruncy-ui/hero-*.png` e video locale, esclusi da Git. iOS resta non verificato.

@@ -52,6 +52,7 @@ export const useLogoFallback = ({
   const failedUrlsRef = useRef(new Set<string>());
   const requestsRef = useRef(0);
   const pendingRef = useRef(false);
+  const [isResolving, setIsResolving] = useState(false);
   const fullRepairRequestedRef = useRef(false);
   const requestScope = `${providerValue}\u0000${link}\u0000${candidateKey}`;
   const requestScopeRef = useRef(requestScope);
@@ -68,11 +69,14 @@ export const useLogoFallback = ({
     failedUrlsRef.current = new Set();
     requestsRef.current = 0;
     pendingRef.current = false;
+    setIsResolving(false);
     fullRepairRequestedRef.current = false;
   }, [providerValue, link, candidateKey]);
 
   const onError = useCallback(() => {
-    if (!uri) {return;}
+    if (!uri) {
+      return;
+    }
     failedUrlsRef.current.add(uri);
     if (index + 1 < urls.length) {
       setIndex(index + 1);
@@ -94,6 +98,7 @@ export const useLogoFallback = ({
       return;
     }
     pendingRef.current = true;
+    setIsResolving(true);
     requestsRef.current += 1;
     const failedUrls = Array.from(failedUrlsRef.current);
     const scope = requestScope;
@@ -105,9 +110,13 @@ export const useLogoFallback = ({
         failedUrls,
       })
       .then(artwork => {
-        if (requestScopeRef.current !== scope) {return;}
+        if (requestScopeRef.current !== scope) {
+          return;
+        }
         const next = artwork?.logo?.trim();
-        if (!validLogoUrl(next) || failedUrlsRef.current.has(next)) {return;}
+        if (!validLogoUrl(next) || failedUrlsRef.current.has(next)) {
+          return;
+        }
         setExtraUrls(previous =>
           previous.includes(next) ? previous : [...previous, next],
         );
@@ -115,29 +124,43 @@ export const useLogoFallback = ({
       })
       .catch(error => console.warn('Logo recovery failed:', error))
       .finally(() => {
-        if (requestScopeRef.current === scope) {pendingRef.current = false;}
+        if (requestScopeRef.current === scope) {
+          pendingRef.current = false;
+          setIsResolving(false);
+        }
       });
-  }, [index, link, onExhausted, providerValue, requestScope, storageProvider, uri, urls.length]);
+  }, [
+    index,
+    link,
+    onExhausted,
+    providerValue,
+    requestScope,
+    storageProvider,
+    uri,
+    urls.length,
+  ]);
 
   const onLoad = useCallback(() => {
-    if (!uri || !storageLink) {return;}
+    if (!uri || !storageLink) {
+      return;
+    }
     const preferredUrl = candidates[0]?.trim() || '';
     if (uri === preferredUrl) {
-      if (saved) {removeMetadata('workingLogo', storageProvider, storageLink);}
+      if (saved) {
+        removeMetadata('workingLogo', storageProvider, storageLink);
+      }
       return;
     }
     if (
       preferredUrl &&
       (saved?.value.url !== uri || saved.value.preferredUrl !== preferredUrl)
     ) {
-      writeMetadata<WorkingLogo>(
-        'workingLogo',
-        storageProvider,
-        storageLink,
-        {url: uri, preferredUrl},
-      );
+      writeMetadata<WorkingLogo>('workingLogo', storageProvider, storageLink, {
+        url: uri,
+        preferredUrl,
+      });
     }
   }, [candidates, saved, storageLink, storageProvider, uri]);
 
-  return {uri, onError, onLoad};
+  return {uri, onError, onLoad, isResolving};
 };
