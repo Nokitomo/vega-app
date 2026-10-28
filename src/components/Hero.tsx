@@ -30,6 +30,7 @@ import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
+import {uniqueHeroPosts} from '../lib/utils/heroPolicy';
 import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
 
 type HeroCardProps = {
@@ -437,18 +438,11 @@ const Hero = memo(
     const layout = getHomeHeroLayout(width, height);
     const [selectedLink, setSelectedLink] = useState('');
     const slides = React.useMemo(() => {
-      const unique = new Map<string, Post>();
-      [initialHero, ...posts].forEach(post => {
-        if (
-          post?.link &&
-          !failedSlides.has(post.link) &&
-          !unique.has(post.link)
-        ) {
-          unique.set(post.link, post);
-        }
-      });
-      return Array.from(unique.values()).slice(0, 6);
-    }, [initialHero, posts, failedSlides]);
+      return uniqueHeroPosts(
+        [initialHero, ...posts].filter(post => post && !failedSlides.has(post.link)),
+        provider.value,
+      ).slice(0, 6);
+    }, [initialHero, posts, failedSlides, provider.value]);
     const page = Math.max(
       0,
       slides.findIndex(post => post.link === selectedLink),
@@ -456,6 +450,8 @@ const Hero = memo(
     const requested = slides[page];
     const [readyLinks, setReadyLinks] = useState<Set<string>>(() => new Set());
     const [displayedLink, setDisplayedLink] = useState('');
+    const [preparationExpired, setPreparationExpired] = useState(false);
+    const [retryGeneration, setRetryGeneration] = useState(0);
     const requestedAt = useRef(perfNow());
     const visible = slides.find(post => post.link === displayedLink);
     const displayedPage = slides.findIndex(post => post.link === displayedLink);
@@ -491,7 +487,7 @@ const Hero = memo(
       }
     }, [requested, readyLinks, displayedLink, provider.value]);
     // Keep the current card mounted while preparing the requested and next card.
-    const mountedSlides = slides.filter(
+    const mountedSlides = preparationExpired && !visible ? [] : slides.filter(
       post =>
         post.link === visible?.link ||
         post.link === requested?.link ||
@@ -572,7 +568,19 @@ const Hero = memo(
       reducedMotion,
     ]);
 
+    useEffect(() => {
+      if (visible || !isActive || appState !== 'active') {return;}
+      const timer = setTimeout(() => setPreparationExpired(true), 45000);
+      return () => clearTimeout(timer);
+    }, [!!visible, isActive, appState, retryGeneration]);
+
     const reportedLinks = useRef(new Set<string>());
+    const retryPreparation = useCallback(() => {
+      reportedLinks.current.clear();
+      setFailedSlides(new Set());
+      setPreparationExpired(false);
+      setRetryGeneration(value => value + 1);
+    }, []);
     const reportHeroFailure = useCallback(
       (failedLink: string) => {
         if (!reportedLinks.current.has(failedLink)) {
@@ -591,7 +599,7 @@ const Hero = memo(
         {!visible && (
           <View
             testID="hero-loading"
-            accessibilityState={{busy: true}}
+            accessibilityState={{busy: !preparationExpired && !!slides.length}}
             style={{
               minHeight: layout.minHeight,
               backgroundColor: '#141519',
@@ -604,10 +612,14 @@ const Hero = memo(
             />
             <View style={{height: 16, backgroundColor: '#23252B'}} />
             <View style={{height: 40, backgroundColor: '#23252B'}} />
-            {!slides.length && failedSlides.size > 0 && (
-              <Text style={{color: '#DADADA'}}>
-                {t('Unable to load details')}
-              </Text>
+            {(preparationExpired || (!slides.length && failedSlides.size > 0)) && (
+              <View>
+                <Text style={{color: '#DADADA'}}>{t('Unable to load details')}</Text>
+                <Pressable testID="hero-retry" accessibilityRole="button"
+                  onPress={retryPreparation} style={{paddingVertical: 16}}>
+                  <Text style={{color: '#FF640A'}}>{t('Retry')}</Text>
+                </Pressable>
+              </View>
             )}
           </View>
         )}

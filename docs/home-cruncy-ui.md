@@ -186,3 +186,67 @@ Per eliminare questi casi servono informazioni affidabili sull'artwork senza
 alterare le priorita concordate. Il timer e la dissolvenza restano approssimazioni.
 Prima della distribuzione dei font di riferimento occorre disporre delle relative
 licenze: l'estrazione dall'APK documenta la provenienza, non i diritti di riuso.
+
+
+### Hero: recupero cache e deduplicazione (2026-10-28)
+
+- Le risposte senza titolo/nome o sinossi non sono idonee alla presentazione
+  hero: non vengono persistite e i vecchi record parziali SQLite/MMKV vengono
+  ignorati. Non si presume che un campo assente sia necessariamente un errore
+  remoto: un'opera realmente priva di sinossi resta disponibile nelle righe e
+  nel dettaglio, ma non viene presentata nel carosello.
+- Logo e generi restano facoltativi. Servizi, lingue, ordine delle sorgenti e
+  fallback di artwork/metadati restano quelli esistenti. Un aggiornamento che
+  perde sinossi, logo o tag gia disponibili non sovrascrive la scheda precedente:
+  React Query conserva il risultato precedente e gestisce due tentativi aggiuntivi
+  con attesa crescente. Nessuna fusione arbitraria fra campi di snapshot diversi.
+- La freschezza non e piu infinita: 24 ore per risultati ricchi; 5 minuti se manca
+  il logo o l'arricchimento ha generato un errore. La scadenza abilita il recupero
+  ai normali eventi React Query (rimontaggio/riconnessione), senza polling continuo.
+- Senza una prima scheda pronta, dopo 45 secondi di attesa in primo piano il
+  carosello sospende la preparazione e offre Riprova; le righe restano utilizzabili.
+  La scadenza riguarda la UI, non annulla le richieste interne dei provider.
+  Una scheda gia visibile resta invece disponibile mentre si prepara la successiva.
+- Deduplicazione prima del limite di sei slide: ID delle opere nelle route AU/SU,
+  route StreamCenter decodificate, ID AniList/MAL e collegamenti delle varianti.
+  Per SU le stagioni della stessa serie valgono una sola opera nel hero.
+  Si conserva il primo Post con la sua navigazione e le sue varianti; nessuna
+  modifica a cataloghi, dettaglio o preferenze doppiaggio. Titoli uguali da soli
+  non sono prova di identita (remake e omonimi restano distinti). Opere senza
+  alcuna identita condivisa non possono essere accorpate con certezza.
+
+
+Verifiche del fix:
+
+- 44 test passati in sette suite: heroMetadataCache, heroMetadataFailure,
+  heroPolicy, heroArtwork, homeResponsiveLayout, providerSheet e streamCenterMetadata.
+  Coprono anche cache parziale preesistente, rifiuto degli aggiornamenti peggiorativi,
+  fallback dopo errore dell'arricchimento, attesa delle immagini/loghi, timeout e
+  riprova, navigazione del carosello, varianti transitive, omonimi e route aggregate.
+- TypeScript ed ESLint senza errori o warning. Il primo controllo TypeScript ha
+  rilevato import Jest mancanti nel nuovo test, corretti. Un primo test ha avuto
+  timeout durante il blocco dell'ambiente ADB; superato dopo il ripristino senza
+  aumentare il timeout del test. Eliminato un import dinamico ridondante del
+  ProviderManager, gia importato staticamente, per eseguire i test con Jest.
+- Prove su Medium_Phone_API_35 con dev client installato 3.3.19 e bundle del
+  branch corrente via Metro. Nessun prebuild o cambio alle preferenze dei servizi.
+  Svuotati i 26 record SQLite heroMetadata/heroMetadata:sourceAware e l'istanza
+  MMKV cache a processo fermo, conservando gli altri record SQLite e gli archivi
+  impostazioni, secure e provider_kv. E un test senza cache hero dell'app, non una
+  reinstallazione e non un reset di tutte le cache interne dei provider/CDN.
+- StreamingUnity: ricostruzione hero con logo, generi e sinossi; CTA verso dettaglio
+  ed episodi e ritorno. StreamCenter: caricamento lento, comparsa di Riprova,
+  recupero con logo e sinossi e avanzamento del carosello. AnimeUnity: caricamento
+  senza cache hero, Riprova e recupero con titolo, tag e sinossi; verificato anche
+  il fallback testuale previsto quando il logo non e disponibile e il ritorno
+  dalla schermata Home di Android, con carosello ancora funzionante.
+- L'ambiente inizialmente aveva migliaia di processi ADB bloccati diretti al nostro
+  emulatore; ripristinato solo quel collegamento e riavviato Medium_Phone_API_35.
+  Un avvio del dev launcher ha avuto timeout prima che Metro completasse il bundle.
+  Rimangono avvisi preesistenti (require cycle downloader/notifiche, SafeAreaView,
+  architettura Legacy), errori intermittenti del manifest remoto e messaggi sulla
+  cartella download non esistente nel dispositivo di test. Nessuno riguarda il
+  codice modificato. Non sono stati modificati downloader, player o cast.
+- Screenshot e registrazioni in `.codex/screenshots/hero-fix-20261028/`, ignorati
+  da Git. La registrazione StreamingUnity iniziale comprende il dialogo di
+  aggiornamento del dev client. Nessun benchmark di velocita; iOS non verificato.

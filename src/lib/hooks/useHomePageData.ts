@@ -26,6 +26,7 @@ import {measurePerfSync, traceAsync} from '../utils/perfTrace';
 import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
 import {reconcileHomeSections} from '../utils/reconcileHomeSections';
 import i18n from '../../i18n';
+import {hasHeroLogo, isPresentableHero, wouldDegradeHero} from '../utils/heroPolicy';
 
 export interface HomePageData {
   title: string;
@@ -601,12 +602,32 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
     : 'heroMetadata';
   const providerCacheScope = getProviderCacheScope(providerValue);
 
+  const queryKey = [metadataKind, heroLink, providerValue, providerCacheScope];
+  const readCachedHero = () => {
+    const records = [
+      readMetadata<any>(metadataKind, providerValue, heroLink),
+      readPersistedCache<any>(cacheStorage, cacheKey),
+    ].filter(record => record && isPresentableHero(record.value));
+    return records.sort((a, b) => b!.updatedAt - a!.updatedAt)[0];
+  };
+  const persistHero = (merged: any) => {
+    const previous = queryClient.getQueryData<any>(queryKey) || readCachedHero()?.value;
+    if (!isPresentableHero(merged) || wouldDegradeHero(previous, merged)) {
+      // A successful provider response can still be an empty fallback. Let Query
+      // retry it without poisoning either cache or replacing a usable card.
+      throw new Error(i18n.t('Unable to load details'));
+    }
+    if (cacheKey) {
+      writePersistedCache(cacheStorage, cacheKey, merged);
+      writeMetadata(metadataKind, providerValue, heroLink, merged);
+    }
+    return merged;
+  };
+
   return useQuery({
-    queryKey: [metadataKind, heroLink, providerValue, providerCacheScope],
+    queryKey,
     queryFn: async () => {
-      const {providerManager: importedProviderManager} =
-        await import('../services/ProviderManager');
-      const info = await importedProviderManager.getMetaData({
+      const info = await providerManager.getMetaData({
         link: heroLink,
         provider: providerValue,
         purpose: 'hero',
@@ -703,8 +724,9 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
         metaKey &&
         (metadataProvider !== 'animeunity' || needsAnimeArtworkFallback)
       ) {
+        let enhancedMeta;
         try {
-          const enhancedMeta =
+          enhancedMeta =
             metadataProvider === 'animeunity'
               ? {
                   banner: await fetchAniListBanner(
@@ -717,55 +739,26 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
                   malId: animeExternalIds.malId,
                   anilistId: animeExternalIds.anilistId,
                 });
-          if (enhancedMeta && Object.keys(enhancedMeta).length > 0) {
-            const merged = mergeHeroMeta(info, enhancedMeta);
-            if (cacheKey) {
-              writePersistedCache(cacheStorage, cacheKey, merged);
-              writeMetadata(metadataKind, providerValue, heroLink, merged);
-            }
-            return merged;
-          }
         } catch {
           const merged = mergeHeroMeta(info, undefined);
-          if (cacheKey) {
-            writePersistedCache(cacheStorage, cacheKey, merged);
-            writeMetadata(metadataKind, providerValue, heroLink, merged);
-          }
-          return merged;
+          return persistHero({...merged, heroRefreshNeeded: true});
+        }
+        if (enhancedMeta && Object.keys(enhancedMeta).length > 0) {
+          return persistHero(mergeHeroMeta(info, enhancedMeta));
         }
       }
 
-      const merged = mergeHeroMeta(info, undefined);
-      if (cacheKey) {
-        writePersistedCache(cacheStorage, cacheKey, merged);
-        writeMetadata(metadataKind, providerValue, heroLink, merged);
-      }
-      return merged;
+      return persistHero(mergeHeroMeta(info, undefined));
     },
     enabled: !!heroLink && !!providerValue,
-    staleTime:
-      providerValue === 'animeunity' ||
-      providerValue === 'streamingunity' ||
-      providerValue === 'streamcenter'
-        ? Infinity
+    staleTime: query =>
+      !hasHeroLogo(query.state.data) || query.state.data?.heroRefreshNeeded
+        ? 5 * 60 * 1000
         : HERO_METADATA_STALE_MS,
-    gcTime: 60 * 60 * 1000, // 1 hour
+    gcTime: 60 * 60 * 1000,
     retry: 2,
-    // Use cached data as initial data
-    initialData: () => {
-      if (!cacheKey) {
-        return undefined;
-      }
-      return (
-        readMetadata<any>(metadataKind, providerValue, heroLink)?.value ||
-        readPersistedCache<any>(cacheStorage, cacheKey)?.value
-      );
-    },
-    initialDataUpdatedAt: () =>
-      cacheKey
-        ? readMetadata<any>(metadataKind, providerValue, heroLink)
-            ?.updatedAt ||
-          readPersistedCache<any>(cacheStorage, cacheKey)?.updatedAt
-        : undefined,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
+    initialData: () => cacheKey ? readCachedHero()?.value : undefined,
+    initialDataUpdatedAt: () => cacheKey ? readCachedHero()?.updatedAt : undefined,
   });
 };

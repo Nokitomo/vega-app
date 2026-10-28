@@ -409,6 +409,18 @@ describe('Hero carousel resilience', () => {
     expect(currentImage().props.source.uri).toBe('first.jpg');
   });
 
+  it('bounds first preparation and lets the user retry without publishing a partial card', async () => {
+    mockAutoLoadArtwork = false;
+    await render();
+    await act(async () => changeAppState('active'));
+    await act(async () => jest.advanceTimersByTime(45000));
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
+    expect(tree.root.findAllByType(Image)).toHaveLength(0);
+    mockAutoLoadArtwork = true;
+    await act(async () => tree.root.findByProps({testID: 'hero-retry'}).props.onPress());
+    expect(currentImage().props.source.uri).toBe('first.jpg');
+  });
+
   it('waits for the selected logo to load as well as the background', async () => {
     mockLogoUri = 'preferred-logo.png';
     await render();
