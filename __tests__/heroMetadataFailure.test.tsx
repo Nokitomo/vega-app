@@ -9,6 +9,10 @@ import useContentStore from '../src/lib/zustand/contentStore';
 import useHeroStore from '../src/lib/zustand/herostore';
 import useUiSettingsStore from '../src/lib/zustand/uiSettingsStore';
 
+jest.mock('../src/lib/hooks/useReducedMotion', () => ({
+  useReducedMotion: () => false,
+}));
+
 jest.mock('../src/lib/utils/providerCacheScope', () => ({
   getProviderCacheScope: (value: string) => value,
 }));

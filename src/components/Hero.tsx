@@ -4,7 +4,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Image,
+  Animated,
+  Easing,
   useWindowDimensions,
   PanResponder,
   AppState,
@@ -27,6 +28,8 @@ import {useLogoFallback} from '../lib/hooks/useLogoFallback';
 import {startPerfNavigation} from '../lib/utils/perfTrace';
 import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
+import {useReducedMotion} from '../lib/hooks/useReducedMotion';
+import HeroArtwork from './HeroArtwork';
 
 interface HeroProps {
   posts?: Post[];
@@ -44,6 +47,8 @@ const Hero = memo(
     posts = [],
     isActive = true,
   }: HeroProps) => {
+    const reducedMotion = useReducedMotion();
+    const progress = useRef(new Animated.Value(0)).current;
     const [failedImages, setFailedImages] = useState<Set<string>>(
       () => new Set(),
     );
@@ -131,13 +136,27 @@ const Hero = memo(
         isDrawerOpen ||
         slides.length < 2
       ) {
+        progress.setValue(1);
         return;
       }
+      progress.setValue(reducedMotion ? 1 : 0);
       const timer = setTimeout(
         () => setPage((page + 1) % slides.length),
         10500,
       );
-      return () => clearTimeout(timer);
+      const animation = Animated.timing(progress, {
+        toValue: 1,
+        duration: 10500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      if (!reducedMotion) {
+        animation.start();
+      }
+      return () => {
+        clearTimeout(timer);
+        animation.stop();
+      };
     }, [
       page,
       slides.length,
@@ -147,6 +166,8 @@ const Hero = memo(
       isLoading,
       appState,
       setPage,
+      progress,
+      reducedMotion,
     ]);
 
     const handlePlayPress = useCallback(() => {
@@ -203,10 +224,6 @@ const Hero = memo(
         uri => !failedImages.has(`${hero?.link}|${uri}`),
       );
     }, [backgroundCandidates, failedImages, hero?.link]);
-    const imageSource = React.useMemo(
-      () => ({uri: currentImageUri}),
-      [currentImageUri],
-    );
 
     const reportHeroFailure = useCallback(
       (failedLink: string) => {
@@ -309,11 +326,11 @@ const Hero = memo(
             {!currentImageUri ? (
               <View style={{flex: 1, backgroundColor: '#141519'}} />
             ) : (
-              <Image
+              <HeroArtwork
                 key={`${hero?.link}|${currentImageUri}`}
-                source={imageSource}
+                uri={currentImageUri}
+                reducedMotion={reducedMotion}
                 onError={handleImageError}
-                style={{width: '100%', height: '100%', resizeMode: 'cover'}}
               />
             )}
             <LinearGradient
@@ -460,9 +477,28 @@ const Hero = memo(
                   style={{
                     height: 7,
                     borderRadius: 4,
-                    backgroundColor: index === page ? '#FF640A' : '#DADADA',
-                  }}
-                />
+                    backgroundColor: '#DADADA',
+                    overflow: 'hidden',
+                  }}>
+                  {index === page && (
+                    <Animated.View
+                      style={{
+                        width: 39,
+                        height: 7,
+                        borderRadius: 4,
+                        backgroundColor: '#FF640A',
+                        transform: [
+                          {
+                            translateX: progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-39, 0],
+                            }),
+                          },
+                        ],
+                      }}
+                    />
+                  )}
+                </View>
               </Pressable>
             ))}
           </View>

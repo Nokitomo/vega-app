@@ -51,4 +51,13 @@ Gli screenshot di revisione vengono salvati in `.codex/screenshots/cruncy-ui/`, 
 - Verifiche: TypeScript e lint senza errori o warning; 15 test tra regressioni hero, interazioni Continua a guardare e riconciliazione sezioni. Otto casi del hero coprono errori, fallback, eventi tardivi, riordinamento/rimozione, contesto provider, background, ricerca, attesa metadati e recupero dopo refresh.
 - Emulatore: catalogo reale, selezione tramite indicatori, swipe al bordo finale, pausa in background (slide 3 prima/dopo) e ripresa della rotazione. Evidenze ignorate in Git: `step2-top.png`, `step2-boundary.png` e dump `step2-before.xml`, `step2-after.xml`, `step2-resumed.xml`. Errori di rete e cambio contesto sono verificati dai test controllati; la matrice di provider reali resta nel punto 4.
 
-I punti 3 (transizioni/indicatori/ritorno in cima) e 4 (matrice dispositivi/provider/accessibilita) restano da completare in quest'ordine, con verifica e commit separati. L'analisi estetica finale deve includere il selettore provider nell'header.
+### Punto 3 — movimento e ritorno in cima
+
+- Il segmento attivo si riempie in arancione durante lo stesso intervallo di 10,5 secondi che governa l'avanzamento. Durante le pause resta arancione pieno; alla ripresa il timer e il riempimento ripartono insieme.
+- Le immagini caricate compaiono con una dissolvenza di 240 ms eseguita dal driver nativo. La durata e una scelta di implementazione, non una misura ricavata dal report Crunchyroll. Gli eventi di caricamento arrivati dopo la rimozione dell'immagine vengono ignorati.
+- La preferenza di sistema Riduci movimento disattiva dissolvenza e riempimento animato, mantenendo selezione e navigazione.
+- Un secondo tocco sulla scheda Home gia selezionata riporta la FlatList in cima tramite `useScrollToTop`; il normale ritorno da un'altra scheda conserva la posizione.
+- Emulatore: verificati ritorno in cima (`step3-scrolled.png`, `step3-top.png`) e riempimento crescente sulla stessa slide (`step3-progress-start.png`, `step3-progress-later.png`). Catture nella cartella ignorata. La dissolvenza e verificata dai test di ciclo di vita; i campioni statici non ne misurano la fluidita.
+- Undici test coprono carosello e caricamento delle immagini, inclusi eventi tardivi, caricamenti duplicati e riduzione del movimento. TypeScript e lint completati senza errori o warning prima del commit.
+
+Resta il punto 4 (matrice dispositivi/provider/accessibilita), seguito dall'analisi estetica finale, che deve includere il selettore provider nell'header.

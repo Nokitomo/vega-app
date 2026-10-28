@@ -27,7 +27,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../../App';
 import {Drawer} from 'react-native-drawer-layout';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
-import {useIsFocused} from '@react-navigation/native';
+import {useIsFocused, useScrollToTop} from '@react-navigation/native';
 import ContinueWatching from '../../components/ContinueWatching';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import {checkContinueWatchingSeries} from '../../lib/services/continueWatchingRefresh';
@@ -146,6 +146,8 @@ const fetchArchiveHero = async ({
 };
 
 const Home = ({}: Props) => {
+  const homeListRef = useRef<FlatList<HomePageData>>(null);
+  useScrollToTop(homeListRef);
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const [backgroundColor, setBackgroundColor] = useState('transparent');
@@ -525,6 +527,7 @@ const Home = ({}: Props) => {
             />
 
             <FlatList
+              ref={homeListRef}
               key={scrollKey}
               data={homeData}
               keyExtractor={keyExtractor}
