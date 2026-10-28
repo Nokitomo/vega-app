@@ -1,11 +1,19 @@
-import {View, Text, ScrollView, TouchableOpacity} from 'react-native';
 import React from 'react';
-import useContentStore from '../lib/zustand/contentStore';
-import useThemeStore from '../lib/zustand/themeStore';
-import {BlurView} from 'expo-blur';
-import {MaterialIcons} from '@expo/vector-icons';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {Ionicons} from '@expo/vector-icons';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
+import useContentStore from '../lib/zustand/contentStore';
 import {ProviderExtension, extensionStorage} from '../lib/storage';
+import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 
 const getProviderKey = (item: ProviderExtension) =>
   `${item.source?.author || 'legacy'}:${item.value}`;
@@ -20,68 +28,148 @@ const isSameProvider = (left: ProviderExtension, right: ProviderExtension) => {
   return !leftAuthor || !rightAuthor || leftAuthor === rightAuthor;
 };
 
-const ProviderDrawer = ({onClose}: {onClose: () => void}) => {
+// Retain the component name and stored drawer preferences for compatibility.
+const ProviderDrawer = ({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) => {
   const {t} = useTranslation();
   const {provider, setProvider, installedProviders} = useContentStore(
     state => state,
   );
-  const {primary} = useThemeStore(state => state);
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
 
   return (
-    <BlurView
-      intensity={90}
-      experimentalBlurMethod="dimezisBlurView"
-      blurReductionFactor={5}
-      tint="dark"
-      className="flex-1">
-      <View className="mt-8 px-4 pb-4 border-b border-white/10">
-        <Text className="text-white text-2xl font-bold">
-          {t('Select Provider')}
-        </Text>
-        <Text className="text-gray-400 mt-1 text-sm">
-          {t('Content source')}
-        </Text>
+    <Modal
+      visible={visible}
+      transparent
+      statusBarTranslucent
+      animationType={reducedMotion ? 'none' : 'slide'}
+      onRequestClose={onClose}>
+      <View style={[styles.overlay, {paddingTop: insets.top + 24}]}>
+        <Pressable
+          testID="provider-sheet-backdrop"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessible={false}
+          importantForAccessibility="no"
+        />
+        <View
+          accessibilityViewIsModal
+          style={[styles.sheet, {paddingBottom: Math.max(insets.bottom, 16)}]}>
+          <View style={styles.heading}>
+            <View style={styles.headingText}>
+              <Text accessibilityRole="header" style={styles.title}>
+                {t('Select Provider')}
+              </Text>
+              <Text style={styles.subtitle}>{t('Content source')}</Text>
+            </View>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={t('Close')}
+              style={styles.close}>
+              <Ionicons name="close" size={24} color="white" />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.listContent}>
+            {installedProviders.map(item => {
+              const isSelected = isSameProvider(provider, item);
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  key={getProviderKey(item)}
+                  accessibilityRole="radio"
+                  accessibilityState={{checked: isSelected}}
+                  accessibilityLabel={item.display_name}
+                  onPress={() => {
+                    if (item.source?.author) {
+                      extensionStorage.setDefaultProviderSource(
+                        item.source.author,
+                      );
+                    }
+                    setProvider(item);
+                    onClose();
+                  }}
+                  style={[styles.row, isSelected && styles.selectedRow]}>
+                  <Ionicons
+                    name="layers-outline"
+                    size={22}
+                    color={isSelected ? '#FF640A' : '#A0A0A0'}
+                  />
+                  <Text
+                    style={[
+                      styles.providerName,
+                      isSelected && styles.selectedName,
+                    ]}>
+                    {item.display_name}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={23} color="#FF640A" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-2">
-        {installedProviders.map(item => {
-          const isSelected = isSameProvider(provider, item);
-          return (
-            <TouchableOpacity
-              key={getProviderKey(item)}
-              onPress={() => {
-                if (item.source?.author) {
-                  extensionStorage.setDefaultProviderSource(item.source.author);
-                }
-                setProvider(item);
-                onClose();
-              }}
-              className={`flex-row items-center justify-between p-4 my-1 rounded-lg ${
-                isSelected ? 'bg-white/10' : 'bg-transparent'
-              }`}>
-              <View className="flex-row items-center">
-                <MaterialIcons
-                  name="movie"
-                  size={20}
-                  color={isSelected ? primary : '#888'}
-                />
-                <Text
-                  className={`ml-3 text-base ${
-                    isSelected ? 'text-white font-medium' : 'text-gray-400'
-                  }`}>
-                  {item.display_name}
-                </Text>
-              </View>
-              {isSelected && (
-                <MaterialIcons name="check" size={20} color={primary} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-        <View className="h-16" />
-      </ScrollView>
-    </BlurView>
+    </Modal>
   );
 };
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 560,
+    maxHeight: '85%',
+    backgroundColor: '#141519',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  heading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#383A40',
+  },
+  headingText: {flex: 1},
+  title: {color: '#FFFFFF', fontSize: 22, fontWeight: '700'},
+  subtitle: {color: '#A0A0A0', fontSize: 14, marginTop: 6},
+  close: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  list: {flexShrink: 1},
+  listContent: {padding: 12},
+  row: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 8,
+    marginVertical: 2,
+    gap: 14,
+  },
+  selectedRow: {backgroundColor: '#25262C'},
+  providerName: {flex: 1, color: '#DADADA', fontSize: 16},
+  selectedName: {color: '#FFFFFF', fontWeight: '600'},
+});
 
 export default ProviderDrawer;

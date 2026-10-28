@@ -72,8 +72,7 @@ Gli screenshot di revisione vengono salvati in `.codex/screenshots/cruncy-ui/`, 
 
 ## Confronto estetico finale: rifiniture consigliate
 
-Il campione `home-hero-swipe-before.png` del report mostra marchio compatto a sinistra e azioni allineate a destra. In Vega il menu hamburger subito accanto alla scritta crea un gruppo visivamente sbilanciato. La proposta e spostare il selettore provider nel gruppo di destra, prima della ricerca, con icona coerente con le fonti e area toccabile almeno 44 dp, mantenendo invariata l'apertura del drawer. Questa proposta non e stata implementata.
-
+Il selettore provider e ora a destra, immediatamente prima della ricerca, con icona a livelli e area toccabile 44 dp. Apre un pannello modale dal basso con sfondo #141519, selezione arancione, lista scorrevole e chiusura tramite X, area esterna o Indietro Android. Il pannello rispetta safe area e Riduci movimento. Restano le preferenze persistite (con etichette aggiornate), il gesto dal bordo sinistro, la scelta del provider e della sorgente autore, e la pausa del carosello durante il menu. Il nome interno ProviderDrawer e le chiavi delle preferenze sono mantenuti per compatibilita.
 Restano differenze visibili rispetto al campione: font/pesi delle intestazioni, posizione verticale e dimensioni dei loghi dei titoli, spazio tra indicatori e prima sezione, e icone/etichette della barra inferiore. Inoltre alcuni poster del catalogo contengono gia il titolo e producono una duplicazione visiva quando sopra viene mostrato il logo. La scelta artwork del provider va considerata nella rifinitura, senza fissare immagini o titoli del campione.
 
 Le quattro destinazioni Vega, l'assenza del banner Premium e i metadati disponibili nei provider restano differenze funzionali rispetto a Crunchyroll. Non vanno aggiunte destinazioni o azioni fittizie per simulare la parita. La home e vicina nella struttura, ma non e ancora una replica estetica 1:1 verificata.
@@ -87,3 +86,59 @@ Dopo la prima presentazione prepara una sola slide successiva. Non avvia il pre-
 Restano invariati query, merge Cinemeta, priorita artwork/lingua, fallback del logo e navigazione. Un logo assente dopo la risoluzione usa il titolo testuale; durante il recupero asincrono del logo la card resta in preparazione. Il pre-caricamento non riduce la latenza di rete della prima slide: evita presentazioni parziali e anticipa il lavoro per le successive.
 
 Verifica Android su Medium_Phone_API_35: arresto del processo e rimozione delle sole cache QA (SQLite dei metadati, MMKV cache, cache immagini/HTTP e file provider), mantenendo provider installati e impostazioni. Il normale comando Cancella cache non elimina tutte queste copie. Controllati AnimeUnity, StreamingUnity e StreamCenter, navigazione al dettaglio e cambio slide. Evidenze in `.codex/screenshots/cruncy-ui/hero-*.png` e video locale, esclusi da Git. iOS resta non verificato.
+
+
+## Lista delle differenze residue rispetto al campione smartphone
+
+Riferimenti: `05-authenticated-navigation.md`, `08-reconstruction-notes.md` e
+`artifacts/home-hero-swipe-before.png` della ricerca Crunchyroll mobile 3.126.0.
+La parita va verificata a stessa risoluzione, densita e scala caratteri; il report
+non definisce tutte le misure o tutti gli stati possibili dell'app originale.
+
+1. Tipografia: famiglia, pesi, dimensioni, interlinea e troncamenti di titoli,
+   metadati, sinossi, CTA e intestazioni. Vega usa ancora font di sistema.
+2. Hero: rifinire altezza, ritaglio/focalizzazione dell'immagine e gradienti
+   superiore/inferiore, allineamento e dimensione massima del logo, distanze tra
+   logo, metadati, sinossi, azioni e indicatori. Nel campione il gradiente superiore
+   assicura contrasto alle icone anche sopra immagini chiare.
+3. Artwork: gestire visivamente immagini che contengono gia il titolo senza
+   sovrapporre un secondo titolo. Non cambiare implicitamente le priorita dei
+   servizi o delle lingue; serve una strategia basata su dati affidabili, non
+   sull'ipotesi che tutti i poster siano privi di scritte.
+4. Controlli del hero: verificare geometria, spessore icone, bordi del bookmark,
+   segmenti/progresso e transizioni. Il timer e i bordi sono gia implementati;
+   la dissolvenza da 240 ms non e una misura certificata del riferimento.
+5. Sezioni: confrontare margine dopo indicatori, intestazioni, azione Altro,
+   dimensioni/aspect ratio e distanza delle card, titoli e badge; confrontare
+   anche Continua a guardare e i relativi progressi con evidenze equivalenti.
+6. Shell: rifinire proporzioni del marchio Vega, altezza toolbar, safe area e
+   barra inferiore (icone, dimensioni, spaziature, etichette). Le etichette restano
+   soggette alla preferenza Vega e le quattro destinazioni non diventano cinque.
+7. Verifica finale: confronto visivo con screenshot equivalenti in cima e dopo
+   scroll, su piu dimensioni/font, con loghi larghi/alti/assenti e nomi lunghi;
+   controllare caricamento, vuoto, errore, menu e ritorno dal dettaglio. Gli stati
+   privi di evidenza nel report non possono essere dichiarati identici.
+
+Differenze intenzionali: brand Vega, selettore provider, cataloghi/metadati,
+assenza di Store/Premium e CTA che apre il dettaglio invece di avviare direttamente
+l'episodio. Non sono rifiniture estetiche: copiarle richiederebbe modificare le
+funzionalita, fuori dallo scopo concordato. Il riferimento ha inoltre il controllo
+Cast nella toolbar: non va aggiunta un'icona senza una funzione reale collegata.
+
+
+## Verifica del selettore provider
+
+- TypeScript ed ESLint senza errori/warning; 18 test passati nelle suite
+  providerSheet, heroMetadataFailure e searchSuggestions. Coperti selezione di
+  provider omonimi di autori diversi, compatibilita legacy, chiusure senza cambio
+  provider, Riduci movimento e regressioni del carosello/ricerca.
+- Medium_Phone_API_35: apertura, cambio StreamCenter -> StreamingUnity, spunta al
+  ritorno nel pannello, chiusura con X, Indietro e tocco esterno, ricerca ancora
+  associata al provider selezionato. Verifica conclusiva dopo arresto completo:
+  un ricaricamento a caldo del dev client aveva lasciato un residuo della modale,
+  non riprodotto nell'avvio pulito. Nessuna modifica nativa o ai provider.
+- Screenshot ignorati: `provider-sheet.png`, `provider-sheet-selected.png`,
+  `provider-menu-home.png`, `provider-menu-search.png`, `provider-menu-back.png`,
+  `provider-menu-close.png` in `.codex/screenshots/cruncy-ui/`.
+- iOS, TalkBack/VoiceOver e la matrice completa di dimensioni/font non verificati
+  per questo intervento; il gesto dal bordo conserva il riconoscitore precedente.

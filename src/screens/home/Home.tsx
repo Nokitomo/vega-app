@@ -25,7 +25,6 @@ import useThemeStore from '../../lib/zustand/themeStore';
 import ProviderDrawer from '../../components/ProviderDrawer';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../../App';
-import {Drawer} from 'react-native-drawer-layout';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {useIsFocused, useScrollToTop} from '@react-navigation/native';
 import ContinueWatching from '../../components/ContinueWatching';
@@ -505,20 +504,11 @@ const Home = ({}: Props) => {
     <QueryErrorBoundary>
       <GestureHandlerRootView style={{flex: 1}}>
         <SafeAreaView className="bg-black flex-1">
-          <Drawer
-            open={isDrawerOpen}
-            onOpen={() => setIsDrawerOpen(true)}
-            onClose={() => setIsDrawerOpen(false)}
-            drawerPosition="left"
-            drawerType="front"
-            drawerStyle={{width: 200, backgroundColor: 'transparent'}}
-            swipeEdgeWidth={0}
-            swipeEnabled={!disableDrawer && isDrawerOpen}
-            renderDrawerContent={() =>
-              !disableDrawer ? (
-                <ProviderDrawer onClose={() => setIsDrawerOpen(false)} />
-              ) : null
-            }>
+          <View style={{flex: 1}}>
+            <ProviderDrawer
+              visible={isDrawerOpen && !disableDrawer}
+              onClose={() => setIsDrawerOpen(false)}
+            />
             <StatusBar
               style="light"
               animated={true}
@@ -601,7 +591,7 @@ const Home = ({}: Props) => {
                 }}
               />
             ) : null}
-          </Drawer>
+          </View>
         </SafeAreaView>
       </GestureHandlerRootView>
     </QueryErrorBoundary>

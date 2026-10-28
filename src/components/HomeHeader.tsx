@@ -133,25 +133,38 @@ export default function HomeHeader({
             }}>
             vega
           </Text>
-          {showHamburgerMenu && !isDrawerDisabled && !isDrawerOpen && (
+        </View>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+          {showHamburgerMenu && !isDrawerDisabled && (
             <Pressable
               onPress={onOpenDrawer}
-              hitSlop={12}
+              style={{
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
               accessibilityRole="button"
+              accessibilityState={{expanded: isDrawerOpen}}
               accessibilityLabel={t('Home providers')}>
-              <Ionicons name="menu-outline" size={25} color="white" />
+              <Ionicons name="layers-outline" size={25} color="white" />
             </Pressable>
           )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('Search in {{provider}}', {
+              provider: provider.display_name,
+            })}
+            onPress={() => setSearchActive(true)}
+            style={{
+              width: 44,
+              height: 44,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Feather name="search" size={25} color="white" />
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('Search in {{provider}}', {
-            provider: provider.display_name,
-          })}
-          onPress={() => setSearchActive(true)}
-          hitSlop={12}>
-          <Feather name="search" size={25} color="white" />
-        </Pressable>
       </View>
 
       <Modal
