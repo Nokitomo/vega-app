@@ -20,6 +20,12 @@ describe('Home navigation inset isolation', () => {
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {tree = renderer.create(<HomeNavigationInset navigation={navigation} />);});
     expect(tree.root.findByType(SafeAreaView).props.edges.bottom).toBe('additive');
+    for (const tab of ['HomeStack', 'SearchStack', 'WatchListStack', 'SettingsStack']) {
+      await act(async () => {state = {routes: [{name: 'TabStack', state: {routes: [{name: tab}]}}]}; listener();});
+      expect(tree.root.findByType(SafeAreaView).props.style.backgroundColor).toBe('#23252B');
+    }
+    await act(async () => {state = {routes: [{name: 'TabStack', state: {routes: [{name: 'SearchStack', state: {routes: [{name: 'Webview'}]}}]}}]}; listener();});
+    expect(tree.root.findByType(SafeAreaView).props.style.backgroundColor).toBe('black');
     await act(async () => {state = {routes: [{name: 'Player'}]}; listener();});
     expect(tree.root.findByType(SafeAreaView).props.style.backgroundColor).toBe('black');
     await act(async () => {state = {routes: [{name: 'TabStack'}]}; listener();});

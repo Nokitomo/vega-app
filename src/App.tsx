@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef} from 'react';
 import {useFonts} from 'expo-font';
-import HomeNavigationInset, {HOME_NAVIGATION_COLOR} from './components/HomeNavigationInset';
+import HomeNavigationInset from './components/HomeNavigationInset';
 import {HOME_FONT} from './components/homePresentation';
 import './global.css';
 import Home from './screens/home/Home';
@@ -38,7 +38,6 @@ import {
   PixelRatio,
   useWindowDimensions,
   ViewStyle,
-  View,
 } from 'react-native';
 import {EpisodeLink, Link, PostVariant} from './lib/providers/types';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -350,7 +349,7 @@ function TabStack() {
         headerShown: false,
         freezeOnBlur: true,
         tabBarActiveTintColor: primary,
-        tabBarInactiveTintColor: '#dadde3',
+        tabBarInactiveTintColor: '#DADADA',
         tabBarShowLabel: showTabBarLables,
         tabBarStyle: defaultTabBarStyle,
         tabBarBackground: () => <TabBarBackgound />,
@@ -387,9 +386,6 @@ function TabStack() {
 
           return {
             title: t('Home'),
-            tabBarActiveTintColor: primary,
-            tabBarInactiveTintColor: '#DADADA',
-            tabBarBackground: () => <View style={{flex: 1, backgroundColor: HOME_NAVIGATION_COLOR}} />,
             tabBarStyle: hideTabBar
               ? ({display: 'none'} as const)
               : defaultTabBarStyle,

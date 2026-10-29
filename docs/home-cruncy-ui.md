@@ -531,3 +531,23 @@ provider coerenti, cambio provider e mantenimento di tema/provider dopo arresto
 e riavvio del processo. Evidenze locali `home-theme-polish/theme-*.png` sotto
 `.codex/screenshots`, escluse da Git. Colori custom verificati nei test; iOS non
 verificato. Nessuna modifica a metadati, fallback o player.
+
+## Barra inferiore condivisa fra le sezioni
+
+Home, Cerca, Lista e Impostazioni usano lo stesso sfondo pieno #23252B,
+icone/etichette inattive #DADADA e colore attivo del tema. Rimosso il precedente
+blur/gradiente delle altre schede. L'area sicura inferiore Android segue il
+fondo della barra in tutte le quattro sezioni e nei rispettivi dettagli.
+WebView con barra nascosta e player mantengono il fondo nero; restano invariate
+geometria, destinazioni, gestione tastiera e disposizione laterale tablet.
+
+TypeScript e lint senza diagnostiche; 34 test superati per selezione della
+scheda attiva, WebView/player, layout, temi e interazioni Home. Su
+Medium_Phone_API_35 verificati i quattro tab con tema Hayasaka, ritorno al
+tema Vega e attivazione/disattivazione delle etichette. Campionamento degli
+screenshot: fondo app e area Android entrambi RGB(35,37,43) in ciascuna scheda.
+Ripristinati tema Vega, provider StreamCenter ed etichette nascoste; navigazione
+Android a tre pulsanti mantenuta. Screenshot `bar-*.png` nella cartella locale
+`.codex/screenshots/home-theme-polish/`, esclusi da Git. iOS e tablet fisico non
+verificati; player/WebView coperti qui dai test di selezione route, non da una
+nuova prova di riproduzione.

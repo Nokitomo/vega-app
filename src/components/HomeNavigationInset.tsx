@@ -4,7 +4,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import type {NavigationContainerRefWithCurrent} from '@react-navigation/native';
 import type {RootStackParamList} from '../App';
 import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
-import {hasHomeBottomBar, HOME_NAVIGATION_COLOR} from '../lib/utils/homeNavigationBar';
+import {hasAppBottomBar, HOME_NAVIGATION_COLOR} from '../lib/utils/homeNavigationBar';
 
 export {HOME_NAVIGATION_COLOR};
 
@@ -18,7 +18,7 @@ export default function HomeNavigationInset({navigation, children}: {
   const {width, height} = useWindowDimensions();
   const tabletRotationEnabled = useUiSettingsStore(state => state.tabletRotationEnabled);
   useEffect(() => {
-    const sync = () => setVisible(hasHomeBottomBar(navigation.getRootState()));
+    const sync = () => setVisible(hasAppBottomBar(navigation.getRootState()));
     const unsubscribe = navigation.addListener('state', sync);
     if (navigation.isReady()) {sync();}
     return unsubscribe;
