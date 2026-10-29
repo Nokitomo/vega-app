@@ -116,7 +116,6 @@ export default function HomeHeader({
         right: 0,
         zIndex: 40,
         paddingBottom: 12,
-
       }}>
       <NativeAnimated.View
         testID="home-toolbar-background"
@@ -147,8 +146,8 @@ export default function HomeHeader({
             <Pressable
               onPress={onOpenDrawer}
               style={{
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -165,8 +164,8 @@ export default function HomeHeader({
             })}
             onPress={() => setSearchActive(true)}
             style={{
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               alignItems: 'center',
               justifyContent: 'center',
             }}>

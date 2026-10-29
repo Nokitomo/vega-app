@@ -202,7 +202,7 @@ const Slider = ({
             fontFamily: homeAppearance ? HOME_FONT.regular : undefined,
             marginTop: homeAppearance ? 8 : 0,
             lineHeight: homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT,
-            minHeight: CARD_TITLE_LINE_HEIGHT * CARD_TITLE_LINES,
+            minHeight: (homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT) * CARD_TITLE_LINES,
           }}
           numberOfLines={CARD_TITLE_LINES}
           ellipsizeMode="tail">
@@ -259,8 +259,8 @@ const Slider = ({
             style={
               homeAppearance
                 ? {
-                    minWidth: 44,
-                    minHeight: 44,
+                    minWidth: 48,
+                    minHeight: 48,
                     justifyContent: 'center',
                     alignItems: 'center',
                     marginLeft: 8,
@@ -285,7 +285,7 @@ const Slider = ({
               : 'flex flex-row gap-2 overflow-hidden'
           }
           style={
-            homeAppearance ? {paddingHorizontal: 3, paddingTop: 7} : undefined
+            homeAppearance ? {paddingHorizontal: homeAppearance ? 0 : 3, paddingTop: homeAppearance ? 0 : 7} : undefined
           }>
           {Array.from({length: skeletonPlaceholderCount}).map((_, index) => (
             <View
@@ -327,7 +327,7 @@ const Slider = ({
           onMomentumScrollBegin={onHorizontalDragStart}
           onScrollEndDrag={onHorizontalDragEnd}
           onMomentumScrollEnd={onHorizontalDragEnd}
-          contentContainerStyle={{paddingHorizontal: 3, paddingTop: 7}}
+          contentContainerStyle={{paddingHorizontal: homeAppearance ? 0 : 3, paddingTop: homeAppearance ? 0 : 7}}
           renderItem={renderItem}
           ListFooterComponent={
             !isLoading && error && !homeAppearance ? (

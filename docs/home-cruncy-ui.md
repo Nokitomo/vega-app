@@ -440,3 +440,28 @@ verificati cima, opacita parziale, saturazione nera e ritorno in cima via tab
 Home, oltre all'apertura ricerca. Evidenze `vega-toolbar-*.png` in
 `.codex/screenshots/home-final-polish-20261029/` (non versionate).
 iOS non verificato. Nessuna modifica alle priorita dei metadati.
+
+
+## Misure e composizione (2026-10-29)
+
+Toolbar, CTA e bookmark usano target di almeno 48 dp. Gli indicatori hanno
+altezza tattile 48 dp e passo 48 dp sui telefoni standard; su schermi molto
+stretti il passo si adatta alla larghezza disponibile senza uscire dal frame.
+L'area logo telefono passa a 80 dp. Solo nell'hero i bitmap stretti vengono
+allineati a sinistra usando le dimensioni gia restituite dal caricamento;
+gli SVG usano xMinYMid. Non vengono eliminati i margini trasparenti interni,
+ne alterati colori o servizi dei loghi. Gli altri utilizzi mantengono il centro.
+
+Il gradiente inferiore occupa meta hero su telefono, un terzo su tablet con
+gradiente laterale; resta un leggero gradiente superiore per la toolbar.
+L'altezza stabile e il budget dei testi ingranditi restano condivisi tra slide.
+Le righe Home allineano i poster al margine 16 dp, riservano tre interlinee ai
+titoli e mantengono badge, scroll e azione Altro.
+
+TypeScript e lint puliti; 50 test superati, inclusi reset dimensioni al cambio
+logo, comportamento centrale fuori dall'hero, layout responsive e carosello.
+Emulatore: selezione indicatori, loghi larghi e stretti, titolo testuale,
+CTA verso dettaglio e ritorno Home; scala 150% con scroll e azioni accessibili.
+Impostazione font_scale riportata a 1.0. Evidenze `vega-layout-*.png` nella
+cartella locale home-final-polish-20261029. Nessun test del player in questo
+intervento; iOS e tablet fisico non verificati.

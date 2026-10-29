@@ -252,15 +252,22 @@ const HeroCard = memo(
             )}
             <LinearGradient
               pointerEvents="none"
-              colors={[
-                'rgba(0,0,0,0.78)',
-                'transparent',
-                'rgba(0,0,0,0.45)',
-                'black',
-              ]}
-              locations={[0, 0.22, 0.54, 0.94]}
-              style={{position: 'absolute', width: '100%', height: '100%'}}
+              colors={['rgba(0,0,0,0.65)', 'transparent']}
+              style={{position: 'absolute', top: 0, width: '100%', height: '25%'}}
             />
+            <LinearGradient
+              pointerEvents="none"
+              colors={['transparent', 'black']}
+              style={{position: 'absolute', bottom: 0, width: '100%', height: layout.tablet ? '33.333%' : '50%'}}
+            />
+            {layout.tablet && (
+              <LinearGradient
+                pointerEvents="none"
+                colors={['black', 'transparent']}
+                start={{x: 0, y: 0.5}} end={{x: 1, y: 0.5}}
+                style={{position: 'absolute', width: '100%', height: '100%'}}
+              />
+            )}
           </Pressable>
 
           <View style={{flex: 1}} />
@@ -288,6 +295,7 @@ const HeroCard = memo(
             }}>
             {logoUri ? (
               <RemoteLogo
+                align="left"
                 uri={logoUri}
                 width={Math.min(
                   layout.contentWidth - layout.inset * 2,
@@ -349,7 +357,7 @@ const HeroCard = memo(
                   activeOpacity={0.8}
                   style={{
                     flex: 1,
-                    minHeight: 44,
+                    minHeight: 48,
                     borderRadius: 24,
                     backgroundColor: '#FF640A',
                     flexDirection: 'row',
@@ -392,8 +400,8 @@ const HeroCard = memo(
                     }
                   }}
                   style={{
-                    width: 44,
-                    height: 44,
+                    width: 48,
+                    height: 48,
                     borderRadius: 24,
                     borderWidth: 2,
                     borderColor: '#FF640A',
@@ -685,9 +693,8 @@ const Hero = memo(
           <View
             style={{
               flexDirection: 'row',
-              gap: 8,
               paddingHorizontal: layout.inset,
-              paddingTop: 4,
+              paddingTop: 0,
               paddingBottom: 16,
             }}>
             {slides.map((item, index) => (
@@ -701,12 +708,14 @@ const Hero = memo(
                 })}
                 accessibilityState={{selected: displayedPage === index}}
                 style={{
-                  width: layout.indicatorWidth,
-                  height: 36,
+                  width: layout.indicatorTargetWidth,
+                  height: 48,
+                  alignItems: 'center',
                   justifyContent: 'center',
                 }}>
                 <View
                   style={{
+                    width: layout.indicatorWidth,
                     height: 7,
                     borderRadius: 4,
                     backgroundColor: '#DADADA',

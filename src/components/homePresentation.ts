@@ -20,7 +20,7 @@ export function getHomeHeroLayout(
   const tablet = Math.min(width, height) >= 600;
   const landscape = tablet && width > height;
   const scale = Math.max(1, fontScale);
-  const logoHeight = tablet ? 100 : 78;
+  const logoHeight = tablet ? 100 : 80;
   const minHeight = tablet
     ? Math.min(760, Math.max(460, height * 0.72))
     : Math.min(680, Math.max(520, height * 0.68));
@@ -29,7 +29,7 @@ export function getHomeHeroLayout(
   // Extra space is artwork, rather than a minimum spacer that grows the card.
   const contentBudget = Math.max(logoHeight, 34 * 3 * scale) +
     18 * scale + 20 * 3 * scale + 22 * 2 * scale +
-    Math.max(44, 24 * 2 * scale + 20) + 5 * 12 + 12 + 16 + 12;
+    Math.max(48, 24 * 2 * scale + 20) + 5 * 12 + 12 + 16 + 12;
   const frameHeight = Math.ceil(Math.max(
     tablet ? minHeight : width * 1.5,
     topInset + 56 + 32 + contentBudget,
@@ -46,6 +46,7 @@ export function getHomeHeroLayout(
       ? Math.min(560, width * (landscape ? 0.48 : 0.75))
       : width,
     logoHeight,
-    indicatorWidth: Math.max(24, Math.min(39, (width - 32 - 5 * 8) / 6)),
+    indicatorTargetWidth: Math.min(48, (width - (tablet ? 64 : 32)) / 6),
+    indicatorWidth: Math.min(48, (width - (tablet ? 64 : 32)) / 6) - 8,
   };
 }
