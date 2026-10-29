@@ -1,5 +1,6 @@
 import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   Text,
   TouchableOpacity,
@@ -30,6 +31,7 @@ import {getMetadataSourceProvider} from '../lib/services/streamCenterMetadata';
 import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
+import HomeRowState from './HomeRowState';
 import {HERO_INTERVAL_MS, heroSwipeTarget, useHeroCarouselMotion} from '../lib/hooks/useHeroCarouselMotion';
 import {isHeroArtworkEligible} from '../lib/utils/animeHeroEligibility';
 import {heroCtaKey} from '../lib/utils/heroCta';
@@ -635,27 +637,19 @@ const Hero = memo(
         {!visible && (
           <View
             testID="hero-loading"
-            accessibilityState={{busy: !preparationExpired && !!slides.length}}
+            accessibilityState={{busy: !preparationExpired && !(slides.length === 0 && failedSlides.size > 0)}}
             style={{
               height: layout.frameHeight,
-              backgroundColor: '#141519',
-              justifyContent: 'flex-end',
-              padding: 16,
-              gap: 12,
+              backgroundColor: 'black',
+              justifyContent: 'center',
+              padding: layout.inset,
             }}>
-            <View
-              style={{width: '60%', height: 60, backgroundColor: '#23252B'}}
-            />
-            <View style={{height: 16, backgroundColor: '#23252B'}} />
-            <View style={{height: 40, backgroundColor: '#23252B'}} />
-            {(preparationExpired || (!slides.length && failedSlides.size > 0)) && (
-              <View>
-                <Text style={{color: '#DADADA'}}>{t('Unable to load details')}</Text>
-                <Pressable testID="hero-retry" accessibilityRole="button"
-                  onPress={retryPreparation} style={{paddingVertical: 16}}>
-                  <Text style={{color: '#FF640A'}}>{t('Retry')}</Text>
-                </Pressable>
-              </View>
+            {(preparationExpired || (!slides.length && failedSlides.size > 0)) ? (
+              <HomeRowState error messageKey="Unable to load details"
+                retryTestID="hero-retry" onRetry={retryPreparation} />
+            ) : (
+              <ActivityIndicator testID="hero-loading-indicator" color="#FF640A" size="large"
+                accessibilityRole="progressbar" accessibilityLabel={t('Loading home content')} />
             )}
           </View>
         )}

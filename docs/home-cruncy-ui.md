@@ -465,3 +465,36 @@ CTA verso dettaglio e ritorno Home; scala 150% con scroll e azioni accessibili.
 Impostazione font_scale riportata a 1.0. Evidenze `vega-layout-*.png` nella
 cartella locale home-final-polish-20261029. Nessun test del player in questo
 intervento; iOS e tablet fisico non verificati.
+
+
+## Stati di caricamento ed errore (2026-10-29)
+
+Il caricamento del hero mantiene il frame finale e mostra un indicatore arancione
+su nero, coerente con l'avvio osservato nel riferimento. Rimangono invariati
+barriera metadati/immagini, timeout, fallback, cache e preparazione delle slide.
+Al timeout o esaurimento delle slide il loader lascia posto a un messaggio
+esplicito e Riprova. L'azione conserva il comportamento di recupero esistente.
+
+Hero e righe condividono la presentazione errore: icona, testo leggibile e CTA
+arancione di almeno 48 dp su fondo nero. Durante il retry delle righe il pulsante
+e disabilitato e mostra attivita; una categoria vuota resta distinta dall'errore.
+Le righe conservano i segnaposto dei poster e i dati disponibili durante errori
+di aggiornamento. L'etichetta accessibile del loader e tradotta in italiano e
+inglese. Nessuna schermata acquisti/offline Premium del riferimento e simulata.
+
+
+Verifiche: TypeScript e lint puliti, 62 test in 8 suite superati. Sul
+Medium_Phone_API_35 osservati loader arancione da avvio pulito, disponibilita
+dei dati in cache senza rete, errori delle righe senza perdita dei poster,
+Riprova disabilitato con indicatore durante il recupero e scomparsa dell'errore
+dopo il ripristino della rete. Timeout/errore totale del hero e ripartenza sono
+coperti dai test deterministici; nel campione reale la cache ha permesso di
+recuperare una slide. I banner rossi nelle catture sono i log del dev client
+per gli errori di rete provocati dalla prova, non nuovi messaggi UI.
+
+Wi-Fi e dati mobili ripristinati a 1; font_scale 1.0 confermato anche dopo
+riavvio del processo; navigazione a tre pulsanti conservata. I primi tentativi
+di reload mostravano codice precedente: esclusi dalla validazione finale.
+Evidenze valide: vega-states-new-home (loader), row-error/row-error2 (errori),
+retry e recovered, nella cartella locale home-final-polish-20261029.
+iOS non verificato; nessuna modifica ai loghi scuri o al player.

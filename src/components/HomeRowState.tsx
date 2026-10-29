@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
 import {HOME_ACCENT, HOME_FONT} from './homePresentation';
@@ -8,10 +8,14 @@ export default function HomeRowState({
   error,
   onRetry,
   retrying = false,
+  messageKey,
+  retryTestID,
 }: {
   error?: boolean;
   onRetry?: () => void;
   retrying?: boolean;
+  messageKey?: string;
+  retryTestID?: string;
 }) {
   const {t} = useTranslation();
   return (
@@ -20,14 +24,14 @@ export default function HomeRowState({
         marginHorizontal: 8,
         padding: 20,
         minHeight: 144,
-        backgroundColor: '#141519',
+        backgroundColor: 'black',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
       }}>
       <Ionicons
         name={error ? 'cloud-offline-outline' : 'albums-outline'}
-        size={28}
+        size={40}
         color="#A0A0A0"
       />
       <Text
@@ -39,21 +43,29 @@ export default function HomeRowState({
           fontFamily: HOME_FONT.regular,
           lineHeight: 20,
         }}>
-        {t(error ? 'Failed to load content' : 'No Content Found')}
+        {t(messageKey || (error ? 'Failed to load content' : 'No Content Found'))}
       </Text>
       {error && onRetry ? (
         <TouchableOpacity
+          testID={retryTestID}
           accessibilityRole="button"
+          accessibilityLabel={t('Retry')}
           disabled={retrying}
           accessibilityState={{disabled: retrying, busy: retrying}}
           onPress={onRetry}
           style={{
-            minHeight: 44,
+            minHeight: 48,
             justifyContent: 'center',
             paddingHorizontal: 24,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            borderRadius: 24,
+            backgroundColor: HOME_ACCENT,
             opacity: retrying ? 0.5 : 1,
           }}>
-          <Text style={{color: HOME_ACCENT, fontFamily: HOME_FONT.bold}}>
+          {retrying && <ActivityIndicator color="black" size="small" />}
+          <Text style={{color: 'black', fontFamily: HOME_FONT.bold}}>
             {t('Retry')}
           </Text>
         </TouchableOpacity>

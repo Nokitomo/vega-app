@@ -273,3 +273,18 @@ ritorno nell'app. Non usare questi tempi come misura della latenza di rete.
 Alla chiusura delle prove l'app di riferimento e tornata alla home, rete e
 scala caratteri sono ripristinate. Nessun acquisto, riproduzione o modifica
 dell'account; la ricerca ha modificato solo stato di navigazione locale.
+
+
+## Aggiornamento implementazioni del 29 ottobre
+
+Le proposte di toolbar, misure/composizione e stati sono state implementate in
+seguito alla ricerca: toolbar progressiva in b4ecbed, composizione in 6260417,
+e stati di caricamento/errore nel relativo commit. Dettagli e verifiche sono
+nelle sezioni omonime di home-cruncy-ui.md. La precedente lista delle proposte
+rimane come cronologia del confronto, non come elenco di lavori ancora aperti.
+
+Restano differenze intenzionali: pausa autoplay durante lo scroll, immagini e
+ritagli dei servizi Vega, font/branding e funzioni specifiche dei provider;
+nessuna replica di promozioni Premium, righe musicali o footer privi di dati e
+funzioni equivalenti. Loghi scuri e riconoscimento scritte esclusi. Non e
+certificata uguaglianza pixel per pixel su tutti i contenuti, iOS o tablet fisici.
