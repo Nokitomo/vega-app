@@ -1,5 +1,22 @@
 # Home: revisione visiva cruncy-ui
 
+## Aggiornamento geometria hero (2026-10-29)
+
+Il carosello usa ora un'altezza esplicita condivisa da schede e skeleton,
+indipendente dalla lunghezza dei contenuti della slide corrente. Su smartphone
+il riferimento e il rapporto 2:3 di Crunchyroll; con testi ingranditi lo spazio
+minimo necessario viene calcolato per tutte le slide, conservando lo scroll
+della home. Lo spacer elastico non impone piu una crescita della card.
+Le precedenti note che descrivono l'hero come libero di crescere secondo il
+contenuto sono superate da questo aggiornamento. Artwork, servizi, preferenze,
+fallback, caricamento e logica del carosello restano invariati.
+
+Verifica Android: AnimeUnity a caratteri 150%, StreamCenter e StreamingUnity
+a scala normale; indicatori stabili al cambio dei contenuti, selettore provider,
+CTA verso il dettaglio, ritorno e ricerca. 35 test mirati passati; TypeScript
+e lint senza diagnostiche. iOS non verificato. Evidenze e ricerca ancora in
+corso sulla home di riferimento: [report](home-research-20261029.md).
+
 Il branch `cruncy-ui` introduce la prima revisione della home smartphone, basata sulla ricerca locale `C:/dev/app_streaming_kotlin_compose/docs/research/crunchyroll-mobile/`, in particolare `05-authenticated-navigation.md`, `08-reconstruction-notes.md` e lo screenshot `artifacts/home-hero-swipe-before.png`.
 
 ## Presentazione

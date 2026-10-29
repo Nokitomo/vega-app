@@ -46,9 +46,9 @@ const HeroCard = memo(
   ({hero, provider, reducedMotion, onFailure, onReady}: HeroCardProps) => {
     const {t} = useTranslation();
     const navigationSize = useWindowDimensions();
-    const {width, height} = navigationSize;
-    const layout = getHomeHeroLayout(width, height);
+    const {width, height, fontScale} = navigationSize;
     const insets = useSafeAreaInsets();
+    const layout = getHomeHeroLayout(width, height, fontScale, insets.top);
     const [failedImages, setFailedImages] = useState<Set<string>>(
       () => new Set(),
     );
@@ -218,7 +218,7 @@ const HeroCard = memo(
       <View style={{backgroundColor: 'black'}}>
         <View
           style={{
-            minHeight: layout.minHeight,
+            height: layout.frameHeight,
             paddingTop: insets.top + 56,
           }}>
           <Pressable
@@ -256,7 +256,7 @@ const HeroCard = memo(
             />
           </Pressable>
 
-          <View style={{flex: 1, minHeight: layout.spacer}} />
+          <View style={{flex: 1}} />
           <View
             style={{
               paddingHorizontal: layout.inset,
@@ -277,6 +277,7 @@ const HeroCard = memo(
               paddingTop: 16,
               paddingBottom: 12,
               gap: 12,
+              flexShrink: 0,
             }}>
             {logoUri ? (
               <RemoteLogo
@@ -310,6 +311,7 @@ const HeroCard = memo(
                 style={{
                   color: '#DADADA',
                   fontSize: 12,
+                  lineHeight: 18,
                   fontFamily: HOME_FONT.regular,
                 }}>
                 {displayGenres.join(' · ')}
@@ -328,7 +330,7 @@ const HeroCard = memo(
               </Text>
             )}
             {error && !isLoading && (
-              <Text style={{color: '#A0A0A0'}}>
+              <Text numberOfLines={2} style={{color: '#A0A0A0', fontSize: 14, lineHeight: 22}}>
                 {t('Unable to load details')}
               </Text>
             )}
@@ -351,9 +353,11 @@ const HeroCard = memo(
                   }}>
                   <Ionicons name="play-outline" size={24} color="black" />
                   <Text
+                    numberOfLines={2}
                     style={{
                       color: 'black',
                       fontSize: 16,
+                      lineHeight: 24,
                       fontFamily: HOME_FONT.bold,
                       flexShrink: 1,
                       textAlign: 'center',
@@ -436,8 +440,9 @@ const Hero = memo(
     const {hero: storedHero, providerScope} = useHeroStore(state => state);
     const scope = getProviderCacheScope(provider.value);
     const initialHero = providerScope === scope ? storedHero : undefined;
-    const {width, height} = useWindowDimensions();
-    const layout = getHomeHeroLayout(width, height);
+    const {width, height, fontScale} = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+    const layout = getHomeHeroLayout(width, height, fontScale, insets.top);
     const [selectedLink, setSelectedLink] = useState('');
     const slides = React.useMemo(() => {
       return uniqueHeroPosts(
@@ -616,7 +621,7 @@ const Hero = memo(
             testID="hero-loading"
             accessibilityState={{busy: !preparationExpired && !!slides.length}}
             style={{
-              minHeight: layout.minHeight,
+              height: layout.frameHeight,
               backgroundColor: '#141519',
               justifyContent: 'flex-end',
               padding: 16,
