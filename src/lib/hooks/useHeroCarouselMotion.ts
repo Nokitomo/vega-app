@@ -22,8 +22,8 @@ export function heroSwipeTarget(page: number, count: number, width: number, dx: 
 
 /** Presentation only. Metadata readiness and selection stay owned by Hero. */
 export function useHeroCarouselMotion({
-  requestedLink, ready, active, reducedMotion,
-}: {requestedLink: string; ready: boolean; active: boolean; reducedMotion: boolean}) {
+  requestedLink, ready, active, reducedMotion, excludedLinks,
+}: {requestedLink: string; ready: boolean; active: boolean; reducedMotion: boolean; excludedLinks?: ReadonlySet<string>}) {
   const [displayedLink, setDisplayedLink] = useState('');
   const displayed = useRef('');
   const [outgoing, setOutgoing] = useState<{link: string; opacity: number} | null>(null);
@@ -51,7 +51,7 @@ export function useHeroCarouselMotion({
     setDragging(false);
 
     if (active && ready && requestedLink && requestedLink !== displayed.current) {
-      const previous = displayed.current;
+      const previous = excludedLinks?.has(displayed.current) ? '' : displayed.current;
       displayed.current = requestedLink;
       setDisplayedLink(requestedLink);
       if (previous && !reducedMotion) {
@@ -73,7 +73,7 @@ export function useHeroCarouselMotion({
       blending.current?.stop();
       restoring.current?.stop();
     };
-  }, [requestedLink, ready, active, reducedMotion, blend, dragOpacity]);
+  }, [requestedLink, ready, active, reducedMotion, excludedLinks, blend, dragOpacity]);
 
   const beginDrag = useCallback(() => {
     ++dragGeneration.current;

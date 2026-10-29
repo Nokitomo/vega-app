@@ -384,3 +384,42 @@ non cambia le impostazioni del player. Anche nell'ultima prova da avvio pulito
 il renderer host dell'emulatore si e chiuso entrando nella riproduzione; il
 colore finale e la navigazione Home/ricerca/dettagli sono stati verificati, ma
 serve una prova di riproduzione su smartphone.
+
+
+## Filtro anime del hero (2026-10-29)
+
+Solo per AnimeUnity e per le opere AnimeUnity di StreamCenter, una slide deve
+avere almeno un ID TMDB/TVDB positivo o un ID IMDb valido e un'immagine di
+provenienza esterna nota. AniList/MAL da soli non soddisfano il requisito.
+StreamingUnity e la sua parte di StreamCenter non vengono filtrati.
+
+La provenienza viene conservata prima della fusione dei metadati del hero:
+TMDB, TVDB, Cinemeta, AniZip o banner AniList sono ammessi; provider e provenienza
+ignota sono esclusi. Non cambiano priorita, lingue, URL o ordine dei fallback.
+Se il candidato corrente e un'immagine del provider, viene scartata l'opera,
+non riordinata la lista immagini. Non vengono aggiunte richieste ai servizi.
+L'origine esterna non garantisce da sola una risoluzione minima dell'immagine.
+
+Il controllo si applica solo al hero: catalogo, ricerca e dettagli rimangono
+accessibili. Le cache precedenti sono utilizzabili quando dichiarano la fonte;
+quelle senza provenienza sufficiente vengono escluse dal hero. Il bacino e i
+limiti di preparazione esistenti restano invariati; se non ci sono opere idonee
+rimane disponibile lo stato di errore con Riprova. Un'immagine non idonea non
+viene montata neppure durante la preparazione della slide.
+
+Corretta inoltre la transizione quando una slide viene rimossa dopo un errore
+immagine: il carosello non anima in uscita un componente gia smontato.
+Verifiche automatiche: TypeScript e lint puliti, 80 test in 11 suite superati,
+compresi ID mancanti, fonte ignota, cache, errore immagine, candidati esauriti,
+deduplicazione, CTA, navigazione e separazione delle sorgenti StreamCenter.
+
+Sul Medium_Phone_API_35 verificati: carosello StreamingUnity, passaggio ad
+AnimeUnity, slide pronte, gesto di cambio slide, apertura dettaglio AnimeUnity
+con caricamento episodi e ritorno Home; successivo passaggio a StreamCenter,
+con slide anime e StreamingUnity nello stesso carosello. Evidenze locali
+`filter-*.png` nella cartella `.codex/screenshots/home-three-fixes-20261029/`,
+non versionata. Necessario un riavvio del processo app durante le prove per
+superare un blocco del rendering dell'emulatore; nessuna misura prestazionale
+viene dedotta dai tempi di questo ambiente. I casi negativi deterministici sono
+coperti dai test automatici, non simulati tramite modifiche dei dati remoti.
+Navigazione Android a tre pulsanti lasciata attiva. iOS non verificato.

@@ -31,6 +31,7 @@ import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
 import {HERO_INTERVAL_MS, heroSwipeTarget, useHeroCarouselMotion} from '../lib/hooks/useHeroCarouselMotion';
+import {isHeroArtworkEligible} from '../lib/utils/animeHeroEligibility';
 import {heroCtaKey} from '../lib/utils/heroCta';
 import {uniqueHeroPosts} from '../lib/utils/heroPolicy';
 import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
@@ -131,15 +132,19 @@ const HeroCard = memo(
       );
     }, [backgroundCandidates, failedImages, hero?.link]);
 
+    const artworkEligible = isHeroArtworkEligible(
+      provider.value, hero.link, heroData, currentImageUri,
+    );
+
     useEffect(() => {
       if (
         !isLoading &&
         hero?.link &&
-        ((error && !heroData) || !currentImageUri)
+        ((error && !heroData) || !currentImageUri || (!!heroData && !artworkEligible))
       ) {
         onFailure(hero.link);
       }
-    }, [error, heroData, hero?.link, onFailure, isLoading, currentImageUri]);
+    }, [error, heroData, hero?.link, onFailure, isLoading, currentImageUri, artworkEligible]);
 
     const handleImageError = useCallback(() => {
       if (hero?.link && currentImageUri) {
@@ -198,6 +203,7 @@ const HeroCard = memo(
     });
 
     const ready =
+      artworkEligible &&
       !!heroData &&
       !isLoading &&
       !!currentImageUri &&
@@ -227,7 +233,7 @@ const HeroCard = memo(
             accessibilityRole="button"
             accessibilityLabel={displayTitle || hero?.title}
             style={{position: 'absolute', width: '100%', height: '100%'}}>
-            {!currentImageUri ? (
+            {!currentImageUri || !artworkEligible ? (
               <View style={{flex: 1, backgroundColor: '#141519'}} />
             ) : (
               <HeroArtwork
@@ -464,6 +470,7 @@ const Hero = memo(
       ready: !!requested && readyLinks.has(requested.link),
       active: motionActive,
       reducedMotion,
+      excludedLinks: failedSlides,
     });
     const {displayedLink, beginDrag, moveDrag, endDrag} = motion;
     const [preparationExpired, setPreparationExpired] = useState(false);

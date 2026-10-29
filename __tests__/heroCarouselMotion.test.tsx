@@ -51,6 +51,15 @@ describe('hero presentation transitions', () => {
     expect(motion.outgoing).toBeNull();
     expect(motion.transitioning).toBe(false);
   });
+  it('does not animate from a rejected and unmounted slide', async () => {
+    await render();
+    await render({requestedLink: 'second', excludedLinks: new Set(['first'])});
+    expect(motion.displayedLink).toBe('second');
+    expect(motion.outgoing).toBeNull();
+    expect(motion.transitioning).toBe(false);
+    expect(animations).toHaveLength(0);
+  });
+
   it('ignores late completion when rapid selection replaces a transition', async () => {
     await render();
     await render({requestedLink: 'second'});

@@ -101,3 +101,17 @@ describe('hero cache recovery', () => {
     expect(options().staleTime({state: {data: complete}})).toBe(86400000);
   });
 });
+
+
+describe('anime hero artwork provenance', () => {
+  it('retains original image sources before the hero image merge', async () => {
+    mockInfo = {...complete, image: 'provider-poster', imdbId: '',
+      extra: {ids: {tmdbShowIds: [42]}, artworkSources: {background: 'tmdb'}}};
+    const query = useHeroMetadata('/anime/1', 'animeunity') as unknown as {queryFn: () => Promise<any>};
+    const result = await query.queryFn();
+    expect(result.image).toBe('background');
+    expect(result.heroArtworkOrigins).toEqual({background: 'tmdb', 'provider-poster': 'provider'});
+    expect(result.extra.ids.tmdbShowIds).toEqual([42]);
+    expect(result.artworkCandidates.background).toEqual(['background', 'provider-poster']);
+  });
+});

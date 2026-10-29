@@ -1,3 +1,4 @@
+import {buildHeroArtworkOrigins} from '../utils/animeHeroEligibility';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useQueries, useQuery} from '@tanstack/react-query';
 import {AppState, type AppStateStatus} from 'react-native';
@@ -665,6 +666,9 @@ export const useHeroMetadata = (heroLink: string, providerValue: string) => {
           enhanced: enhancedMeta,
           activePoster: providerInfo.poster || providerInfo.image,
         });
+        if (metadataProvider === 'animeunity') {
+          merged.heroArtworkOrigins = buildHeroArtworkOrigins(providerInfo, enhancedMeta?.banner);
+        }
         merged.artworkCandidates = artworkCandidates;
         merged.poster = artworkCandidates.poster[0];
         merged.background = artworkCandidates.background[0];

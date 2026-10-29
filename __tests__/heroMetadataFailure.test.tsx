@@ -304,6 +304,41 @@ describe('Hero carousel resilience', () => {
     expect(currentImage().props.source.uri).toBe('first.jpg');
   });
 
+  it('skips anime without mapped IDs before presenting any provider image', async () => {
+    contentStoreMock.mockImplementation(selectorStoreMock({provider: {value: 'animeunity'}}) as unknown as typeof useContentStore);
+    heroStoreMock.mockImplementation(selectorStoreMock({hero: first, providerScope: 'animeunity'}) as unknown as typeof useHeroStore);
+    metadataMock.mockImplementation(link => ({...metadata(link), data: {
+      background: `${link}.jpg`, extra: {ids: link === 'first' ? {} : {tmdbShowIds: [2]},
+        artworkSources: {background: 'tmdb'}},
+    }}) as ReturnType<typeof useHeroMetadata>);
+    await render();
+    expect(onError).toHaveBeenCalledWith('first');
+    expect(currentImage().props.source.uri).toBe('second.jpg');
+    expect(slides()).toHaveLength(2);
+  });
+
+  it('rejects an anime slide when its external image fails instead of showing provider artwork', async () => {
+    contentStoreMock.mockImplementation(selectorStoreMock({provider: {value: 'animeunity'}}) as unknown as typeof useContentStore);
+    heroStoreMock.mockImplementation(selectorStoreMock({hero: first, providerScope: 'animeunity'}) as unknown as typeof useHeroStore);
+    metadataMock.mockImplementation(link => ({...metadata(link), data: {
+      background: `${link}-external.jpg`, extra: {ids: {tvdbShowIds: [2]}, artworkSources: {background: 'tvdb'}},
+    }}) as ReturnType<typeof useHeroMetadata>);
+    await render();
+    expect(currentImage().props.source.uri).toBe('first-external.jpg');
+    await act(async () => currentImage().props.onError());
+    expect(onError).toHaveBeenCalledWith('first');
+    expect(tree.root.findAllByType(Image).some(node => node.props.source?.uri === 'first.jpg')).toBe(false);
+  });
+
+  it('finishes an all-ineligible anime pool with a retry instead of an endless loader', async () => {
+    contentStoreMock.mockImplementation(selectorStoreMock({provider: {value: 'animeunity'}}) as unknown as typeof useContentStore);
+    heroStoreMock.mockImplementation(selectorStoreMock({hero: first, providerScope: 'animeunity'}) as unknown as typeof useHeroStore);
+    await render();
+    expect(tree.root.findAllByProps({testID: 'hero-visible'})).toHaveLength(0);
+    expect(tree.root.findAllByProps({testID: 'hero-retry'}).length).toBeGreaterThan(0);
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
   it('tries the provider poster after artwork fails and ignores late errors from another slide', async () => {
     metadataMock.mockImplementation(
       link =>
