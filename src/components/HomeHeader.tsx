@@ -1,5 +1,7 @@
 import React, {useCallback, useState} from 'react';
 import {
+  Animated as NativeAnimated,
+  StyleSheet,
   Keyboard,
   Modal,
   Pressable,
@@ -27,13 +29,13 @@ export default function HomeHeader({
   onOpenDrawer,
   searchActive,
   setSearchActive,
-  scrolled,
+  backgroundOpacity,
 }: {
   isDrawerOpen: boolean;
   onOpenDrawer: () => void;
   searchActive: boolean;
   setSearchActive: (active: boolean) => void;
-  scrolled: boolean;
+  backgroundOpacity: NativeAnimated.AnimatedInterpolation<number>;
 }) {
   const {t} = useTranslation();
   const {provider} = useContentStore();
@@ -114,8 +116,13 @@ export default function HomeHeader({
         right: 0,
         zIndex: 40,
         paddingBottom: 12,
-        backgroundColor: scrolled ? '#141519' : 'transparent',
+
       }}>
+      <NativeAnimated.View
+        testID="home-toolbar-background"
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, {backgroundColor: 'black', opacity: backgroundOpacity}]}
+      />
       <View
         style={{
           paddingTop: insets.top + 12,

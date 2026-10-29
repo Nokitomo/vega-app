@@ -423,3 +423,20 @@ superare un blocco del rendering dell'emulatore; nessuna misura prestazionale
 viene dedotta dai tempi di questo ambiente. I casi negativi deterministici sono
 coperti dai test automatici, non simulati tramite modifiche dei dati remoti.
 Navigazione Android a tre pulsanti lasciata attiva. iOS non verificato.
+
+
+## Toolbar progressiva (2026-10-29)
+
+Il fondo della toolbar usa l'interpolazione clamp(offset / (altezza feed * 0.3),
+0, 1), coerente con il riferimento analizzato. La sola opacita del fondo nero
+viene aggiornata dal driver nativo; logo e icone restano opachi. La status bar
+trasparente lascia visibile lo stesso fondo. La pausa autoplay resta legata
+all'offset positivo, separata dall'animazione. Al rimontaggio del feed (cambio
+provider o struttura) l'offset visivo riparte da zero; il ritorno dal dettaglio
+conserva invece lo scroll esistente.
+
+TypeScript e lint puliti; 39 test hero/layout superati. Medium_Phone_API_35:
+verificati cima, opacita parziale, saturazione nera e ritorno in cima via tab
+Home, oltre all'apertura ricerca. Evidenze `vega-toolbar-*.png` in
+`.codex/screenshots/home-final-polish-20261029/` (non versionate).
+iOS non verificato. Nessuna modifica alle priorita dei metadati.

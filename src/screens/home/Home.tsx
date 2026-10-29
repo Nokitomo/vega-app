@@ -1,5 +1,6 @@
 import {
   SafeAreaView,
+  Animated,
   FlatList,
   RefreshControl,
   View,
@@ -149,7 +150,14 @@ const Home = ({}: Props) => {
   useScrollToTop(homeListRef);
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
-  const [backgroundColor, setBackgroundColor] = useState('transparent');
+  const [scrolled, setScrolled] = useState(false);
+  const scrollOffset = useRef(new Animated.Value(0)).current;
+  const [feedHeight, setFeedHeight] = useState(1);
+  const toolbarOpacity = useMemo(() => scrollOffset.interpolate({
+    inputRange: [0, Math.max(1, feedHeight * 0.3)],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  }), [scrollOffset, feedHeight]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const [isHorizontalListDragging, setIsHorizontalListDragging] =
@@ -217,12 +225,13 @@ const Home = ({}: Props) => {
     isScreenActive: isHomeFocused,
   });
 
-  // Memoized scroll handler
-  const handleScroll = useCallback((event: any) => {
-    const newBackgroundColor =
-      event.nativeEvent.contentOffset.y > 0 ? 'black' : 'transparent';
-    setBackgroundColor(newBackgroundColor);
-  }, []);
+  // Only the functional top-of-feed flag crosses into React state.
+  const handleScroll = useMemo(() => Animated.event(
+    [{nativeEvent: {contentOffset: {y: scrollOffset}}}],
+    {useNativeDriver: true, listener: (event: any) => {
+      setScrolled(event.nativeEvent.contentOffset.y > 0);
+    }},
+  ), [scrollOffset]);
 
   const clearDrawerUnlockTimeout = useCallback(() => {
     if (drawerUnlockTimeoutRef.current) {
@@ -477,6 +486,11 @@ const Home = ({}: Props) => {
     return `${provider?.value ?? 'none'}:${homeData.length}`;
   }, [provider?.value, homeData.length]);
 
+  useEffect(() => {
+    scrollOffset.setValue(0);
+    setScrolled(false);
+  }, [scrollKey, scrollOffset]);
+
   // Memoized error message
   const errorComponent = useMemo(() => {
     if (isLoading || homeData.length > 0) {
@@ -513,10 +527,10 @@ const Home = ({}: Props) => {
               style="light"
               animated={true}
               translucent={true}
-              backgroundColor={backgroundColor}
+              backgroundColor="transparent"
             />
 
-            <FlatList
+            <Animated.FlatList
               ref={homeListRef}
               key={scrollKey}
               data={homeData}
@@ -524,6 +538,7 @@ const Home = ({}: Props) => {
               renderItem={renderSliderItem}
               onViewableItemsChanged={handleVisibleSectionsChanged}
               viewabilityConfig={homeViewabilityConfig}
+              onLayout={event => setFeedHeight(event.nativeEvent.layout.height)}
               onScroll={handleScroll}
               scrollEventThrottle={16} // Optimize scroll performance
               showsVerticalScrollIndicator={false}
@@ -541,7 +556,7 @@ const Home = ({}: Props) => {
                       .flatMap(section => section.Posts)
                       .slice(0, 20)}
                     isActive={
-                      isHomeFocused && backgroundColor === 'transparent'
+                      isHomeFocused && !scrolled
                     }
                     isDrawerOpen={isDrawerOpen}
                     searchActive={searchActive}
@@ -575,7 +590,7 @@ const Home = ({}: Props) => {
               onOpenDrawer={() => setIsDrawerOpen(true)}
               searchActive={searchActive}
               setSearchActive={setSearchActive}
-              scrolled={backgroundColor !== 'transparent'}
+              backgroundOpacity={toolbarOpacity}
             />
             {canOpenDrawerFromEdge ? (
               <View
