@@ -212,8 +212,8 @@ const ContinueWatching = ({
               onPress={handleSeeAllPress}
               className="mr-2"
               style={{
-                minWidth: 44,
-                minHeight: 44,
+                minWidth: 48,
+                minHeight: 48,
                 justifyContent: 'center',
                 alignItems: 'center',
               }}>

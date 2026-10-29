@@ -498,3 +498,12 @@ di reload mostravano codice precedente: esclusi dalla validazione finale.
 Evidenze valide: vega-states-new-home (loader), row-error/row-error2 (errori),
 retry e recovered, nella cartella locale home-final-polish-20261029.
 iOS non verificato; nessuna modifica ai loghi scuri o al player.
+
+## Pulsante Altro in Continua a guardare
+
+Area minima portata da 44 a 48 dp su entrambi gli assi, come nelle altre
+categorie Home. Destinazione e gestione della cronologia invariate.
+Verifiche: TypeScript e lint senza diagnostiche, tre test delle interazioni
+ContinueWatching superati. Su Medium_Phone_API_35 verificati apertura della
+lista completa con Altro e ritorno alla Home. Screenshot locali in
+`.codex/screenshots/home-theme-polish/`, esclusi da Git. iOS non verificato.
