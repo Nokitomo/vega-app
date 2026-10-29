@@ -339,3 +339,20 @@ Verifiche delle animazioni:
 - Verificata la CTA del hero verso il dettaglio StreamCenter e il ritorno alla
   home, senza avviare playback. Nessuna regressione rilevata nei percorsi provati;
   la verifica non certifica nuovamente player, download, cast o iOS.
+
+
+## CTA contestuale (2026-10-29)
+
+Il pulsante hero usa `Inizia a guardare E1` per i metadati di tipo serie/TV.
+Film e tipi sconosciuti mantengono `Riproduci`; una serie con un episodio usa
+`Riproduci` solo quando lo stato dichiara che l'opera e conclusa. Il numero di
+stream, server o stagioni non determina il testo. La pressione continua ad aprire
+Info con gli stessi parametri: non viene introdotto l'avvio diretto del player.
+Le stringhe sono disponibili in italiano e inglese. Le preferenze dei metadati
+non cambiano.
+
+Verifiche: TypeScript e lint senza problemi; 31 test mirati superati (CTA,
+preparazione/fallimenti hero, layout). Sul Medium_Phone_API_35: CTA serie su piu
+slide, apertura Info e ritorno Home verificati. Film, dati ignoti e opera conclusa
+a episodio unico coperti dai test unitari. Screenshot locali non versionati in
+`.codex/screenshots/home-three-fixes-20261029/cta-*.png`. iOS non verificato.

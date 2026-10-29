@@ -31,6 +31,7 @@ import {getProviderCacheScope} from '../lib/utils/providerCacheScope';
 import {useReducedMotion} from '../lib/hooks/useReducedMotion';
 import HeroArtwork from './HeroArtwork';
 import {HERO_INTERVAL_MS, heroSwipeTarget, useHeroCarouselMotion} from '../lib/hooks/useHeroCarouselMotion';
+import {heroCtaKey} from '../lib/utils/heroCta';
 import {uniqueHeroPosts} from '../lib/utils/heroPolicy';
 import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
 
@@ -362,7 +363,7 @@ const HeroCard = memo(
                       flexShrink: 1,
                       textAlign: 'center',
                     }}>
-                    {t('Play')}
+                    {t(heroCtaKey(heroData))}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
