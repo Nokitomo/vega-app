@@ -14,8 +14,9 @@ fallback, caricamento e logica del carosello restano invariati.
 Verifica Android: AnimeUnity a caratteri 150%, StreamCenter e StreamingUnity
 a scala normale; indicatori stabili al cambio dei contenuti, selettore provider,
 CTA verso il dettaglio, ritorno e ricerca. 35 test mirati passati; TypeScript
-e lint senza diagnostiche. iOS non verificato. Evidenze e ricerca ancora in
-corso sulla home di riferimento: [report](home-research-20261029.md).
+e lint senza diagnostiche. iOS non verificato. Evidenze e reverse engineering
+della home di riferimento: [report](home-research-20261029.md), con formula
+della toolbar, matrice dei gesti, stati di rete, misure e prossimi interventi.
 
 Il branch `cruncy-ui` introduce la prima revisione della home smartphone, basata sulla ricerca locale `C:/dev/app_streaming_kotlin_compose/docs/research/crunchyroll-mobile/`, in particolare `05-authenticated-navigation.md`, `08-reconstruction-notes.md` e lo screenshot `artifacts/home-hero-swipe-before.png`.
 
