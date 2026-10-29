@@ -1,4 +1,6 @@
 import {mainStorage} from './StorageService';
+import {readThemePreferences} from './themePreferences';
+import {DEFAULT_PRIMARY} from '../utils/themeColors';
 import {
   defaultDownloadLocationConfig,
   DownloadLocationConfig,
@@ -72,7 +74,7 @@ export class SettingsStorage {
 
   // Theme settings
   getPrimaryColor(): string {
-    return mainStorage.getString(SettingsKeys.PRIMARY_COLOR) || '#FF6347';
+    return readThemePreferences(mainStorage).primary;
   }
 
   setPrimaryColor(color: string): void {
@@ -80,7 +82,7 @@ export class SettingsStorage {
   }
 
   isCustomTheme(): boolean {
-    return this.getBoolWithDefault(SettingsKeys.IS_CUSTOM_THEME, false);
+    return readThemePreferences(mainStorage).isCustom;
   }
 
   setCustomTheme(isCustom: boolean): void {
@@ -88,7 +90,7 @@ export class SettingsStorage {
   }
 
   getCustomColor(): string {
-    return mainStorage.getString(SettingsKeys.CUSTOM_COLOR) || '#FF6347';
+    return mainStorage.getString(SettingsKeys.CUSTOM_COLOR) || DEFAULT_PRIMARY;
   }
 
   setCustomColor(color: string): void {

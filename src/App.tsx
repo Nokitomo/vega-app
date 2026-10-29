@@ -387,7 +387,7 @@ function TabStack() {
 
           return {
             title: t('Home'),
-            tabBarActiveTintColor: '#FF640A',
+            tabBarActiveTintColor: primary,
             tabBarInactiveTintColor: '#DADADA',
             tabBarBackground: () => <View style={{flex: 1, backgroundColor: HOME_NAVIGATION_COLOR}} />,
             tabBarStyle: hideTabBar

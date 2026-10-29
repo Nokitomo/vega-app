@@ -411,8 +411,8 @@ const Extensions = ({navigation}: Props) => {
           {item.icon ? (
             <Image
               source={{uri: item.icon}}
-              className="w-12 h-12 rounded-xl border-2 border-primary bg-quaternary"
-              style={{resizeMode: 'cover'}}
+              className="w-12 h-12 rounded-xl border-2 bg-quaternary"
+              style={{resizeMode: 'cover', borderColor: primary}}
             />
           ) : (
             <View className="px-3 py-2 bg-quaternary rounded-xl border border-gray-700">

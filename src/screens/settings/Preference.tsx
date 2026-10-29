@@ -14,6 +14,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import useThemeStore from '../../lib/zustand/themeStore';
 import {Dropdown} from 'react-native-element-dropdown';
+import {DEFAULT_PRIMARY} from '../../lib/utils/themeColors';
 import {themes} from '../../lib/constants';
 import {TextInput} from 'react-native';
 import Constants from 'expo-constants';
@@ -238,7 +239,7 @@ const Preferences = () => {
                     <TouchableOpacity
                       onPress={() => {
                         setCustom(false);
-                        setPrimary('#FF6347');
+                        setPrimary(DEFAULT_PRIMARY);
                       }}>
                       <MaterialCommunityIcons
                         name="close"

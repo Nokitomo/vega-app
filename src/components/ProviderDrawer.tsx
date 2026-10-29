@@ -1,3 +1,4 @@
+import useThemeStore from '../lib/zustand/themeStore';
 import React from 'react';
 import {
   Modal,
@@ -38,6 +39,7 @@ const ProviderDrawer = ({
   onClose: () => void;
 }) => {
   const {t} = useTranslation();
+  const primary = useThemeStore(state => state.primary);
   const {provider, setProvider, installedProviders} = useContentStore(
     state => state,
   );
@@ -102,7 +104,7 @@ const ProviderDrawer = ({
                   <Ionicons
                     name="layers-outline"
                     size={22}
-                    color={isSelected ? '#FF640A' : '#A0A0A0'}
+                    color={isSelected ? primary : '#A0A0A0'}
                   />
                   <Text
                     style={[
@@ -112,7 +114,7 @@ const ProviderDrawer = ({
                     {item.display_name}
                   </Text>
                   {isSelected && (
-                    <Ionicons name="checkmark" size={23} color="#FF640A" />
+                    <Ionicons name="checkmark" size={23} color={primary} />
                   )}
                 </TouchableOpacity>
               );

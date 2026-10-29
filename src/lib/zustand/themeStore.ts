@@ -1,38 +1,25 @@
 import {create} from 'zustand';
-import {persist, createJSONStorage} from 'zustand/middleware';
-import {MMKVLoader} from 'react-native-mmkv-storage';
-import {settingsStorage} from '../storage';
-
-const storage = new MMKVLoader().initialize();
+import {settingsStorage} from '../storage/SettingsStorage';
 
 export interface Theme {
   primary: string;
   isCustom: boolean;
-  setPrimary: (type: Theme['primary']) => void;
+  setPrimary: (primary: string) => void;
   setCustom: (isCustom: boolean) => void;
 }
 
-const useThemeStore = create<Theme>()(
-  persist(
-    set => ({
-      primary: settingsStorage.getPrimaryColor(),
-      isCustom: settingsStorage.isCustomTheme(),
-
-      setPrimary: (primary: Theme['primary']) => {
-        set({primary});
-        settingsStorage.setPrimaryColor(primary);
-      },
-      setCustom: (isCustom: Theme['isCustom']) => {
-        set({isCustom});
-        settingsStorage.setCustomTheme(isCustom);
-      },
-    }),
-    {
-      name: 'content-storage',
-      //@ts-expect-error
-      storage: createJSONStorage(() => storage),
-    },
-  ),
-);
+// SettingsStorage is the sole persistence owner, separate from provider state.
+const useThemeStore = create<Theme>(set => ({
+  primary: settingsStorage.getPrimaryColor(),
+  isCustom: settingsStorage.isCustomTheme(),
+  setPrimary: primary => {
+    settingsStorage.setPrimaryColor(primary);
+    set({primary});
+  },
+  setCustom: isCustom => {
+    settingsStorage.setCustomTheme(isCustom);
+    set({isCustom});
+  },
+}));
 
 export default useThemeStore;

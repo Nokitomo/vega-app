@@ -1,3 +1,4 @@
+import useThemeStore from '../lib/zustand/themeStore';
 import React, {useCallback, useState} from 'react';
 import {
   Animated as NativeAnimated,
@@ -38,6 +39,7 @@ export default function HomeHeader({
   backgroundOpacity: NativeAnimated.AnimatedInterpolation<number>;
 }) {
   const {t} = useTranslation();
+  const primary = useThemeStore(state => state.primary);
   const {provider} = useContentStore();
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState('');
@@ -133,7 +135,7 @@ export default function HomeHeader({
         <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
           <Text
             style={{
-              color: '#FF640A',
+              color: primary,
               fontSize: 29,
               fontFamily: HOME_FONT.heading,
               letterSpacing: -1,

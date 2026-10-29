@@ -5,7 +5,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#FF6347',
+        primary: require('./src/lib/themeColors.json').defaultPrimary,
         secondary: '#000000',
         tertiary: '#171717',
         quaternary: '#1a1a1a',

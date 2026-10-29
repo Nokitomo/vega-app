@@ -1,4 +1,3 @@
-export const HOME_ACCENT = '#FF640A';
 export const HOME_FONT = {
   heading: 'VegaAtypBold',
   regular: 'VegaDMSansRegular',

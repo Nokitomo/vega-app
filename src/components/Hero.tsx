@@ -1,3 +1,5 @@
+import {foregroundOnPrimary} from '../lib/utils/themeColors';
+import useThemeStore from '../lib/zustand/themeStore';
 import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +51,8 @@ type HeroCardProps = {
 const HeroCard = memo(
   ({hero, provider, reducedMotion, onFailure, onReady}: HeroCardProps) => {
     const {t} = useTranslation();
+    const primary = useThemeStore(state => state.primary);
+    const onPrimary = foregroundOnPrimary(primary);
     const navigationSize = useWindowDimensions();
     const {width, height, fontScale} = navigationSize;
     const insets = useSafeAreaInsets();
@@ -361,18 +365,18 @@ const HeroCard = memo(
                     flex: 1,
                     minHeight: 48,
                     borderRadius: 24,
-                    backgroundColor: '#FF640A',
+                    backgroundColor: primary,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 10,
                     padding: 10,
                   }}>
-                  <Ionicons name="play-outline" size={24} color="black" />
+                  <Ionicons name="play-outline" size={24} color={onPrimary} />
                   <Text
                     numberOfLines={2}
                     style={{
-                      color: 'black',
+                      color: onPrimary,
                       fontSize: 16,
                       lineHeight: 24,
                       fontFamily: HOME_FONT.bold,
@@ -406,14 +410,14 @@ const HeroCard = memo(
                     height: 48,
                     borderRadius: 24,
                     borderWidth: 2,
-                    borderColor: '#FF640A',
+                    borderColor: primary,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
                   <Ionicons
                     name={isSaved ? 'bookmark' : 'bookmark-outline'}
                     size={24}
-                    color="#FF640A"
+                    color={primary}
                   />
                 </TouchableOpacity>
               </View>
@@ -453,6 +457,7 @@ const Hero = memo(
       return () => subscription.remove();
     }, []);
     const {t} = useTranslation();
+    const primary = useThemeStore(state => state.primary);
     const {provider} = useContentStore(state => state);
     const {hero: storedHero, providerScope} = useHeroStore(state => state);
     const scope = getProviderCacheScope(provider.value);
@@ -648,7 +653,7 @@ const Hero = memo(
               <HomeRowState error messageKey="Unable to load details"
                 retryTestID="hero-retry" onRetry={retryPreparation} />
             ) : (
-              <ActivityIndicator testID="hero-loading-indicator" color="#FF640A" size="large"
+              <ActivityIndicator testID="hero-loading-indicator" color={primary} size="large"
                 accessibilityRole="progressbar" accessibilityLabel={t('Loading home content')} />
             )}
           </View>
@@ -721,7 +726,7 @@ const Hero = memo(
                         width: layout.indicatorWidth,
                         height: 7,
                         borderRadius: 4,
-                        backgroundColor: '#FF640A',
+                        backgroundColor: primary,
                         transform: [
                           {
                             translateX: progress.interpolate({

@@ -1,3 +1,4 @@
+import {DEFAULT_PRIMARY} from './utils/themeColors';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 
 export const FLAGS = {
@@ -13,7 +14,7 @@ export const downloadFolder = defaultDownloadFolder;
 export const themes: {name: string; color: string}[] = [
   {
     name: 'Vega',
-    color: '#FF6347',
+    color: DEFAULT_PRIMARY,
   },
   {
     name: 'Hayasaka',

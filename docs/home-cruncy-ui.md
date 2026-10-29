@@ -507,3 +507,27 @@ Verifiche: TypeScript e lint senza diagnostiche, tre test delle interazioni
 ContinueWatching superati. Su Medium_Phone_API_35 verificati apertura della
 lista completa con Altro e ritorno alla Home. Screenshot locali in
 `.codex/screenshots/home-theme-polish/`, esclusi da Git. iOS non verificato.
+
+## Temi e colore Vega predefinito
+
+Il preset Vega usa ora #FF640A, centralizzato in `src/lib/themeColors.json`.
+Home, hero, indicatori, caricamenti, errori, provider e Continua a guardare
+seguono il tema selezionato. Sfondi e geometria restano invariati. Il testo dei
+controlli riempiti sceglie nero/bianco in base al contrasto; Vega mantiene nero.
+Anche il bordo delle icone nella gestione provider usa il tema corrente.
+
+SettingsStorage e la sola persistenza del tema: rimosso il persist Zustand che
+condivideva `content-storage` con i provider. La lettura recupera i valori legacy
+solo se mancano le preferenze dedicate, senza alterare la chiave dei provider.
+Il vecchio arancione viene aggiornato solo fuori dalla modalita personalizzata;
+altri preset e colori personalizzati salvati sono conservati.
+
+TypeScript e lint senza diagnostiche; 36 test superati, inclusi migrazione,
+isolamento dal provider, contrasto e cambio colore su componente montato. Un
+primo timeout dei test di Continua a guardare non si riproduce nell'esecuzione
+isolata ne nella successiva suite completa. Su Medium_Phone_API_35 verificati
+nuovo arancione nelle impostazioni, cambio Vega/Hayasaka, Home e selettore
+provider coerenti, cambio provider e mantenimento di tema/provider dopo arresto
+e riavvio del processo. Evidenze locali `home-theme-polish/theme-*.png` sotto
+`.codex/screenshots`, escluse da Git. Colori custom verificati nei test; iOS non
+verificato. Nessuna modifica a metadati, fallback o player.

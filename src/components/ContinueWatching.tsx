@@ -1,3 +1,4 @@
+import {foregroundOnPrimary} from '../lib/utils/themeColors';
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -10,7 +11,8 @@ import {
 } from 'react-native';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {useNavigation} from '@react-navigation/native';
-import {getHomeCardWidth, HOME_ACCENT, HOME_FONT} from './homePresentation';
+import useThemeStore from '../lib/zustand/themeStore';
+import {getHomeCardWidth, HOME_FONT} from './homePresentation';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../App';
 import AntDesign from '@expo/vector-icons/AntDesign';
@@ -44,7 +46,8 @@ const ContinueWatching = ({
   onHorizontalDragStart?: () => void;
   onHorizontalDragEnd?: () => void;
 }) => {
-  const primary = HOME_ACCENT;
+  const primary = useThemeStore(state => state.primary);
+  const onPrimary = foregroundOnPrimary(primary);
   const {width} = useWindowDimensions();
   const cardWidth = getHomeCardWidth(width);
   const {t} = useTranslation();
@@ -306,7 +309,7 @@ const ContinueWatching = ({
                   <View
                     className="absolute top-2 left-2 rounded-full px-2 py-0.5"
                     style={{backgroundColor: primary}}>
-                    <Text className="text-black text-[10px] font-semibold">
+                    <Text className="text-[10px] font-semibold" style={{color: onPrimary}}>
                       {t('ITA')}
                     </Text>
                   </View>
@@ -317,7 +320,7 @@ const ContinueWatching = ({
                       showItaBadge ? 'right-2' : 'left-2'
                     } rounded-full px-2 py-0.5`}
                     style={{backgroundColor: primary}}>
-                    <Text className="text-black text-[10px] font-semibold">
+                    <Text className="text-[10px] font-semibold" style={{color: onPrimary}}>
                       {episodeLabel}
                     </Text>
                   </View>
@@ -326,7 +329,7 @@ const ContinueWatching = ({
                   <View
                     className="absolute bottom-3 left-1 rounded px-1 py-0.5"
                     style={{backgroundColor: primary}}>
-                    <Text className="text-black text-[9px] font-semibold">
+                    <Text className="text-[9px] font-semibold" style={{color: onPrimary}}>
                       {t('New episodes')}
                     </Text>
                   </View>

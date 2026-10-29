@@ -1,8 +1,10 @@
+import {foregroundOnPrimary} from '../lib/utils/themeColors';
+import useThemeStore from '../lib/zustand/themeStore';
 import React from 'react';
 import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
-import {HOME_ACCENT, HOME_FONT} from './homePresentation';
+import {HOME_FONT} from './homePresentation';
 
 export default function HomeRowState({
   error,
@@ -18,6 +20,8 @@ export default function HomeRowState({
   retryTestID?: string;
 }) {
   const {t} = useTranslation();
+  const primary = useThemeStore(state => state.primary);
+  const onPrimary = foregroundOnPrimary(primary);
   return (
     <View
       style={{
@@ -61,11 +65,11 @@ export default function HomeRowState({
             alignItems: 'center',
             gap: 8,
             borderRadius: 24,
-            backgroundColor: HOME_ACCENT,
+            backgroundColor: primary,
             opacity: retrying ? 0.5 : 1,
           }}>
-          {retrying && <ActivityIndicator color="black" size="small" />}
-          <Text style={{color: 'black', fontFamily: HOME_FONT.bold}}>
+          {retrying && <ActivityIndicator color={onPrimary} size="small" />}
+          <Text style={{color: onPrimary, fontFamily: HOME_FONT.bold}}>
             {t('Retry')}
           </Text>
         </TouchableOpacity>

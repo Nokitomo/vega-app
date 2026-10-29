@@ -1,3 +1,4 @@
+import {foregroundOnPrimary} from '../lib/utils/themeColors';
 import React, {memo, useMemo} from 'react';
 import {Text, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
@@ -11,6 +12,7 @@ interface PostBadgesProps {
 
 const PostBadges = ({post, primary}: PostBadgesProps): React.ReactElement => {
   const {t} = useTranslation();
+  const onPrimary = foregroundOnPrimary(primary);
   const episodeLabel = post.episodeLabelKey
     ? t(post.episodeLabelKey, post.episodeLabelParams)
     : post.episodeLabel;
@@ -34,7 +36,7 @@ const PostBadges = ({post, primary}: PostBadgesProps): React.ReactElement => {
         <View
           className="absolute top-1 right-1 rounded-full px-2 py-0.5"
           style={{backgroundColor: primary}}>
-          <Text className="text-black text-[10px] font-semibold">
+          <Text className="text-[10px] font-semibold" style={{color: onPrimary}}>
             {episodeLabel}
           </Text>
         </View>
@@ -43,7 +45,7 @@ const PostBadges = ({post, primary}: PostBadgesProps): React.ReactElement => {
         <View
           className="absolute top-1 left-1 rounded-full px-2 py-0.5"
           style={{backgroundColor: primary}}>
-          <Text className="text-black text-[10px] font-semibold">
+          <Text className="text-[10px] font-semibold" style={{color: onPrimary}}>
             {dubLabel}
           </Text>
         </View>
