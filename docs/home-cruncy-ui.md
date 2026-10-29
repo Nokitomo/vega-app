@@ -356,3 +356,31 @@ preparazione/fallimenti hero, layout). Sul Medium_Phone_API_35: CTA serie su piu
 slide, apertura Info e ritorno Home verificati. Film, dati ignoti e opera conclusa
 a episodio unico coperti dai test unitari. Screenshot locali non versionati in
 `.codex/screenshots/home-three-fixes-20261029/cta-*.png`. iOS non verificato.
+
+
+## Barra Android coerente (2026-10-29)
+
+Su Android l'area inferiore di sicurezza usa `#23252B` quando e visibile la
+navbar Home, anche nei dettagli aperti da Home. Un contenitore di safe area con stato locale colora solo l'inset; il layout e lo sfondo del
+contenuto restano invariati e l'albero di navigazione non viene ridisegnato al cambio colore. La selezione segue la route attiva: altre tab, Webview, Player e
+layout tablet con tab laterali mantengono il comportamento precedente. Non
+vengono cambiate visibilita delle barre native, orientamento o impostazioni iOS.
+
+Verificati sul Medium_Phone_API_35 con tre pulsanti: Home e dettagli hanno pixel
+`#23252B` sia nella navbar sia nella barra Android; ricerca torna al nero;
+apertura/chiusura tastiera e ritorno Home funzionano. Test delle route e layout:
+16 test superati; TypeScript e lint puliti dopo la correzione del teardown del test. Evidenze locali `nav-*.png` in
+`.codex/screenshots/home-three-fixes-20261029/`. iOS non verificato.
+
+Verificata anche l'apertura del player in fullscreen e il ritorno a dettagli/Home
+con ripristino della barra. L'emulatore con GPU host ha avuto un crash del renderer
+(`Failed to find ColorBuffer`); la prova e stata ripetuta con rendering software
+senza finestra. Non e una misura delle prestazioni su dispositivo reale.
+
+Limite della prova player: il renderer dell'emulatore ha mostrato crash e ANR
+anche durante la preparazione del sistema. Sono stati osservati fullscreen e
+ritorno Home, ma la riproduzione prolungata non e certificata. Il componente finale conserva l'identita dei figli mentre aggiorna il colore e
+non cambia le impostazioni del player. Anche nell'ultima prova da avvio pulito
+il renderer host dell'emulatore si e chiuso entrando nella riproduzione; il
+colore finale e la navigazione Home/ricerca/dettagli sono stati verificati, ma
+serve una prova di riproduzione su smartphone.

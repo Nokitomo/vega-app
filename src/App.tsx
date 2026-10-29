@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef} from 'react';
 import {useFonts} from 'expo-font';
+import HomeNavigationInset, {HOME_NAVIGATION_COLOR} from './components/HomeNavigationInset';
 import {HOME_FONT} from './components/homePresentation';
 import './global.css';
 import Home from './screens/home/Home';
@@ -45,7 +46,6 @@ import TabBarBackgound from './components/TabBarBackgound';
 import {TouchableOpacity} from 'react-native';
 import {
   SafeAreaProvider,
-  SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import {StyleProp} from 'react-native';
@@ -389,7 +389,7 @@ function TabStack() {
             title: t('Home'),
             tabBarActiveTintColor: '#FF640A',
             tabBarInactiveTintColor: '#DADADA',
-            tabBarBackground: () => <View style={{flex: 1, backgroundColor: '#23252B'}} />,
+            tabBarBackground: () => <View style={{flex: 1, backgroundColor: HOME_NAVIGATION_COLOR}} />,
             tabBarStyle: hideTabBar
               ? ({display: 'none'} as const)
               : defaultTabBarStyle,
@@ -699,15 +699,7 @@ const AppContent = () => {
   return (
     <GlobalErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <SafeAreaView
-          edges={{
-            right: 'off',
-            top: 'off',
-            left: 'off',
-            bottom: 'additive',
-          }}
-          className="flex-1"
-          style={{backgroundColor: 'black'}}>
+        <HomeNavigationInset navigation={navigationRef}>
           <NavigationContainer
             ref={navigationRef}
             onReady={async () => {
@@ -793,7 +785,7 @@ const AppContent = () => {
             </RootStack.Navigator>
           </NavigationContainer>
           <WafWebViewDialog />
-        </SafeAreaView>
+        </HomeNavigationInset>
       </QueryClientProvider>
     </GlobalErrorBoundary>
   );
