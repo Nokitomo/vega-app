@@ -33,20 +33,13 @@ import BootSplash from 'react-native-bootsplash';
 import {enableFreeze, enableScreens} from 'react-native-screens';
 import Preferences from './screens/settings/Preference';
 import useThemeStore from './lib/zustand/themeStore';
-import {
-  LogBox,
-  PixelRatio,
-  useWindowDimensions,
-  ViewStyle,
-} from 'react-native';
+import {LogBox, ViewStyle} from 'react-native';
+import useAdaptiveNavigation from './lib/hooks/useAdaptiveNavigation';
 import {EpisodeLink, Link, PostVariant} from './lib/providers/types';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import TabBarBackgound from './components/TabBarBackgound';
 import {TouchableOpacity} from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {StyleProp} from 'react-native';
 import Animated from 'react-native-reanimated';
 import Downloads from './screens/settings/Downloads';
@@ -92,8 +85,6 @@ const getCrashlytics = (): any | null => {
 enableScreens(true);
 enableFreeze(true);
 
-const LARGE_SCREEN_WIDTH = 768;
-const TABLET_MIN_DIMENSION_DP = 600;
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type InfoRouteParams = {
@@ -298,46 +289,26 @@ function SettingsStackScreen() {
 function TabStack() {
   const {t} = useTranslation();
   const {primary} = useThemeStore(state => state);
-  const insets = useSafeAreaInsets();
-  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const {useSideTabLayout} = useAdaptiveNavigation();
   const showTabBarLables = useUiSettingsStore(
     state => state.showTabBarLabels,
   );
-  const tabletRotationEnabled = useUiSettingsStore(
-    state => state.tabletRotationEnabled,
-  );
-  const isLargeScreen = windowWidth > LARGE_SCREEN_WIDTH;
-  const isTabletDevice =
-    Math.min(windowWidth, windowHeight) >= TABLET_MIN_DIMENSION_DP;
-  const allowNonPlayerRotation = isTabletDevice && tabletRotationEnabled;
-  const useSideTabLayout =
-    isTabletDevice && isLargeScreen && !allowNonPlayerRotation;
-  const tabBarLabelLift = (() => {
-    if (!showTabBarLables) {
-      return 0;
-    }
-    const fontScale = PixelRatio.getFontScale();
-    const labelHeight = Math.ceil(10 * fontScale + 6);
-    return Math.min(insets.bottom, labelHeight);
-  })();
-
+  // The outer HomeNavigationInset already reserves the system bottom inset.
+  // Keep tabs in normal layout so native screens cannot cover an absolute bar.
   const defaultTabBarStyle = !useSideTabLayout
     ? {
-        position: 'absolute' as const,
-        bottom: -insets.bottom + tabBarLabelLift,
-        height: 55 + insets.bottom,
+        height: 55,
         borderRadius: 0,
-        overflow: 'hidden' as const,
         elevation: 0,
         borderTopWidth: 0,
-        paddingHorizontal: 0,
         paddingTop: 5,
-        paddingBottom: insets.bottom,
+        paddingBottom: 0,
       }
     : {};
 
   return (
     <Tab.Navigator
+      safeAreaInsets={{bottom: 0}}
       detachInactiveScreens={true}
       screenOptions={{
         animation: 'shift',
@@ -492,13 +463,11 @@ const AppContent = () => {
   const {clearCache} = useSearchCacheStore(state => ({
     clearCache: state.clearCache,
   }));
-  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const {isTabletDevice} = useAdaptiveNavigation();
   const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
   const tabletRotationEnabled = useUiSettingsStore(
     state => state.tabletRotationEnabled,
   );
-  const isTabletDevice =
-    Math.min(windowWidth, windowHeight) >= TABLET_MIN_DIMENSION_DP;
   const allowNonPlayerRotation = isTabletDevice && tabletRotationEnabled;
 
   SystemUI.setBackgroundColorAsync('black');

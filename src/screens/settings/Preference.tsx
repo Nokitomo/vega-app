@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   ToastAndroid,
   StatusBar,
-  useWindowDimensions,
 } from 'react-native';
 import React, {useState} from 'react';
+import useAdaptiveNavigation from '../../lib/hooks/useAdaptiveNavigation';
 import {settingsStorage} from '../../lib/storage';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -43,11 +43,10 @@ const getCrashlytics = (): any | null => {
 const Preferences = () => {
   const hasFirebase = Boolean(Constants?.expoConfig?.extra?.hasFirebase);
   const {t} = useTranslation();
-  const {width, height} = useWindowDimensions();
+  const {isTabletDevice} = useAdaptiveNavigation();
   const {primary, setPrimary, isCustom, setCustom} = useThemeStore(
     state => state,
   );
-  const isTabletDevice = Math.min(width, height) >= 600;
   const showRecentlyWatched = useUiSettingsStore(
     state => state.showRecentlyWatched,
   );

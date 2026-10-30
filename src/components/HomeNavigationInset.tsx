@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import {Platform, View, useWindowDimensions} from 'react-native';
+import {Platform, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import type {NavigationContainerRefWithCurrent} from '@react-navigation/native';
 import type {RootStackParamList} from '../App';
-import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
+import useAdaptiveNavigation from '../lib/hooks/useAdaptiveNavigation';
 import {hasAppBottomBar, HOME_NAVIGATION_COLOR} from '../lib/utils/homeNavigationBar';
 
 export {HOME_NAVIGATION_COLOR};
@@ -15,15 +15,13 @@ export default function HomeNavigationInset({navigation, children}: {
   navigation: NavigationContainerRefWithCurrent<RootStackParamList>;
 }) {
   const [visible, setVisible] = useState(true);
-  const {width, height} = useWindowDimensions();
-  const tabletRotationEnabled = useUiSettingsStore(state => state.tabletRotationEnabled);
+  const {useSideTabLayout: sideTabs} = useAdaptiveNavigation();
   useEffect(() => {
     const sync = () => setVisible(hasAppBottomBar(navigation.getRootState()));
     const unsubscribe = navigation.addListener('state', sync);
     if (navigation.isReady()) {sync();}
     return unsubscribe;
   }, [navigation]);
-  const sideTabs = Math.min(width, height) >= 600 && width > 768 && !tabletRotationEnabled;
   const color = Platform.OS === 'android' && visible && !sideTabs ? HOME_NAVIGATION_COLOR : 'black';
   return <SafeAreaView
     edges={{right: 'off', top: 'off', left: 'off', bottom: 'additive'}}

@@ -1,11 +1,4 @@
-import {
-  View,
-  Text,
-  Platform,
-  Image,
-  FlatList,
-  useWindowDimensions,
-} from 'react-native';
+import {View, Text, Platform, Image, FlatList} from 'react-native';
 import React from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {WatchListStackParamList} from '../App';
@@ -21,18 +14,16 @@ import {hasItaBadge} from '../lib/utils/helpers';
 const WatchList = () => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
-  const {width: windowWidth} = useWindowDimensions();
   const navigation =
     useNavigation<NativeStackNavigationProp<WatchListStackParamList>>();
   const {watchList} = useWatchListStore(state => state);
   const [listWidth, setListWidth] = React.useState(0);
 
-  const containerPadding = 12; // from the px-3 class (3*4=12)
   const itemSpacing = 10;
 
-  // Measure the list itself so the grid matches the width it can actually use.
-  const availableWidth =
-    listWidth || Math.max(windowWidth - containerPadding * 2, 100);
+  // Use the stable viewport, excluding sidebar and outer padding. Do not
+  // render columns from a provisional window width before it is measured.
+  const availableWidth = listWidth;
 
   // Determine number of columns and adjusted item width
   const numColumns = Math.max(
@@ -107,43 +98,49 @@ const WatchList = () => {
           {t('Watchlist')}
         </Text>
 
-        {watchList.length > 0 ? (
-          <FlatList
-            key={`watchlist-grid-${numColumns}`}
-            data={watchList}
-            renderItem={renderItem}
-            keyExtractor={(item, index) => item.link + index}
-            numColumns={numColumns}
-            onLayout={({nativeEvent: {layout}}) => {
-              setListWidth(currentWidth =>
-                Math.abs(currentWidth - layout.width) > 0.5
-                  ? layout.width
-                  : currentWidth,
-              );
-            }}
-            columnWrapperStyle={{
-              gap: itemSpacing,
-              justifyContent: 'flex-start',
-            }}
-            contentContainerStyle={{
-              paddingBottom: 50,
-            }}
-            showsVerticalScrollIndicator={false}
-          />
-        ) : (
-          <View className="flex-1">
-            <View className="items-center justify-center mt-20 mb-12">
-              <MaterialCommunityIcons
-                name="playlist-remove"
-                size={80}
-                color={primary}
+        <View
+          testID="watchlist-viewport"
+          style={{flex: 1, minWidth: 0}}
+          onLayout={({nativeEvent: {layout}}) => {
+            setListWidth(Math.max(0, layout.width));
+          }}>
+          {watchList.length > 0 ? (
+            listWidth > 0 ? (
+              <FlatList
+                key={`watchlist-grid-${numColumns}`}
+                data={watchList}
+                renderItem={renderItem}
+                keyExtractor={(item, index) => item.link + index}
+                numColumns={numColumns}
+                columnWrapperStyle={
+                  numColumns > 1
+                    ? {
+                        gap: itemSpacing,
+                        justifyContent: 'flex-start',
+                      }
+                    : undefined
+                }
+                contentContainerStyle={{
+                  paddingBottom: 50,
+                }}
+                showsVerticalScrollIndicator={false}
               />
-              <Text className="text-white/70 text-base mt-4 text-center">
-                {t('Your watchlist is empty')}
-              </Text>
+            ) : null
+          ) : (
+            <View className="flex-1">
+              <View className="items-center justify-center mt-20 mb-12">
+                <MaterialCommunityIcons
+                  name="playlist-remove"
+                  size={80}
+                  color={primary}
+                />
+                <Text className="text-white/70 text-base mt-4 text-center">
+                  {t('Your watchlist is empty')}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
+        </View>
       </View>
     </View>
   );
