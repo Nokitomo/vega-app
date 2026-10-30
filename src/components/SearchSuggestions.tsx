@@ -2,6 +2,7 @@ import React, {memo, useCallback} from 'react';
 import {FlatList, Text, TouchableOpacity, View} from 'react-native';
 import {MaterialIcons} from '@expo/vector-icons';
 import {useTranslation} from 'react-i18next';
+import {HOME_FONT} from './homePresentation';
 import type {TitleSuggestion} from '../lib/services/imdbSuggestions';
 
 interface SearchSuggestionsProps {
@@ -47,10 +48,10 @@ const SearchSuggestionItem = memo(
             style={{marginRight: 12}}
           />
           <View className="flex-1">
-            <Text className="text-white text-base" numberOfLines={1}>
+            <Text className="text-white text-base" style={{fontFamily: HOME_FONT.regular}} numberOfLines={1}>
               {item.title}
             </Text>
-            <Text className="text-white/50 text-xs">{details}</Text>
+            <Text className="text-white/50 text-xs" style={{fontFamily: HOME_FONT.regular}}>{details}</Text>
           </View>
           <MaterialIcons name="north-east" size={18} color="#666" />
         </TouchableOpacity>

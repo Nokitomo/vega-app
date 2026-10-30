@@ -7,11 +7,8 @@ import {
   Modal,
   Pressable,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {FadeIn} from 'react-native-reanimated';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -21,6 +18,8 @@ import {HomeStackParamList, SearchStackParamList} from '../App';
 import useContentStore from '../lib/zustand/contentStore';
 import useUiSettingsStore from '../lib/zustand/uiSettingsStore';
 import SearchSuggestions from './SearchSuggestions';
+import SearchToolbar from './SearchToolbar';
+import SearchSuggestionState from './SearchSuggestionState';
 import {HOME_FONT} from './homePresentation';
 import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
@@ -59,7 +58,7 @@ export default function HomeHeader({
     setSuggestionsSuppressed(false);
   }, []);
 
-  const suggestions = useSearchSuggestions({
+  const {suggestions, status} = useSearchSuggestions({
     query: searchText,
     enabled: searchActive,
     suppressed: suggestionsSuppressed,
@@ -182,47 +181,18 @@ export default function HomeHeader({
         statusBarTranslucent
         onRequestClose={closeSearch}>
         <SafeAreaView className="flex-1 bg-black">
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            className="px-4 pt-4 flex-row items-center">
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel={t('Close search')}
-              onPress={closeSearch}
-              className="p-2 mr-2">
-              <Ionicons name="arrow-back" size={26} color="white" />
-            </TouchableOpacity>
-            <View className="flex-1 flex-row items-center rounded-xl bg-[#141414] px-3">
-              <Feather name="search" size={21} color="#999" />
-              <TextInput
-                testID="provider-search-input"
-                autoFocus
-                value={searchText}
-                onChangeText={handleSearchTextChange}
-                onSubmitEditing={event =>
-                  handleSearchSubmit(event.nativeEvent.text)
-                }
-                placeholder={t('Search in {{provider}}', {
-                  provider: provider.display_name,
-                })}
-                placeholderTextColor="#777"
-                returnKeyType="search"
-                className="flex-1 h-12 px-3 text-white text-base"
-              />
-              {searchText.length > 0 && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={t('Clear search')}
-                  onPress={() => {
-                    setSuggestionsSuppressed(false);
-                    setSearchText('');
-                  }}
-                  className="p-2">
-                  <Feather name="x" size={18} color="#999" />
-                </TouchableOpacity>
-              )}
-            </View>
-          </Animated.View>
+          <SearchToolbar
+            testID="provider-search-input"
+            autoFocus
+            value={searchText}
+            onChangeText={handleSearchTextChange}
+            onSubmit={handleSearchSubmit}
+            onBack={closeSearch}
+            placeholder={t('Search')}
+          />
+          <Text style={{color: '#a0a0a0', fontFamily: HOME_FONT.regular, paddingHorizontal: 16, paddingTop: 12}}>
+            {t('Search in {{provider}}', {provider: provider.display_name})}
+          </Text>
           <View className="flex-1 pt-2">
             {suggestions.length > 0 ? (
               <SearchSuggestions
@@ -230,12 +200,7 @@ export default function HomeHeader({
                 onSelectSuggestion={handleSelectSuggestion}
               />
             ) : (
-              <View className="flex-1 items-center justify-center px-8">
-                <Ionicons name="search" size={34} color="#666" />
-                <Text className="text-white/50 text-sm text-center mt-3">
-                  {t('Type at least two characters for suggestions')}
-                </Text>
-              </View>
+              <SearchSuggestionState status={status} />
             )}
           </View>
         </SafeAreaView>

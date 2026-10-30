@@ -692,5 +692,12 @@
   "Enter TMDB API key v3": "Enter TMDB API key v3",
   "TMDB key saved": "TMDB key saved",
   "No TMDB key saved": "No TMDB key saved",
-  "Unable to save TMDB key.": "Unable to save TMDB key."
+  "Unable to save TMDB key.": "Unable to save TMDB key.",
+  "Searching suggestions": "Loading suggestions…",
+  "Suggestions unavailable; submit to search": "Suggestions unavailable. Submit to search the providers.",
+  "No suggestions; submit to search": "No suggestions. Submit to search the providers.",
+  "Remove recent search: {{query}}": "Remove recent search: {{query}}",
+  "Search all installed providers": "Search all installed providers",
+  "No installed providers to search": "No installed providers to search",
+  "Back": "Back"
 }

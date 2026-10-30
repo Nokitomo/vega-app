@@ -692,5 +692,12 @@
   "Enter TMDB API key v3": "Inserisci la chiave API TMDB v3",
   "TMDB key saved": "Chiave TMDB salvata",
   "No TMDB key saved": "Nessuna chiave TMDB salvata",
-  "Unable to save TMDB key.": "Impossibile salvare la chiave TMDB."
+  "Unable to save TMDB key.": "Impossibile salvare la chiave TMDB.",
+  "Searching suggestions": "Caricamento suggerimenti…",
+  "Suggestions unavailable; submit to search": "Suggerimenti non disponibili. Premi Cerca per cercare nei provider.",
+  "No suggestions; submit to search": "Nessun suggerimento. Premi Cerca per cercare nei provider.",
+  "Remove recent search: {{query}}": "Rimuovi ricerca recente: {{query}}",
+  "Search all installed providers": "Cerca in tutti i provider installati",
+  "No installed providers to search": "Nessun provider installato in cui cercare",
+  "Back": "Indietro"
 }

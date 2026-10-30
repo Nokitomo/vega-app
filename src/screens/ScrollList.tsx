@@ -23,6 +23,7 @@ import {providerManager} from '../lib/services/ProviderManager';
 import ProviderImage from '../components/ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from '../components/PostBadges';
+import {HOME_FONT} from '../components/homePresentation';
 import ArchiveFilterModal from '../components/ArchiveFilterModal';
 import {
   buildArchiveFilter,
@@ -88,6 +89,8 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const {filter: routeFilter, providerValue} = route.params;
   const [page, setPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [searchError, setSearchError] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const [isEnd, setIsEnd] = useState<boolean>(false);
   const {provider} = useContentStore(state => state);
   const effectiveProviderValue = providerValue || provider.value;
@@ -220,6 +223,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         isLoadingMore.current = true;
 
         setIsLoading(true);
+        setSearchError(false);
 
         // Simulate network delay to reduce rapid API calls
         // Remove this in production if not needed
@@ -280,6 +284,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         if (!isMounted.current || (error as any)?.name === 'AbortError') {
           return;
         }
+        if (route.params.isSearch) {setSearchError(true);}
         console.error('Error fetching posts:', error);
       } finally {
         if (isMounted.current) {
@@ -296,6 +301,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     filterSelection.random,
     page,
     route.params.isSearch,
+    retryAttempt,
   ]);
 
   const applyArchiveFilters = (
@@ -314,7 +320,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
 
   const onEndReached = async () => {
     // Don't trigger more loading if we're already loading or at the end
-    if (isLoading || isEnd || isLoadingMore.current) {
+    if (isLoading || isEnd || isLoadingMore.current || (route.params.isSearch && searchError)) {
       return;
     }
     setIsLoading(true);
@@ -348,10 +354,10 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     <View className="h-full w-full bg-black items-center p-4" style={{flex: 1}}>
       <View className="w-full px-4 font-semibold my-6 flex-row justify-between items-center">
         <View className="flex-row items-center gap-2">
-          <TouchableOpacity onPress={() => navigation.goBack()}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Back')} style={route.params.isSearch ? {minWidth: 48, minHeight: 48, justifyContent: 'center'} : undefined} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={26} color="white" />
           </TouchableOpacity>
-          <Text className="text-2xl font-bold" style={{color: primary}}>
+          <Text className="text-2xl font-bold" style={{color: primary, ...(route.params.isSearch ? {fontFamily: HOME_FONT.heading, fontWeight: 'normal' as const} : {})}}>
             {route.params.title}
           </Text>
         </View>
@@ -483,6 +489,14 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                     {renderSkeletons()}
                   </View>
                 )}
+                {route.params.isSearch && searchError && !isLoading && (
+                  <View style={{padding: 24, alignItems: 'center'}} accessibilityLiveRegion="polite">
+                    <Text style={{color: '#a0a0a0'}}>{t('Failed to search')}</Text>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => {setSearchError(false); setIsLoading(true); setRetryAttempt(value => value + 1);}} style={{minHeight: 48, justifyContent: 'center', paddingHorizontal: 16}}>
+                      <Text style={{color: primary}}>{t('Retry')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <View className="h-32" />
               </>
             }
@@ -553,7 +567,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
             onEndReachedThreshold={0.5}
           />
         )}
-        {!isCalendarView && !isLoading && posts.length === 0 ? (
+        {!isCalendarView && !isLoading && !searchError && posts.length === 0 ? (
           <View className="w-full h-full flex items-center justify-center">
             <Text className="text-white text-center font-semibold text-lg">
               {t('No Content Found')}

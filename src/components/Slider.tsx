@@ -245,8 +245,8 @@ const Slider = ({
           style={{
             color: homeAppearance ? 'white' : primary,
             paddingLeft: homeAppearance ? 8 : 0,
-            fontWeight: homeAppearance ? undefined : '600',
-            fontFamily: homeAppearance ? HOME_FONT.heading : undefined,
+            fontWeight: homeAppearance || isSearch ? undefined : '600',
+            fontFamily: homeAppearance || isSearch ? HOME_FONT.heading : undefined,
             fontSize: homeAppearance ? 20 : undefined,
             lineHeight: homeAppearance ? 26 : undefined,
           }}>
@@ -257,7 +257,7 @@ const Slider = ({
             onPress={handleMorePress}
             accessibilityRole="button"
             style={
-              homeAppearance
+              homeAppearance || isSearch
                 ? {
                     minWidth: 48,
                     minHeight: 48,
@@ -270,7 +270,7 @@ const Slider = ({
             <Text
               className="text-white text-sm"
               style={
-                homeAppearance ? {fontFamily: HOME_FONT.medium} : undefined
+                homeAppearance || isSearch ? {fontFamily: HOME_FONT.medium} : undefined
               }>
               {t('More')}
             </Text>
