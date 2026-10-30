@@ -15,7 +15,7 @@ import {FlashList} from '@shopify/flash-list';
 import type {FlashListProps} from '@shopify/flash-list';
 import SkeletonLoader from './Skeleton';
 import HomeRowState from './HomeRowState';
-import {getHomeCardWidth, HOME_FONT} from './homePresentation';
+import {getHomeCardWidth, HOME_FONT, CATALOG_CARD_TITLE_STYLE} from './homePresentation';
 import ProviderImage from './ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from './PostBadges';
@@ -73,12 +73,13 @@ const Slider = ({
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const {width: windowWidth} = useWindowDimensions();
-  const cardWidth = homeAppearance
+  const catalogAppearance = homeAppearance || isSearch;
+  const cardWidth = catalogAppearance
     ? getHomeCardWidth(windowWidth)
     : CARD_TITLE_WIDTH;
-  const imageWidth = homeAppearance ? cardWidth : CARD_IMAGE_WIDTH;
-  const imageHeight = homeAppearance ? cardWidth * 1.5 : CARD_IMAGE_HEIGHT;
-  const skeletonPlaceholderCount = homeAppearance
+  const imageWidth = catalogAppearance ? cardWidth : CARD_IMAGE_WIDTH;
+  const imageHeight = catalogAppearance ? cardWidth * 1.5 : CARD_IMAGE_HEIGHT;
+  const skeletonPlaceholderCount = catalogAppearance
     ? Math.ceil(windowWidth / (cardWidth + 16)) + 1
     : getSkeletonPlaceholderCount(windowWidth);
   const navigation =
@@ -146,7 +147,7 @@ const Slider = ({
         className="flex flex-col mx-2"
         style={{
           width: cardWidth,
-          alignItems: homeAppearance ? 'flex-start' : 'center',
+          alignItems: catalogAppearance ? 'flex-start' : 'center',
         }}>
         <TouchableOpacity
           onLongPress={e => {
@@ -166,7 +167,7 @@ const Slider = ({
           }}>
           <View className="relative">
             <ProviderImage
-              className={homeAppearance ? undefined : 'rounded-md'}
+              className={catalogAppearance ? undefined : 'rounded-md'}
               uri={item?.image}
               link={item.link}
               providerValue={item.provider || providerValue || provider?.value}
@@ -197,12 +198,11 @@ const Slider = ({
           className="text-white text-center text-xs"
           style={{
             width: cardWidth,
-            textAlign: homeAppearance ? 'left' : 'center',
-            fontSize: homeAppearance ? 14 : 12,
-            fontFamily: homeAppearance ? HOME_FONT.regular : undefined,
-            marginTop: homeAppearance ? 8 : 0,
-            lineHeight: homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT,
-            minHeight: (homeAppearance ? 19 : CARD_TITLE_LINE_HEIGHT) * CARD_TITLE_LINES,
+            textAlign: 'center',
+            fontSize: 12,
+            lineHeight: CARD_TITLE_LINE_HEIGHT,
+            minHeight: CARD_TITLE_LINE_HEIGHT * CARD_TITLE_LINES,
+            ...(catalogAppearance ? CATALOG_CARD_TITLE_STYLE : {}),
           }}
           numberOfLines={CARD_TITLE_LINES}
           ellipsizeMode="tail">
@@ -214,7 +214,7 @@ const Slider = ({
       cardWidth,
       imageWidth,
       imageHeight,
-      homeAppearance,
+      catalogAppearance,
       handleItemPress,
       primary,
       provider?.value,
@@ -280,17 +280,17 @@ const Slider = ({
       {isLoading ? (
         <View
           className={
-            homeAppearance
+            catalogAppearance
               ? 'flex flex-row overflow-hidden'
               : 'flex flex-row gap-2 overflow-hidden'
           }
           style={
-            homeAppearance ? {paddingHorizontal: homeAppearance ? 0 : 3, paddingTop: homeAppearance ? 0 : 7} : undefined
+            catalogAppearance ? {paddingHorizontal: 0, paddingTop: 0} : undefined
           }>
           {Array.from({length: skeletonPlaceholderCount}).map((_, index) => (
             <View
               className={
-                homeAppearance
+                catalogAppearance
                   ? 'mx-2'
                   : 'mx-3 gap-0 flex mb-3 justify-center items-center'
               }
@@ -299,14 +299,14 @@ const Slider = ({
               <SkeletonLoader
                 height={imageHeight}
                 width={imageWidth}
-                marginVertical={homeAppearance ? 0 : 8}
-                style={homeAppearance ? {borderRadius: 0} : undefined}
+                marginVertical={catalogAppearance ? 0 : 8}
+                style={catalogAppearance ? {borderRadius: 0} : undefined}
               />
               <SkeletonLoader
-                height={homeAppearance ? 19 : 12}
+                height={catalogAppearance ? 19 : 12}
                 width={cardWidth}
               />
-              {homeAppearance ? <View style={{height: 30}} /> : null}
+              {catalogAppearance ? <View style={{height: 30}} /> : null}
             </View>
           ))}
         </View>
@@ -314,8 +314,9 @@ const Slider = ({
         <HomeRowState error={!!error} onRetry={onRetry} retrying={retrying} />
       ) : (
         <SafeFlashList
+          key={cardWidth}
           estimatedItemSize={
-            homeAppearance ? cardWidth + 16 : CARD_ESTIMATED_ITEM_SIZE
+            catalogAppearance ? cardWidth + 16 : CARD_ESTIMATED_ITEM_SIZE
           }
           showsHorizontalScrollIndicator={false}
           data={posts}
@@ -327,7 +328,7 @@ const Slider = ({
           onMomentumScrollBegin={onHorizontalDragStart}
           onScrollEndDrag={onHorizontalDragEnd}
           onMomentumScrollEnd={onHorizontalDragEnd}
-          contentContainerStyle={{paddingHorizontal: homeAppearance ? 0 : 3, paddingTop: homeAppearance ? 0 : 7}}
+          contentContainerStyle={{paddingHorizontal: catalogAppearance ? 0 : 3, paddingTop: catalogAppearance ? 0 : 7}}
           renderItem={renderItem}
           ListFooterComponent={
             !isLoading && error && !homeAppearance ? (

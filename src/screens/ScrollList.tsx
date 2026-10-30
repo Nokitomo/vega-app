@@ -23,7 +23,7 @@ import {providerManager} from '../lib/services/ProviderManager';
 import ProviderImage from '../components/ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from '../components/PostBadges';
-import {HOME_FONT} from '../components/homePresentation';
+import {HOME_FONT, CATALOG_CARD_TITLE_STYLE, getHomeCardWidth} from '../components/homePresentation';
 import ArchiveFilterModal from '../components/ArchiveFilterModal';
 import {
   buildArchiveFilter,
@@ -153,21 +153,24 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         data: grouped.get(dayKey) || [],
       }));
   }, [calendarDayOrder, isCalendarView, posts, t]);
-  const gridColumns = 3;
   const gridFallbackHorizontalPadding = 32;
-  const gridMaxItemWidth = GRID_MAX_POSTER_WIDTH;
+  const searchAppearance = !!route.params.isSearch;
+  const gridMaxItemWidth = searchAppearance ? getHomeCardWidth(windowWidth) : GRID_MAX_POSTER_WIDTH;
   const gridBaseWidth =
     gridContainerWidth > 0
       ? gridContainerWidth
       : Math.max(0, windowWidth - gridFallbackHorizontalPadding);
   const gridAvailableWidth = Math.max(0, gridBaseWidth);
+  const gridColumns = searchAppearance && windowWidth >= 600
+    ? Math.max(3, Math.floor(gridAvailableWidth / (gridMaxItemWidth + 16)))
+    : 3;
   const gridColumnWidth =
     gridAvailableWidth > 0
       ? Math.floor(gridAvailableWidth / gridColumns)
       : gridMaxItemWidth;
-  const gridItemWidth = Math.min(gridMaxItemWidth, gridColumnWidth);
+  const gridItemWidth = Math.min(gridMaxItemWidth, Math.max(1, gridColumnWidth - (searchAppearance ? 12 : 0)));
   const gridItemHeight = Math.round(gridItemWidth * 1.5);
-  const gridTitleWidth = Math.max(88, Math.min(gridItemWidth, gridColumnWidth) - 4);
+  const gridTitleWidth = searchAppearance ? gridItemWidth : Math.max(88, Math.min(gridItemWidth, gridColumnWidth) - 4);
   const gridItemWrapperStyle: ViewStyle = {
     width: gridColumnWidth > 0 ? gridColumnWidth : gridMaxItemWidth,
     alignItems: 'center',
@@ -337,15 +340,15 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     const imageSize =
       viewType === 1
         ? {width: gridItemWidth, height: gridItemHeight}
-        : {width: 100, height: 150};
+        : searchAppearance ? {width: 70, height: 105} : {width: 100, height: 150};
     const textWidth = viewType === 1 ? gridTitleWidth : 97;
     return Array.from({length: skeletonCount}).map((_, i) => (
       <View
-        className="gap-0 flex justify-center items-center"
+        className={searchAppearance && viewType !== 1 ? 'flex-row items-center' : 'gap-0 flex justify-center items-center'}
         style={itemWrapperStyle}
         key={i}>
-        <SkeletonLoader height={imageSize.height} width={imageSize.width} />
-        <SkeletonLoader height={12} width={textWidth} />
+        <SkeletonLoader height={imageSize.height} width={imageSize.width} style={searchAppearance ? {borderRadius: 0} : undefined} />
+        <SkeletonLoader height={searchAppearance ? 19 : 12} width={textWidth} style={searchAppearance && viewType !== 1 ? {marginLeft: 12} : undefined} />
       </View>
     ));
   };
@@ -353,11 +356,11 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   return (
     <View className="h-full w-full bg-black items-center p-4" style={{flex: 1}}>
       <View className="w-full px-4 font-semibold my-6 flex-row justify-between items-center">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center gap-2" style={searchAppearance ? {flex: 1, minWidth: 0} : undefined}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Back')} style={route.params.isSearch ? {minWidth: 48, minHeight: 48, justifyContent: 'center'} : undefined} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={26} color="white" />
           </TouchableOpacity>
-          <Text className="text-2xl font-bold" style={{color: primary, ...(route.params.isSearch ? {fontFamily: HOME_FONT.heading, fontWeight: 'normal' as const} : {})}}>
+          <Text numberOfLines={searchAppearance ? 2 : undefined} className="text-2xl font-bold" style={{flexShrink: 1, color: primary, ...(route.params.isSearch ? {fontFamily: HOME_FONT.heading, fontWeight: 'normal' as const} : {})}}>
             {route.params.title}
           </Text>
         </View>
@@ -501,8 +504,8 @@ const ScrollList = ({route}: Props): React.ReactElement => {
               </>
             }
             data={posts}
-            numColumns={viewType === 1 ? 3 : 1}
-            key={`view-type-${viewType}`}
+            numColumns={viewType === 1 ? gridColumns : 1}
+            key={`view-type-${viewType}-${viewType === 1 ? gridColumns : 1}`}
             contentContainerStyle={{paddingBottom: 80}}
             keyExtractor={(item, i) => `${item.title}-${i}`}
             renderItem={({item}) => (
@@ -529,7 +532,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                 }>
                 <View className="relative">
                   <ProviderImage
-                    className="rounded-md"
+                    className={searchAppearance ? undefined : 'rounded-md'}
                     uri={item.image}
                     link={item.link}
                     providerValue={route.params.providerValue || provider.value}
@@ -537,7 +540,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                     style={
                       viewType === 1
                         ? {width: gridItemWidth, height: gridItemHeight}
-                        : {width: 70, height: 100}
+                        : {width: 70, height: searchAppearance ? 105 : 100}
                     }
                   />
                   <PostBadges post={item} primary={primary} />
@@ -546,7 +549,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                   className={
                     viewType === 1
                       ? 'text-white text-center text-xs'
-                      : 'text-white ml-3 w-72 font-semibold text-base'
+                      : searchAppearance ? 'text-white ml-3' : 'text-white ml-3 w-72 font-semibold text-base'
                   }
                   style={
                     viewType === 1
@@ -554,8 +557,9 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                           width: gridTitleWidth,
                           lineHeight: GRID_TITLE_LINE_HEIGHT,
                           minHeight: GRID_TITLE_LINE_HEIGHT * GRID_TITLE_LINES,
+                          ...(searchAppearance ? CATALOG_CARD_TITLE_STYLE : {}),
                         }
-                      : undefined
+                      : searchAppearance ? {...CATALOG_CARD_TITLE_STYLE, flex: 1, minWidth: 0, marginTop: 0, minHeight: 0} : undefined
                   }
                   numberOfLines={viewType === 1 ? GRID_TITLE_LINES : 2}
                   ellipsizeMode="tail">

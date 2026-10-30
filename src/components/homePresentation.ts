@@ -4,6 +4,16 @@ export const HOME_FONT = {
   medium: 'VegaDMSansMedium',
   bold: 'VegaDMSansBold',
 };
+// Shared by Home catalog cards and search results; artwork selection stays separate.
+export const CATALOG_CARD_TITLE_STYLE = {
+  fontFamily: HOME_FONT.regular,
+  fontSize: 14,
+  lineHeight: 19,
+  textAlign: 'left' as const,
+  marginTop: 8,
+  minHeight: 57,
+};
+
 export const getHomeCardWidth = (windowWidth: number) =>
   windowWidth >= 600
     ? Math.min(200, Math.max(160, windowWidth * 0.19))
