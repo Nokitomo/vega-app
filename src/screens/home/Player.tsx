@@ -88,6 +88,7 @@ import {
   prepareNativeCastQueue,
   resolveCastSubtitleUri,
 } from '../../lib/cast/nativeCast';
+import {observeNativeCastPlayback} from '../../lib/cast/nativeCastPlayback';
 import {
   clearActiveVegaCastTracking,
   fetchVegaCastProgress,
@@ -106,7 +107,6 @@ import {
   shouldResolveProviderCardTitle,
 } from '../../lib/utils/providerCardTitleResolver';
 import {buildProviderCacheKey} from '../../lib/utils/providerCacheScope';
-import {hasStreamRequestHeaders} from '../../lib/utils/streamHeaders';
 import {torrentManager} from '../../lib/torrentManager';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {
@@ -685,6 +685,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   );
   const [pendingNativeCast, setPendingNativeCast] = useState(false);
   const [isStartingNativeCast, setIsStartingNativeCast] = useState(false);
+  const nativeCastPlaybackCleanupRef = useRef<(() => void) | null>(null);
   const lastCastProgressWriteRef = useRef(0);
   const lastVegaProgressSyncRef = useRef(0);
   const currentCastEpisodeRef = useRef<{
@@ -2142,7 +2143,19 @@ const Player = ({route}: Props): React.JSX.Element => {
         },
       });
 
+      nativeCastPlaybackCleanupRef.current?.();
       await remoteMediaClient.loadMedia(request);
+      nativeCastPlaybackCleanupRef.current = observeNativeCastPlayback(
+        remoteMediaClient,
+        selectedStream.link,
+        () => {
+          askWvcFallback().then(async fallback => {
+            if (fallback) {
+              await handleWebVideoCasterCast();
+            }
+          });
+        },
+      );
       playerRef?.current?.pause();
       setPendingNativeCast(false);
       currentCastEpisodeRef.current = {
@@ -2163,6 +2176,8 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
       return true;
     } catch (error) {
+      nativeCastPlaybackCleanupRef.current?.();
+      nativeCastPlaybackCleanupRef.current = null;
       console.error('Native cast start failed:', error);
       ToastAndroid.show(t('Failed to start native cast'), ToastAndroid.SHORT);
       return false;
@@ -2174,7 +2189,9 @@ const Player = ({route}: Props): React.JSX.Element => {
     activeEpisode?.link,
     activeEpisode?.seasonNumber,
     activeEpisode?.title,
+    askWvcFallback,
     getCastSubtitleTracks,
+    handleWebVideoCasterCast,
     isStartingNativeCast,
     playbackRate,
     providerValue,
@@ -2197,23 +2214,6 @@ const Player = ({route}: Props): React.JSX.Element => {
   const handleNativeCast = useCallback(async () => {
     if (!selectedStream?.link) {
       ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
-      return;
-    }
-
-    if (hasStreamRequestHeaders(selectedStream)) {
-      Alert.alert(
-        t('Protected stream'),
-        t(
-          "Native Cast cannot forward this server's request headers. Open Web Video Caster instead?",
-        ),
-        [
-          {text: t('Cancel'), style: 'cancel'},
-          {
-            text: t('Open Web Video Caster'),
-            onPress: handleWebVideoCasterCast,
-          },
-        ],
-      );
       return;
     }
 
@@ -2302,6 +2302,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     }, 30000);
     return () => clearTimeout(timeout);
   }, [pendingNativeCast]);
+
+  useEffect(() => () => nativeCastPlaybackCleanupRef.current?.(), []);
 
   useEffect(() => {
     if (!remoteMediaClient) {

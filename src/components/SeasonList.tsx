@@ -82,6 +82,7 @@ import GoogleCast, {
   useRemoteMediaClient,
 } from 'react-native-google-cast';
 import {prepareNativeCastQueue} from '../lib/cast/nativeCast';
+import {observeNativeCastPlayback} from '../lib/cast/nativeCastPlayback';
 import {
   clearActiveVegaCastTracking,
   fetchVegaCastProgress,
@@ -874,6 +875,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     null,
   );
   const [isStartingNativeCast, setIsStartingNativeCast] = useState(false);
+  const nativeCastPlaybackCleanupRef = useRef<(() => void) | null>(null);
   const [isLoadingStreams, setIsLoadingStreams] = useState<boolean>(false);
   const [resumeProgress, setResumeProgress] = useState<ResumeProgress | null>(
     null,
@@ -1595,7 +1597,19 @@ const SeasonList: React.FC<SeasonListProps> = ({
           },
         });
 
+        nativeCastPlaybackCleanupRef.current?.();
         await remoteMediaClient.loadMedia(request);
+        nativeCastPlaybackCleanupRef.current = observeNativeCastPlayback(
+          remoteMediaClient,
+          stream.link,
+          () => {
+            askWvcFallback().then(async fallback => {
+              if (fallback) {
+                await openWebVideoCaster(stream);
+              }
+            });
+          },
+        );
         setShowServerModal(false);
         setPendingNativeCastStream(null);
         ToastAndroid.show(
@@ -1609,6 +1623,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
         }
         return true;
       } catch (error) {
+        nativeCastPlaybackCleanupRef.current?.();
+        nativeCastPlaybackCleanupRef.current = null;
         console.error('Native cast start failed from list:', error);
         ToastAndroid.show(t('Failed to start native cast'), ToastAndroid.SHORT);
         return false;
@@ -1620,12 +1636,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
     [
       activeSeason?.title,
       activeSeasonNumber,
+      askWvcFallback,
       externalPlayerContext?.currentEpisodeLink,
       externalPlayerContext?.episodeList,
       externalPlayerContext?.seasonNumber,
       externalPlayerContext?.seasonTitle,
       isStartingNativeCast,
       metaTitle,
+      openWebVideoCaster,
       poster?.background,
       poster?.poster,
       providerValue,
@@ -1647,23 +1665,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
       if (castProvider === 'wvc') {
         await openWebVideoCaster(stream);
-        return;
-      }
-
-      if (hasStreamRequestHeaders(stream)) {
-        Alert.alert(
-          t('Protected stream'),
-          t(
-            'Native Cast cannot forward this server\'s request headers. Open Web Video Caster instead?',
-          ),
-          [
-            {text: t('Cancel'), style: 'cancel'},
-            {
-              text: t('Open Web Video Caster'),
-              onPress: () => openWebVideoCaster(stream),
-            },
-          ],
-        );
         return;
       }
 
@@ -2091,6 +2092,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
     }, 30000);
     return () => clearTimeout(timeout);
   }, [pendingNativeCastStream]);
+
+  useEffect(() => () => nativeCastPlaybackCleanupRef.current?.(), []);
 
   // Memoized play handler
   const playHandler = useCallback(
