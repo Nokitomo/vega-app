@@ -4,9 +4,14 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
-  Platform,
   Alert,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {
+  HOME_FONT,
+  CATALOG_CARD_TITLE_STYLE,
+} from '../components/homePresentation';
+import usePosterGrid from '../components/usePosterGrid';
 import React, {useEffect, useState} from 'react';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -24,12 +29,14 @@ type Props = NativeStackScreenProps<WatchHistoryStackParamList, 'WatchHistory'>;
 const WatchHistory = ({navigation}: Props) => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
+  const grid = usePosterGrid();
   const insets = useSafeAreaInsets();
-  const {history, clearHistory, removeItemsByLinks, migrateDisplayTitles} = useWatchHistoryStore(
-    state => state,
-  );
+  const {history, clearHistory, removeItemsByLinks, migrateDisplayTitles} =
+    useWatchHistoryStore(state => state);
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedLinks, setSelectedLinks] = useState<Set<string>>(() => new Set());
+  const [selectedLinks, setSelectedLinks] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     migrateDisplayTitles().catch(error => {
@@ -48,7 +55,9 @@ const WatchHistory = ({navigation}: Props) => {
       return true;
     });
   }, [history]);
-  const selectedCount = uniqueHistory.filter(item => selectedLinks.has(item.link)).length;
+  const selectedCount = uniqueHistory.filter(item =>
+    selectedLinks.has(item.link),
+  ).length;
 
   const toggleSelection = (link: string) => {
     setSelectedLinks(current => {
@@ -77,8 +86,13 @@ const WatchHistory = ({navigation}: Props) => {
     Alert.alert(
       t('Delete selected'),
       links.length === 1
-        ? t('Delete the selected title? This also removes it from Continue Watching and deletes its progress.')
-        : t('Delete {{count}} selected titles? This also removes them from Continue Watching and deletes their progress.', {count: links.length}),
+        ? t(
+            'Delete the selected title? This also removes it from Continue Watching and deletes its progress.',
+          )
+        : t(
+            'Delete {{count}} selected titles? This also removes them from Continue Watching and deletes their progress.',
+            {count: links.length},
+          ),
       [
         {text: t('Cancel'), style: 'cancel'},
         {
@@ -96,7 +110,9 @@ const WatchHistory = ({navigation}: Props) => {
   const confirmClearHistory = () => {
     Alert.alert(
       t('Clear Watch History'),
-      t('Delete all watch history? This also clears Continue Watching and all saved progress.'),
+      t(
+        'Delete all watch history? This also clears Continue Watching and all saved progress.',
+      ),
       [
         {text: t('Cancel'), style: 'cancel'},
         {text: t('Clear All'), style: 'destructive', onPress: clearHistory},
@@ -127,7 +143,9 @@ const WatchHistory = ({navigation}: Props) => {
   };
 
   return (
-    <View className="flex-1 bg-black">
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={{flex: 1, backgroundColor: 'black'}}>
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -135,21 +153,29 @@ const WatchHistory = ({navigation}: Props) => {
       />
 
       <View
-        className="w-full bg-black"
+        className="flex-row justify-between items-center p-4"
         style={{
-          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-        }}
-      />
-
-      <View className="flex-row justify-between items-center p-4">
-        <Text className="text-white text-2xl font-bold">
+          flexWrap: 'wrap',
+          gap: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: '#23252b',
+        }}>
+        <Text
+          style={{fontFamily: HOME_FONT.heading, fontSize: 22, color: 'white'}}>
           {t('Watch History')}
         </Text>
         {uniqueHistory.length > 0 ? (
           <View className="flex-row items-center gap-2">
             <TouchableOpacity
-              onPress={selectionMode ? exitSelection : () => setSelectionMode(true)}
-              className="bg-white/10 px-3 py-1 rounded-full">
+              onPress={
+                selectionMode ? exitSelection : () => setSelectionMode(true)
+              }
+              className="px-3"
+              style={{
+                minHeight: 48,
+                justifyContent: 'center',
+                backgroundColor: '#23252b',
+              }}>
               <Text className="text-white">
                 {selectionMode ? t('Cancel') : t('Select')}
               </Text>
@@ -157,7 +183,12 @@ const WatchHistory = ({navigation}: Props) => {
             {!selectionMode ? (
               <TouchableOpacity
                 onPress={confirmClearHistory}
-                className="bg-white/10 px-3 py-1 rounded-full">
+                className="px-3"
+                style={{
+                  minHeight: 48,
+                  justifyContent: 'center',
+                  backgroundColor: '#23252b',
+                }}>
                 <Text className="text-white">{t('Clear')}</Text>
               </TouchableOpacity>
             ) : null}
@@ -165,197 +196,236 @@ const WatchHistory = ({navigation}: Props) => {
         ) : null}
       </View>
 
-      <FlashList
-        data={uniqueHistory}
-        extraData={{selectionMode, selectedLinks}}
-        estimatedItemSize={220}
-        numColumns={3}
-        ListEmptyComponent={() => (
-          <View className="flex-1 justify-center items-center mt-10">
-            <MaterialCommunityIcons name="history" size={80} color={primary} />
-            <Text className="text-white/70 text-base mt-4">
-              {t('No watch history')}
-            </Text>
-          </View>
-        )}
-        renderItem={({item}) => {
-          // Get the progress for this item
-          const progress = getWatchHistoryCardProgress(item);
-          const manuallyMarked = isLatestManualEpisodeMark(item);
-          const displayTitle = item.displayTitle || item.title;
-          const showItaBadge = hasItaBadge(displayTitle);
+      <View
+        testID="history-viewport"
+        onLayout={grid.onLayout}
+        style={{flex: 1, marginHorizontal: 10, paddingTop: 12}}>
+        {grid.ready && (
+          <FlashList
+            data={uniqueHistory}
+            extraData={{selectionMode, selectedLinks}}
+            estimatedItemSize={220}
+            numColumns={grid.columns}
+            key={grid.columns}
+            ListEmptyComponent={() => (
+              <View className="flex-1 justify-center items-center mt-10">
+                <MaterialCommunityIcons
+                  name="history"
+                  size={80}
+                  color={primary}
+                />
+                <Text className="text-white/70 text-base mt-4">
+                  {t('No watch history')}
+                </Text>
+              </View>
+            )}
+            renderItem={({item}) => {
+              // Get the progress for this item
+              const progress = getWatchHistoryCardProgress(item);
+              const manuallyMarked = isLatestManualEpisodeMark(item);
+              const displayTitle = item.displayTitle || item.title;
+              const showItaBadge = hasItaBadge(displayTitle);
 
-          return (
-            <View className="flex-1 m-1">
-              <TouchableOpacity
-                onPress={() => selectionMode
-                  ? toggleSelection(item.link)
-                  : handleNavigateToInfo(item)}
-                onLongPress={() => {
-                  if (!selectionMode) {
-                    setSelectionMode(true);
-                    setSelectedLinks(new Set([item.link]));
-                  }
-                }}
-                accessibilityLabel={selectionMode
-                  ? t('Select {{title}}', {title: displayTitle})
-                  : displayTitle}
-                accessibilityState={selectionMode
-                  ? {selected: selectedLinks.has(item.link)}
-                  : undefined}
-                activeOpacity={0.8}>
-                <View className="relative overflow-hidden">
-                  <Image
-                    source={{uri: item.poster}}
-                    className="w-full aspect-[2/3] rounded-lg"
-                  />
-                  {selectionMode ? (
-                    <View
-                      className="absolute top-2 right-2 rounded-full bg-black/75 p-1"
-                      style={{zIndex: 30}}>
-                      <MaterialCommunityIcons
-                        name={selectedLinks.has(item.link)
-                          ? 'checkbox-marked-circle'
-                          : 'checkbox-blank-circle-outline'}
-                        size={24}
-                        color={selectedLinks.has(item.link) ? primary : 'white'}
-                      />
-                    </View>
-                  ) : null}
-                  {showItaBadge ? (
-                    <View
-                      className="absolute top-2 left-2 rounded-full px-2 py-0.5"
-                      style={{backgroundColor: primary, zIndex: 15}}>
-                      <Text className="text-black text-[10px] font-semibold">
-                        {t('ITA')}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {/* Enhanced Progress Bar */}
-                  <View
-                    className="absolute bottom-0 left-0 right-0 h-2"
-                    style={{
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      zIndex: 10,
-                    }}>
-                    {/* Progress bar fill with gradient effect */}
-                    <View
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        height: '100%',
-                        width: `${progress}%`,
-                        backgroundColor: primary,
-                        zIndex: 20,
-                        shadowColor: primary,
-                        shadowOffset: {width: 0, height: 0},
-                        shadowOpacity: 0.5,
-                        shadowRadius: 3,
-                        elevation: 5,
-                      }}
-                    />
-                  </View>
-
-                  {/* Overlay gradient for better text readability */}
-                  {progress > 0 && (
-                    <View
-                      className="absolute bottom-0 left-0 right-0 h-16"
-                      style={{
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        zIndex: 10,
-                      }}
-                    />
-                  )}
-                  {/* IMPROVED percentage indicator with more visible fill */}
-                  {progress > 0 && progress < 100 && (
-                    <View
-                      className="absolute bottom-3 right-2"
-                      style={{
-                        zIndex: 15,
-                      }}>
-                      {/* Container with fixed width for consistent size */}
-                      <View
+              return (
+                <View
+                  style={{
+                    width: grid.cellWidth,
+                    paddingHorizontal: 6,
+                    marginBottom: 24,
+                  }}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      selectionMode
+                        ? toggleSelection(item.link)
+                        : handleNavigateToInfo(item)
+                    }
+                    onLongPress={() => {
+                      if (!selectionMode) {
+                        setSelectionMode(true);
+                        setSelectedLinks(new Set([item.link]));
+                      }
+                    }}
+                    accessibilityLabel={
+                      selectionMode
+                        ? t('Select {{title}}', {title: displayTitle})
+                        : displayTitle
+                    }
+                    accessibilityState={
+                      selectionMode
+                        ? {selected: selectedLinks.has(item.link)}
+                        : undefined
+                    }
+                    activeOpacity={0.8}>
+                    <View className="relative overflow-hidden">
+                      <Image
+                        source={{uri: item.poster}}
+                        resizeMode="cover"
                         style={{
-                          width: 45, // Fixed width for consistent sizing
-                          height: 18, // Fixed height
-                          backgroundColor: 'rgba(0,0,0,0.7)',
-                          borderRadius: 9,
-                          overflow: 'hidden',
-                          borderLeftWidth: 2,
-                          borderLeftColor: primary,
-                          flexDirection: 'row', // For horizontal layout
-                          alignItems: 'center', // Center text vertically
+                          width: grid.posterWidth,
+                          height: grid.posterWidth * 1.5,
+                          backgroundColor: '#23252b',
+                        }}
+                      />
+                      {selectionMode ? (
+                        <View
+                          className="absolute top-2 right-2 rounded-full bg-black/75 p-1"
+                          style={{zIndex: 30}}>
+                          <MaterialCommunityIcons
+                            name={
+                              selectedLinks.has(item.link)
+                                ? 'checkbox-marked-circle'
+                                : 'checkbox-blank-circle-outline'
+                            }
+                            size={24}
+                            color={
+                              selectedLinks.has(item.link) ? primary : 'white'
+                            }
+                          />
+                        </View>
+                      ) : null}
+                      {showItaBadge ? (
+                        <View
+                          className="absolute top-2 left-2 rounded-full px-2 py-0.5"
+                          style={{backgroundColor: primary, zIndex: 15}}>
+                          <Text className="text-black text-[10px] font-semibold">
+                            {t('ITA')}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {/* Enhanced Progress Bar */}
+                      <View
+                        className="absolute bottom-0 left-0 right-0 h-2"
+                        style={{
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          zIndex: 10,
                         }}>
-                        {/* More visible fill with primary color */}
+                        {/* Progress bar fill with gradient effect */}
                         <View
                           style={{
                             position: 'absolute',
                             left: 0,
                             top: 0,
-                            bottom: 0,
+                            height: '100%',
                             width: `${progress}%`,
-                            backgroundColor: `${primary}CC`, // More opaque primary color (80%)
+                            backgroundColor: primary,
+                            zIndex: 20,
+                            shadowColor: primary,
+                            shadowOffset: {width: 0, height: 0},
+                            shadowOpacity: 0.5,
+                            shadowRadius: 3,
+                            elevation: 5,
                           }}
                         />
-
-                        {/* Percentage text always centered */}
-                        <Text
-                          className="text-white text-[10px] font-medium w-full text-center"
-                          style={{
-                            textShadowColor: 'rgba(0,0,0,0.9)',
-                            textShadowRadius: 3,
-                            textShadowOffset: {width: 0, height: 0},
-                            zIndex: 20, // Ensure text is on top
-                          }}>
-                          {Math.round(progress)}%
-                        </Text>
                       </View>
-                    </View>
-                  )}
 
-                  {/* Checkmark overlay when progress is 100% */}
-                  {progress >= 100 && (
-                    <View
-                      className="absolute top-2 right-2 p-1 rounded-full"
-                      style={{
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        borderWidth: 1.5,
-                        borderColor: primary,
-                        zIndex: 15,
-                      }}>
-                      <MaterialCommunityIcons
-                        name="check-circle"
-                        size={18}
-                        color={primary}
-                      />
+                      {/* Overlay gradient for better text readability */}
+                      {progress > 0 && (
+                        <View
+                          className="absolute bottom-0 left-0 right-0 h-16"
+                          style={{
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            zIndex: 10,
+                          }}
+                        />
+                      )}
+                      {/* IMPROVED percentage indicator with more visible fill */}
+                      {progress > 0 && progress < 100 && (
+                        <View
+                          className="absolute bottom-3 right-2"
+                          style={{
+                            zIndex: 15,
+                          }}>
+                          {/* Container with fixed width for consistent size */}
+                          <View
+                            style={{
+                              width: 45, // Fixed width for consistent sizing
+                              height: 18, // Fixed height
+                              backgroundColor: 'rgba(0,0,0,0.7)',
+                              borderRadius: 9,
+                              overflow: 'hidden',
+                              borderLeftWidth: 2,
+                              borderLeftColor: primary,
+                              flexDirection: 'row', // For horizontal layout
+                              alignItems: 'center', // Center text vertically
+                            }}>
+                            {/* More visible fill with primary color */}
+                            <View
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                bottom: 0,
+                                width: `${progress}%`,
+                                backgroundColor: `${primary}CC`, // More opaque primary color (80%)
+                              }}
+                            />
+
+                            {/* Percentage text always centered */}
+                            <Text
+                              className="text-white text-[10px] font-medium w-full text-center"
+                              style={{
+                                textShadowColor: 'rgba(0,0,0,0.9)',
+                                textShadowRadius: 3,
+                                textShadowOffset: {width: 0, height: 0},
+                                zIndex: 20, // Ensure text is on top
+                              }}>
+                              {Math.round(progress)}%
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Checkmark overlay when progress is 100% */}
+                      {progress >= 100 && (
+                        <View
+                          className="absolute top-2 right-2 p-1 rounded-full"
+                          style={{
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            borderWidth: 1.5,
+                            borderColor: primary,
+                            zIndex: 15,
+                          }}>
+                          <MaterialCommunityIcons
+                            name="check-circle"
+                            size={18}
+                            color={primary}
+                          />
+                        </View>
+                      )}
                     </View>
-                  )}
+
+                    <Text
+                      numberOfLines={3}
+                      style={{...CATALOG_CARD_TITLE_STYLE, color: 'white'}}>
+                      {displayTitle}
+                    </Text>
+                    {item.episodeTitle && (
+                      <Text numberOfLines={1} className="text-white/60 text-xs">
+                        {item.episodeTitle}
+                      </Text>
+                    )}
+                    {manuallyMarked && (
+                      <Text numberOfLines={1} className="text-white/60 text-xs">
+                        {t('Marked as watched manually')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-
-                <Text numberOfLines={2} className="text-white text-sm mt-1">
-                  {displayTitle}
-                </Text>
-                {item.episodeTitle && (
-                  <Text numberOfLines={1} className="text-white/60 text-xs">
-                    {item.episodeTitle}
-                  </Text>
-                )}
-                {manuallyMarked && (
-                  <Text numberOfLines={1} className="text-white/60 text-xs">
-                    {t('Marked as watched manually')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          );
-        }}
-      />
+              );
+            }}
+          />
+        )}
+      </View>
       {selectionMode ? (
         <View
           className="flex-row items-center justify-between border-t border-white/15 bg-black px-4 pt-3"
-          style={{paddingBottom: Math.max(12, insets.bottom), marginBottom: 55}}>
+          style={{
+            paddingBottom: Math.max(12, insets.bottom),
+            marginBottom: 0,
+            flexWrap: 'wrap',
+            gap: 12,
+          }}>
           <Text className="text-white">
             {selectedCount === 1
               ? t('One selected')
@@ -366,11 +436,13 @@ const WatchHistory = ({navigation}: Props) => {
             disabled={selectedCount === 0}
             className="rounded-lg px-4 py-2"
             style={{backgroundColor: selectedCount > 0 ? primary : '#404040'}}>
-            <Text className="font-semibold text-black">{t('Delete selected')}</Text>
+            <Text className="font-semibold text-black">
+              {t('Delete selected')}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 };
 
