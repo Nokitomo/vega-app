@@ -3031,16 +3031,19 @@ const SeasonList: React.FC<SeasonListProps> = ({
       <View>
         <InfoSeasonPicker items={linkListWithDisplayTitle} selected={activeSeasonValue} onSelect={handleSeasonChange} />
 
-        <View
-          style={{
-            width: '100%',
-            padding: 10,
-            alignItems: 'flex-start',
-            gap: 20,
-          }}>
-          {[...Array(6)].map((_, index) => (
-            <SkeletonLoader key={index} show={true} height={48} width={'85%'} />
+        <View accessible accessibilityLabel={t('Loading episodes...')} accessibilityState={{busy: true}}>
+          <View pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {[0, 1, 2].map(index => (
+            <View key={index} style={{flexDirection: 'row', gap: 12, paddingVertical: 12}}>
+              <SkeletonLoader height={90} width="40%" style={{maxWidth: 160}} />
+              <View style={{flex: 1}}>
+                <SkeletonLoader height={16} width="50%" />
+                <SkeletonLoader height={24} width="90%" />
+                <SkeletonLoader height={16} width="80%" />
+              </View>
+            </View>
           ))}
+          </View>
         </View>
       </View>
     );
@@ -3049,14 +3052,16 @@ const SeasonList: React.FC<SeasonListProps> = ({
   // Show error state
   if (episodeError && episodeList.length === 0) {
     return (
-      <View className="p-4">
-        <Text className="text-red-500 text-center">
+      <View style={{paddingVertical: 24, gap: 16}}>
+        <InfoSeasonPicker items={linkListWithDisplayTitle} selected={activeSeasonValue} onSelect={handleSeasonChange} />
+        <Text accessibilityLiveRegion="polite" style={{color: '#a0a0a8', fontFamily: HOME_FONT.regular, textAlign: 'center'}}>
           {t('Failed to load episodes. Please try again.')}
         </Text>
         <TouchableOpacity
-          className="mt-2 bg-red-600 p-2 rounded-md"
+          accessibilityRole="button" disabled={episodeFetching} accessibilityState={{busy: episodeFetching, disabled: episodeFetching}}
+          style={{backgroundColor: primary, minHeight: 48, justifyContent: 'center', padding: 12, opacity: episodeFetching ? 0.5 : 1}}
           onPress={() => refetchEpisodes()}>
-          <Text className="text-white text-center">{t('Retry')}</Text>
+          <Text style={{color: 'black', fontFamily: HOME_FONT.bold, textAlign: 'center'}}>{t('Retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -3105,12 +3110,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
         <View className="flex-row justify-between items-center mt-2">
           <TextInput
             placeholder={t('Search...')}
-            className="bg-black/30 text-white rounded-md p-2 h-10 w-[80%] border-collapse border border-white/10"
+            accessibilityLabel={t('Search episodes')} placeholderTextColor="#a0a0a8"
+            style={{color: 'white', flex: 1, minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#23252b', fontFamily: HOME_FONT.regular}}
             value={searchText}
             onChangeText={setSearchText}
           />
           <TouchableOpacity
-            className="bg-black/30 rounded-md p-2 h-10 w-[15%] flex-row justify-center items-center"
+            accessibilityRole="button" accessibilityLabel={t(sortOrder === 'asc' ? 'Sort newest first' : 'Sort oldest first')}
+            style={{width: 56, minHeight: 48, alignItems: 'center', justifyContent: 'center'}}
             onPress={toggleSortOrder}>
             <MaterialCommunityIcons
               name={sortOrder === 'asc' ? 'sort-ascending' : 'sort-descending'}
@@ -3187,9 +3194,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
         {/* No Content Available */}
         {filteredAndSortedEpisodes.length === 0 &&
           filteredAndSortedDirectLinks.length === 0 && (
-            <View className="w-full min-h-20 items-center justify-center px-4">
+            <View accessibilityLiveRegion="polite" style={{width: '100%', minHeight: 100, alignItems: 'center', justifyContent: 'center', padding: 16}}>
               <Text className="text-white text-lg font-semibold text-center">
-                {noContentMessage}
+                {searchText.trim() ? t('No matching episodes') : noContentMessage}
               </Text>
               {activeSeasonValue?.availabilityStatus === 'upcoming' &&
               upcomingMessage ? (

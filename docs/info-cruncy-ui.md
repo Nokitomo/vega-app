@@ -119,3 +119,47 @@ confermata per un blocco dell'emulatore anche sui comandi ADB. La riproduzione
 era stata osservata al passaggio 3; nessuna modifica al player in questo punto.
 Metro in watch mode ha avuto un errore infrastrutturale; riavviato in modalita
 CI senza watcher per caricare il bundle aggiornato, senza cambiare configurazioni.
+
+## Passaggio 6: stati e responsive
+
+Caricamento iniziale non interattivo con scheletro, etichetta accessibile e X
+sempre disponibile. Scheletro episodi allineato alle nuove righe; errori con
+accento del tema e retry disabilitato durante la richiesta. Il selettore stagioni
+resta disponibile in caso di errore episodi. Ricerca senza corrispondenze distinta
+dal catalogo senza stream; ricerca e ordinamento hanno etichette accessibili e
+target di almeno 48 dp. Nessuna modifica a richieste, retry di rete o metadata.
+
+Colonna centrale e azioni limitate a 840 dp sui tablet, sfondo nero a tutta
+larghezza sotto il hero. Il test tablet ha rilevato e permesso di correggere
+strisce della copertina ai lati della colonna durante lo scroll. Transizione
+toolbar anticipata per evitare la sovrapposizione con il logo; reset di scroll
+animato e stato CTA quando caricamento iniziale/errore smontano la lista.
+
+Verifiche Android con StreamingUnity:
+- Medium_Phone_API_35: Dexter, testo al 150%, righe ad altezza variabile, barra
+  Riprendi leggibile, ricerca senza risultati e toolbar durante scorrimento.
+- Medium_Tablet_API_35: Breaking Bad e Lupin; verticale/orizzontale, passaggio
+  da tab inferiori a rail laterale, picker e selezione stagione 4, righe e barra
+  azioni entro i margini, senza strisce laterali dopo la correzione.
+- Caricamento iniziale reale osservato sul tablet. Errore Info simulato solo
+  nello stato React Query in memoria (data null/status error), senza modificare
+  provider o storage persistente; Riprova ha recuperato il contenuto reale.
+- TypeScript e lint puliti. 46 test mirati su artworkSelection,
+  EpisodeMetadata, adaptiveNavigation, episodesThroughTarget e continueWatchingFixes.
+
+Evidenze locali nella cartella indicata sopra: `step6-large-episodes.png`,
+`step6-empty-back.png`, `step6-tablet-hero-detail.png` (caricamento reale),
+`step6-tablet-portrait.png`, `step6-tablet-picker.png`,
+`step6-tablet-landscape-final.png`, `step6-error-sim.png`, `step6-retry-result.png`.
+I primi tentativi di simulazione sul telefono non hanno prodotto uno stato
+visibile attendibile e non sono conteggiati come test superati.
+Ripetuto errore/riprova sul bundle finale: query tornata success con dati reali
+e toolbar trasparente dopo il recupero (`step6-toolbar-recovered.png`).
+Ripristinate le preferenze di rotazione tablet precedenti e la scala testo del
+telefono. Screenshot e script diagnostici restano fuori Git su D:.
+
+Limiti: iOS non verificato in questo ambiente; AnimeUnity indisponibile e quindi
+non usato per test remoti. Player e download end-to-end non certificati da questo
+intervento UI; resta il blocco emulatore descritto al punto 5. Gli stati e le
+funzioni esclusivi di Crunchyroll non presenti in Vega non vengono aggiunti.
+La copertura non equivale a una garanzia di assenza di bug su ogni dispositivo.

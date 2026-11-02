@@ -137,7 +137,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     return Math.round(width * (isTabletDevice ? 9 / 16 : 3 / 2));
   }, [contentWidth, isTabletDevice]);
   const toolbarOpacity = scrollY.interpolate({
-    inputRange: [Math.max(0, infoHeaderHeight - 160), Math.max(1, infoHeaderHeight - 64)],
+    inputRange: [Math.max(0, infoHeaderHeight - insets.top - 260), Math.max(1, infoHeaderHeight - insets.top - 180)],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
@@ -156,6 +156,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     repairInfo,
     check,
   } = useContentDetails(activeLink, providerValue);
+  useEffect(() => {
+    if (error || (infoLoading && !info)) {
+      // The list unmounts in these states: reset its animated toolbar as well.
+      scrollY.setValue(0);
+      setPlaybackAction(null);
+    }
+  }, [error, infoLoading, info, scrollY]);
   useEffect(() => {
     markPerfNavigationStage('info_mounted');
     perfTrace('info_opened', {provider: providerValue, cacheHit: !!info});
@@ -749,34 +756,59 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     );
   }, [infoStack, navigation]);
 
+  // Initial loading is non-interactive; closing the screen remains available.
+  if (infoLoading && !info) {
+    return (
+      <View style={{flex: 1, backgroundColor: 'black', paddingTop: insets.top}}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
+          onPress={handleClose} style={{width: 56, height: 56, alignItems: 'center', justifyContent: 'center'}}>
+          <Ionicons name="close" size={28} color="white" />
+        </TouchableOpacity>
+        <ScrollView contentContainerStyle={{padding: 16, width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+          <View accessible accessibilityLabel={t('Loading content')} accessibilityState={{busy: true}}>
+            <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden pointerEvents="none">
+              <SkeletonLoader height={Math.min(360, infoHeaderHeight / 2)} width="100%" />
+              <SkeletonLoader height={28} width="65%" />
+              <SkeletonLoader height={16} width="90%" />
+              <SkeletonLoader height={16} width="80%" />
+              <SkeletonLoader height={90} width="100%" />
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   // Error handling - show error UI instead of throwing
   if (error) {
     return (
-      <View className="h-full w-full bg-black justify-center items-center p-4">
+      <ScrollView style={{flex: 1, backgroundColor: 'black'}} contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24}}>
         <StatusBar
           showHideTransition={'slide'}
           animated={true}
           translucent={true}
           backgroundColor="black"
         />
-        <Text className="text-red-400 text-lg font-bold mb-4 text-center">
+        <Text accessibilityRole="header" style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 20, textAlign: 'center', marginBottom: 16}}>
           {t('Failed to load content')}
         </Text>
-        <Text className="text-gray-400 text-sm mb-6 text-center">
+        <Text style={{color: '#a0a0a8', fontFamily: HOME_FONT.regular, fontSize: 14, textAlign: 'center', marginBottom: 24, maxWidth: 640}}>
           {error.message ||
             t('An unexpected error occurred while loading the content')}
         </Text>
         <TouchableOpacity
+          accessibilityRole="button" disabled={refreshing} accessibilityState={{disabled: refreshing, busy: refreshing}}
           onPress={handleRefresh}
-          className="bg-red-600 px-6 py-3 rounded-lg mb-4">
-          <Text className="text-white font-semibold">{t('Try Again')}</Text>
+          style={{backgroundColor: primary, minHeight: 48, justifyContent: 'center', padding: 16, marginBottom: 12, opacity: refreshing ? 0.5 : 1}}>
+          <Text style={{color: 'black', fontFamily: HOME_FONT.bold}}>{t('Try Again')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="bg-gray-600 px-6 py-3 rounded-lg">
-          <Text className="text-white font-semibold">{t('Go Back')}</Text>
+          accessibilityRole="button" onPress={() => navigation.goBack()}
+          style={{minHeight: 48, justifyContent: 'center', padding: 16}}>
+          <Text style={{color: 'white', fontFamily: HOME_FONT.medium}}>{t('Go Back')}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -902,7 +934,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     )}
                   </View>
                 </View>
-                <View className="p-4 bg-black">
+                <View style={{backgroundColor: 'black', width: '100%'}}>
+                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: 840, alignSelf: 'center'}}>
                   {variants.length > 1 ? (
                     <View className="mb-4">
                       <Text className="text-gray-300 text-xs mb-2">
@@ -1158,7 +1191,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                   </Modal>
                   {/* cast */}
                 </View>
-                <View className="p-4 bg-black">
+                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: 840, alignSelf: 'center'}}>
                   {infoLoading ? (
                     <View className="gap-y-3 items-start mb-4 p-3">
                       <SkeletonLoader show={true} height={30} width={80} />
@@ -1226,7 +1259,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       {infoView === 'related' && (
                         <View className="gap-3">
                           {relatedItems.length === 0 ? (
-                            <Text className="text-gray-400 text-xs">
+                            <Text accessibilityLiveRegion="polite" style={{color: '#a0a0a8', fontFamily: HOME_FONT.regular, fontSize: 14, textAlign: 'center', paddingVertical: 32}}>
                               {t('No related items available.')}
                             </Text>
                           ) : (
@@ -1295,9 +1328,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </>
                   )}
                 </View>
+                </View>
               </>
             }
-            ListFooterComponent={<View className="h-16" />}
+            ListFooterComponent={<View style={{height: 64, backgroundColor: 'black'}} />}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
             onScroll={Animated.event([{nativeEvent: {contentOffset: {y: scrollY}}}], {useNativeDriver: true})}
@@ -1313,7 +1347,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             }
           />
           {!infoLoading && info ? (
-            <View style={{backgroundColor: '#141519', padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12}}>
+            <View style={{backgroundColor: '#141519', paddingVertical: 16, paddingHorizontal: Math.max(16, (contentWidth - 808) / 2), flexDirection: 'row', alignItems: 'center', gap: 12}}>
               <TouchableOpacity accessibilityRole="button"
                 accessibilityState={{disabled: !playbackAction?.available, busy: playbackAction?.loading}}
                 disabled={!playbackAction?.available}
