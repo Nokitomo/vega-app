@@ -101,3 +101,21 @@ Breaking Bad, apertura dai risultati, picker con cinque stagioni, selezione
 stagione 2 e verifica episodi (Tutto cambia, Grigliato). Passaggio Correlati /
 Episodi conserva stagione 2; riapertura e Back chiudono senza cambiare scelta.
 Evidenze `step4-picker.png`, `step4-season2.png`, `step4-season2-rows.png`.
+
+## Passaggio 5: righe episodi
+
+Miniature 16:9 fino a 160 dp, numero episodio, titolo e sinossi con font Home.
+Download e menu esplicito sono azioni separate dal target di riproduzione;
+il menu richiama le azioni esistenti, disponibili anche con pressione lunga.
+Fallback senza miniatura, filler, progressi e controller restano invariati.
+Rimosso il calcolo fisso di altezza dei link diretti, ora ad altezza variabile.
+
+TypeScript, lint e tre test EpisodeMetadata superati. StreamingUnity sul telefono:
+numero e titolo visibili, ordinamento crescente/decrescente, menu episodio e
+selettore server download verificati; nessun download avviato. Evidenze
+`step5-fresh-rows.png`, `step5-options.png`, `step5-download.png`, `step5-sort.png`.
+Il tap della miniatura apre il player; la successiva riproduzione non e stata
+confermata per un blocco dell'emulatore anche sui comandi ADB. La riproduzione
+era stata osservata al passaggio 3; nessuna modifica al player in questo punto.
+Metro in watch mode ha avuto un errore infrastrutturale; riavviato in modalita
+CI senza watcher per caricare il bundle aggiornato, senza cambiare configurazioni.

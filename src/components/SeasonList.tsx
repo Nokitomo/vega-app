@@ -2743,9 +2743,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
         fillerEpisodeNumber != null &&
         fillerEpisodes.has(fillerEpisodeNumber);
       const metadataLabel = episodeLabel;
-      const hasExtendedMetadata = !!(
-        item.thumbnail?.trim() || item.synopsis?.trim()
-      );
 
       return (
         <View
@@ -2757,11 +2754,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
               : ''
           }
         `}>
-          <View className="flex-row w-full justify-between gap-2 items-center">
+          <View style={{width: '100%', borderBottomWidth: 1, borderBottomColor: '#23252b', paddingBottom: 8}}>
             <TouchableOpacity
-              className={`rounded-md bg-white/30 w-[80%] items-center flex-row gap-x-2 relative justify-start ${
-                hasExtendedMetadata ? 'min-h-20 p-2' : 'h-12 p-1'
-              }`}
+              accessibilityRole="button"
+              style={{width: '100%', minHeight: 64, paddingVertical: 8, flexDirection: 'row', gap: 12, alignItems: 'flex-start'}}
               onPress={() =>
                 playHandler({
                   linkIndex: index,
@@ -2802,7 +2798,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 </View>
               ) : null}
             </TouchableOpacity>
-            <Downloader
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8}}>
+            <Downloader flat
               providerValue={providerValue}
               link={item.link}
               type={type}
@@ -2817,6 +2814,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 item.title
               ).replaceAll(/[^a-zA-Z0-9]/g, '_')}
             />
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Episode options')}
+              onPress={() => onLongPressHandler(true, item.link, 'series')}
+              style={{width: 48, height: 48, alignItems: 'center', justifyContent: 'center'}}>
+              <MaterialCommunityIcons name="dots-vertical" size={24} color="#c1c4c9" />
+            </TouchableOpacity>
+            </View>
           </View>
         </View>
       );
@@ -2870,9 +2873,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
               : ''
           }
         `}>
-          <View className="flex-row w-full justify-between gap-2 items-center">
+          <View style={{width: '100%', borderBottomWidth: 1, borderBottomColor: '#23252b', paddingBottom: 8}}>
             <TouchableOpacity
-              className="rounded-md bg-white/30 w-[80%] h-12 items-center p-2 flex-row gap-x-2 relative justify-start"
+              accessibilityRole="button" style={{width: '100%', minHeight: 56, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 12}}
               onPress={() =>
                 playHandler({
                   linkIndex: index,
@@ -2926,7 +2929,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 </View>
               ) : null}
             </TouchableOpacity>
-            <Downloader
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8}}>
+            <Downloader flat
               providerValue={providerValue}
               link={item.link}
               type={type}
@@ -2941,6 +2945,12 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 item.title
               ).replaceAll(/[^a-zA-Z0-9]/g, '_')}
             />
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Episode options')}
+              onPress={() => onLongPressHandler(true, item.link, item?.type || 'series')}
+              style={{width: 48, height: 48, alignItems: 'center', justifyContent: 'center'}}>
+              <MaterialCommunityIcons name="dots-vertical" size={24} color="#c1c4c9" />
+            </TouchableOpacity>
+            </View>
           </View>
         </View>
       );
@@ -3170,11 +3180,6 @@ const SeasonList: React.FC<SeasonListProps> = ({
               maxToRenderPerBatch={10}
               windowSize={10}
               removeClippedSubviews={true}
-              getItemLayout={(data, index) => ({
-                length: 68,
-                offset: 68 * index,
-                index,
-              })}
             />
           </View>
         )}

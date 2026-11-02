@@ -36,12 +36,14 @@ const DownloadComponent = ({
   type,
   providerValue,
   title,
+  flat = false,
 }: {
   link: string;
   fileName: string;
   type: string;
   providerValue: string;
   title: string;
+  flat?: boolean;
 }) => {
   const {primary} = useThemeStore(state => state);
   const {provider} = useContentStore(state => state);
@@ -178,7 +180,7 @@ const DownloadComponent = ({
 
   return (
     <>
-      <View className="flex-row items-center mt-1 justify-between rounded-full bg-white/30 p-1">
+      <View className={flat ? 'flex-row items-center justify-center' : 'flex-row items-center mt-1 justify-between rounded-full bg-white/30 p-1'}>
         {downloadActive ? (
           <Animated.View
             style={[
@@ -221,7 +223,9 @@ const DownloadComponent = ({
               }
               setLongPressModal(true);
             }}
-            className="mx-2">
+            accessibilityRole="button" accessibilityLabel={t('Download')}
+            style={flat ? {width: 48, height: 48, alignItems: 'center', justifyContent: 'center'} : undefined}
+            className={flat ? undefined : 'mx-2'}>
             <Octicons name="download" size={25} color="#c1c4c9" />
           </TouchableOpacity>
         )}
