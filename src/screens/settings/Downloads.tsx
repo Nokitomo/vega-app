@@ -1,4 +1,14 @@
-import {View, Text, Image, Platform, TouchableOpacity} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
+import {
+  View,
+  Text,
+  Image,
+  Platform,
+  TouchableOpacity,
+  useWindowDimensions,
+  ActivityIndicator,
+} from 'react-native';
 import requestStoragePermission from '../../lib/file/getStoragePermission';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -201,6 +211,8 @@ const Downloads = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {t} = useTranslation();
+  const {width} = useWindowDimensions();
+  const thumbnailWidth = Math.min(180, Math.max(88, width * 0.34));
 
   const loadData = useCallback(async () => {
     const downloadLocation = settingsStorage.getDownloadLocationConfig();
@@ -310,7 +322,9 @@ const Downloads = () => {
           const mergedThumbnails = {...thumbnails, ...newThumbnails};
           downloadsStorage.saveThumbnails(
             mergedThumbnails,
-            serializeDownloadLocation(settingsStorage.getDownloadLocationConfig()),
+            serializeDownloadLocation(
+              settingsStorage.getDownloadLocationConfig(),
+            ),
           );
           setThumbnails(mergedThumbnails);
         }
@@ -448,173 +462,193 @@ const Downloads = () => {
   };
 
   return (
-    <View className="mt-14 px-2 w-full h-full">
-      <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-2xl">{t('Downloads')}</Text>
-        <View className="flex-row gap-x-7 items-center">
-          {isSelecting && (
-            <MaterialCommunityIcons
-              name="close"
-              size={28}
-              color={primary}
-              onPress={() => {
-                setGroupSelected([]);
-                setIsSelecting(false);
-              }}
-            />
-          )}
-          {isSelecting && groupSelected.length > 0 && (
-            <MaterialCommunityIcons
-              name="delete-outline"
-              size={28}
-              color={primary}
-              onPress={deleteFiles}
-            />
-          )}
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <View className="flex-1 px-4">
+        <View className="flex-row justify-between items-center py-4 border-b border-[#23252b] mb-3">
+          <Text style={settingsPresentation.title} className="text-2xl">
+            {t('Downloads')}
+          </Text>
+          <View className="flex-row gap-x-7 items-center">
+            {isSelecting && (
+              <MaterialCommunityIcons
+                name="close"
+                size={28}
+                color={primary}
+                onPress={() => {
+                  setGroupSelected([]);
+                  setIsSelecting(false);
+                }}
+              />
+            )}
+            {isSelecting && groupSelected.length > 0 && (
+              <MaterialCommunityIcons
+                name="delete-outline"
+                size={28}
+                color={primary}
+                onPress={deleteFiles}
+              />
+            )}
+          </View>
         </View>
-      </View>
 
-      <FlashList
-        data={groupMediaFiles}
-        extraData={{isSelecting, groupSelected}}
-        estimatedItemSize={100}
-        keyExtractor={item => getGroupKey(item)}
-        ListEmptyComponent={() =>
-          !loading && (
-            <View className="flex-1 justify-center items-center mt-10">
-              <Text className="text-center text-lg">
-                {t('Looks Empty Here!')}
-              </Text>
-            </View>
-          )
-        }
-        renderItem={({item}) => (
-          <TouchableOpacity
-            className={`flex-row w-full p-2 mb-2 rounded-lg overflow-hidden items-center ${
-              isSelecting && isGroupSelected(item)
-                ? 'bg-quaternary'
-                : 'bg-transparent'
-            }`}
-            style={{
-              borderColor:
-                isSelecting && isGroupSelected(item) ? primary : 'transparent',
-              borderWidth: isSelecting && isGroupSelected(item) ? 1 : 0,
-            }}
-            onLongPress={() => {
-              if (settingsStorage.isHapticFeedbackEnabled()) {
-                RNReactNativeHapticFeedback.trigger('effectTick', {
-                  enableVibrateFallback: true,
-                  ignoreAndroidSystemSettings: false,
-                });
-              }
-              setGroupSelected(getGroupUris(item));
-              setIsSelecting(true);
-            }}
-            onPress={() => {
-              if (isSelecting) {
+        <FlashList
+          data={groupMediaFiles}
+          extraData={{isSelecting, groupSelected}}
+          estimatedItemSize={120}
+          contentContainerStyle={{paddingBottom: 24}}
+          keyExtractor={item => getGroupKey(item)}
+          ListEmptyComponent={() =>
+            loading ? (
+              <ActivityIndicator color={primary} style={{marginTop: 40}} />
+            ) : (
+              <View className="flex-1 justify-center items-center mt-10">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-center text-lg text-white/70">
+                  {t('Looks Empty Here!')}
+                </Text>
+              </View>
+            )
+          }
+          renderItem={({item}) => (
+            <TouchableOpacity
+              className={`flex-row w-full py-3 mb-2 border-b border-[#23252b] overflow-hidden items-center ${
+                isSelecting && isGroupSelected(item)
+                  ? 'bg-quaternary'
+                  : 'bg-transparent'
+              }`}
+              style={{
+                borderColor:
+                  isSelecting && isGroupSelected(item)
+                    ? primary
+                    : 'transparent',
+                borderWidth: isSelecting && isGroupSelected(item) ? 1 : 0,
+              }}
+              onLongPress={() => {
                 if (settingsStorage.isHapticFeedbackEnabled()) {
                   RNReactNativeHapticFeedback.trigger('effectTick', {
                     enableVibrateFallback: true,
                     ignoreAndroidSystemSettings: false,
                   });
                 }
-                toggleGroupSelection(item);
-              } else {
-                // Direct play for movies, navigate to episodes for series
-                if (item.isMovie) {
-                  const file = item.episodes[0];
-                  const fileName = getFileName(file);
-                  navigation.navigate('Player', {
-                    episodeList: [{title: fileName, link: file.uri}],
-                    linkIndex: 0,
-                    type: '',
-                    directUrl: file.uri,
-                    primaryTitle: item.title,
-                    poster: {},
-                    providerValue: 'vega',
-                    doNotTrack: true,
-                  });
+                setGroupSelected(getGroupUris(item));
+                setIsSelecting(true);
+              }}
+              onPress={() => {
+                if (isSelecting) {
+                  if (settingsStorage.isHapticFeedbackEnabled()) {
+                    RNReactNativeHapticFeedback.trigger('effectTick', {
+                      enableVibrateFallback: true,
+                      ignoreAndroidSystemSettings: false,
+                    });
+                  }
+                  toggleGroupSelection(item);
                 } else {
-                  navigation.navigate('TabStack', {
-                    screen: 'SettingsStack',
-                    params: {
-                      screen: 'WatchHistoryStack',
+                  // Direct play for movies, navigate to episodes for series
+                  if (item.isMovie) {
+                    const file = item.episodes[0];
+                    const fileName = getFileName(file);
+                    navigation.navigate('Player', {
+                      episodeList: [{title: fileName, link: file.uri}],
+                      linkIndex: 0,
+                      type: '',
+                      directUrl: file.uri,
+                      primaryTitle: item.title,
+                      poster: {},
+                      providerValue: 'vega',
+                      doNotTrack: true,
+                    });
+                  } else {
+                    navigation.navigate('TabStack', {
+                      screen: 'SettingsStack',
                       params: {
-                        screen: 'SeriesEpisodes',
+                        screen: 'WatchHistoryStack',
                         params: {
-                          episodes: item.episodes as any,
-                          series: item.title,
-                          thumbnails: thumbnails,
+                          screen: 'SeriesEpisodes',
+                          params: {
+                            episodes: item.episodes as any,
+                            series: item.title,
+                            thumbnails: thumbnails,
+                          },
                         },
                       },
-                    },
-                  });
+                    });
+                  }
                 }
-              }
-            }}>
-            <View className="w-40 aspect-video rounded-md overflow-hidden bg-quaternary mr-3 relative">
-              {item.thumbnail ? (
-                <Image
-                  source={{uri: item.thumbnail}}
-                  className="w-full h-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <View className="w-full h-full items-center justify-center">
-                  <MaterialCommunityIcons
-                    name="movie-open-outline"
-                    size={32}
-                    color={primary}
+              }}>
+              <View
+                style={{width: thumbnailWidth, aspectRatio: 16 / 9}}
+                className="overflow-hidden bg-[#23252b] mr-3 relative">
+                {item.thumbnail ? (
+                  <Image
+                    source={{uri: item.thumbnail}}
+                    className="w-full h-full"
+                    resizeMode="cover"
                   />
-                </View>
-              )}
-              {item.isIta ? (
-                <View
-                  className="absolute top-2 left-2 rounded-full px-2 py-0.5"
-                  style={{backgroundColor: primary}}>
-                  <Text className="text-black text-[10px] font-semibold">
-                    {t('ITA')}
-                  </Text>
-                </View>
-              ) : null}
-              {isSelecting && (
-                <>
-                  {isGroupSelected(item) && (
-                    <View className="absolute inset-0 bg-black/40" />
-                  )}
-                  <View className="absolute top-2 right-2 bg-black/70 rounded-full p-1">
+                ) : (
+                  <View className="w-full h-full items-center justify-center">
                     <MaterialCommunityIcons
-                      name={
-                        isGroupSelected(item)
-                          ? 'check-circle'
-                          : 'checkbox-blank-circle-outline'
-                      }
-                      size={20}
-                      color={isGroupSelected(item) ? primary : 'white'}
+                      name="movie-open-outline"
+                      size={32}
+                      color={primary}
                     />
                   </View>
-                </>
-              )}
-            </View>
+                )}
+                {item.isIta ? (
+                  <View
+                    className="absolute top-2 left-2 rounded-full px-2 py-0.5"
+                    style={{backgroundColor: primary}}>
+                    <Text
+                      style={settingsPresentation.bold}
+                      className="text-black text-[10px] font-semibold">
+                      {t('ITA')}
+                    </Text>
+                  </View>
+                ) : null}
+                {isSelecting && (
+                  <>
+                    {isGroupSelected(item) && (
+                      <View className="absolute inset-0 bg-black/40" />
+                    )}
+                    <View className="absolute top-2 right-2 bg-black/70 rounded-full p-1">
+                      <MaterialCommunityIcons
+                        name={
+                          isGroupSelected(item)
+                            ? 'check-circle'
+                            : 'checkbox-blank-circle-outline'
+                        }
+                        size={20}
+                        color={isGroupSelected(item) ? primary : 'white'}
+                      />
+                    </View>
+                  </>
+                )}
+              </View>
 
-            <View className="flex-1 justify-center">
-              <Text
-                className="text-white font-semibold text-lg mb-1"
-                numberOfLines={2}>
-                {item.title}
-              </Text>
-              {!item.isMovie && (
-                <Text className="text-gray-400 text-sm">
-                  {item.episodes.length === 1
-                    ? t('{{count}} episode', {count: item.episodes.length})
-                    : t('{{count}} episodes', {count: item.episodes.length})}
+              <View className="flex-1 justify-center">
+                <Text
+                  style={settingsPresentation.bold}
+                  className="text-white font-semibold text-lg mb-1"
+                  numberOfLines={2}>
+                  {item.title}
                 </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
+                {!item.isMovie && (
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-gray-400 text-sm">
+                    {item.episodes.length === 1
+                      ? t('{{count}} episode', {count: item.episodes.length})
+                      : t('{{count}} episodes', {count: item.episodes.length})}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 

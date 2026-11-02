@@ -1,7 +1,19 @@
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
 import React, {useMemo, useState} from 'react';
-import {View, Text, Image, TouchableOpacity, Platform} from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
-import {NativeStackScreenProps, NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {
+  NativeStackScreenProps,
+  NativeStackNavigationProp,
+} from '@react-navigation/native-stack';
 import {useNavigation} from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -19,9 +31,12 @@ type SeriesEpisodesRouteProp = NativeStackScreenProps<
 >;
 
 const SeriesEpisodes = ({navigation, route}: SeriesEpisodesRouteProp) => {
-  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const rootNavigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
+  const {width} = useWindowDimensions();
+  const thumbnailWidth = Math.min(180, Math.max(88, width * 0.34));
   const {series, episodes: initialEpisodes, thumbnails} = route.params;
   const [episodes, setEpisodes] = useState(initialEpisodes);
   const [episodeSelected, setEpisodeSelected] = useState<string[]>([]);
@@ -113,173 +128,202 @@ const SeriesEpisodes = ({navigation, route}: SeriesEpisodesRouteProp) => {
   };
 
   return (
-    <View className="w-full h-full bg-black">
-      {/* Simple Header */}
-      <View className="bg-tertiary px-4 pt-14 pb-4">
-        <View className="flex-row items-center justify-between">
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            className="bg-quaternary p-2 rounded-full">
-            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-          </TouchableOpacity>
-          <Text
-            className="text-xl text-white font-bold ml-4 flex-1"
-            numberOfLines={1}
-            ellipsizeMode="tail">
-            {series.length > 20 ? series.substring(0, 20) + '...' : series}
-          </Text>
-          <View className="flex-row items-center gap-x-4">
-            {isSelecting && (
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <View className="flex-1 bg-black">
+        {/* Simple Header */}
+        <View className="bg-black px-4 py-4 border-b border-[#23252b]">
+          <View className="flex-row items-center justify-between">
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              className="p-2 min-h-12 min-w-12 items-center justify-center">
               <MaterialCommunityIcons
-                name="close"
-                size={26}
-                color={primary}
-                onPress={() => {
-                  setEpisodeSelected([]);
-                  setIsSelecting(false);
-                }}
+                name="arrow-left"
+                size={24}
+                color="white"
               />
-            )}
-            {isSelecting && episodeSelected.length > 0 && (
-              <MaterialCommunityIcons
-                name="delete-outline"
-                size={26}
-                color={primary}
-                onPress={deleteEpisodes}
-              />
-            )}
+            </TouchableOpacity>
+            <Text
+              style={settingsPresentation.title}
+              className="text-xl text-white font-bold ml-4 flex-1"
+              numberOfLines={1}
+              ellipsizeMode="tail">
+              {series}
+            </Text>
+            <View className="flex-row items-center gap-x-4">
+              {isSelecting && (
+                <MaterialCommunityIcons
+                  name="close"
+                  size={26}
+                  color={primary}
+                  onPress={() => {
+                    setEpisodeSelected([]);
+                    setIsSelecting(false);
+                  }}
+                />
+              )}
+              {isSelecting && episodeSelected.length > 0 && (
+                <MaterialCommunityIcons
+                  name="delete-outline"
+                  size={26}
+                  color={primary}
+                  onPress={deleteEpisodes}
+                />
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* Episodes list */}
-      <View className="flex-1 px-4">
-        <View className="flex-row items-center justify-between py-4">
-          <Text className="text-white text-lg font-bold">{t('Episodes')}</Text>
-          <Text className="text-gray-400">
-            {episodes.length === 1
-              ? t('{{count}} episode', {count: episodes.length})
-              : t('{{count}} episodes', {count: episodes.length})}
-          </Text>
-        </View>
+        {/* Episodes list */}
+        <View className="flex-1 px-4">
+          <View className="flex-row items-center justify-between py-4">
+            <Text
+              style={settingsPresentation.bold}
+              className="text-white text-lg font-bold">
+              {t('Episodes')}
+            </Text>
+            <Text style={settingsPresentation.body} className="text-gray-400">
+              {episodes.length === 1
+                ? t('{{count}} episode', {count: episodes.length})
+                : t('{{count}} episodes', {count: episodes.length})}
+            </Text>
+          </View>
 
-        <FlashList
-          data={sortedEpisodes}
-          extraData={{isSelecting, episodeSelected}}
-          estimatedItemSize={100}
-          keyExtractor={item => item.uri}
-          renderItem={({item}) => {
-            const fileName = item.uri.split('/').pop() || '';
-            const episodeNumber = getEpisodeNumber(fileName);
-            const selected = isEpisodeSelected(item.uri);
-            const showItaBadge = hasItaBadge(fileName);
+          <FlashList
+            data={sortedEpisodes}
+            extraData={{isSelecting, episodeSelected}}
+            estimatedItemSize={120}
+            contentContainerStyle={{paddingBottom: 24}}
+            keyExtractor={item => item.uri}
+            renderItem={({item}) => {
+              const fileName = item.uri.split('/').pop() || '';
+              const episodeNumber = getEpisodeNumber(fileName);
+              const selected = isEpisodeSelected(item.uri);
+              const showItaBadge = hasItaBadge(fileName);
 
-            return (
-              <TouchableOpacity
-                className={`flex-row rounded-lg overflow-hidden mb-2 h-24 ${
-                  isSelecting && selected ? 'bg-quaternary' : 'bg-tertiary'
-                }`}
-                style={{
-                  borderColor:
-                    isSelecting && selected ? primary : 'transparent',
-                  borderWidth: isSelecting && selected ? 1 : 0,
-                }}
-                onPress={() => {
-                  if (isSelecting) {
+              return (
+                <TouchableOpacity
+                  className={`flex-row overflow-hidden mb-3 items-center ${
+                    isSelecting && selected ? 'bg-quaternary' : 'bg-[#141519]'
+                  }`}
+                  style={{
+                    borderColor:
+                      isSelecting && selected ? primary : 'transparent',
+                    borderWidth: isSelecting && selected ? 1 : 0,
+                  }}
+                  onPress={() => {
+                    if (isSelecting) {
+                      if (settingsStorage.isHapticFeedbackEnabled()) {
+                        RNReactNativeHapticFeedback.trigger('effectTick', {
+                          enableVibrateFallback: true,
+                          ignoreAndroidSystemSettings: false,
+                        });
+                      }
+                      toggleSelection(item.uri);
+                      return;
+                    }
+                    rootNavigation.navigate('Player', {
+                      episodeList: [{title: fileName || '', link: item.uri}],
+                      linkIndex: 0,
+                      type: '',
+                      directUrl: item.uri,
+                      primaryTitle: fileName,
+                      poster: {},
+                      providerValue: 'vega',
+                      doNotTrack: true,
+                    });
+                  }}
+                  onLongPress={() => {
                     if (settingsStorage.isHapticFeedbackEnabled()) {
                       RNReactNativeHapticFeedback.trigger('effectTick', {
                         enableVibrateFallback: true,
                         ignoreAndroidSystemSettings: false,
                       });
                     }
-                    toggleSelection(item.uri);
-                    return;
-                  }
-                  rootNavigation.navigate('Player', {
-                    episodeList: [{title: fileName || '', link: item.uri}],
-                    linkIndex: 0,
-                    type: '',
-                    directUrl: item.uri,
-                    primaryTitle: fileName,
-                    poster: {},
-                    providerValue: 'vega',
-                    doNotTrack: true,
-                  });
-                }}
-                onLongPress={() => {
-                  if (settingsStorage.isHapticFeedbackEnabled()) {
-                    RNReactNativeHapticFeedback.trigger('effectTick', {
-                      enableVibrateFallback: true,
-                      ignoreAndroidSystemSettings: false,
-                    });
-                  }
-                  setIsSelecting(true);
-                  setEpisodeSelected([item.uri]);
-                }}>
-                <View className="w-32 h-full relative">
-                  {thumbnails[item.uri] ? (
-                    <Image
-                      source={{uri: thumbnails[item.uri]}}
-                      className="w-full h-full rounded-t-lg"
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View className="w-full h-full bg-quaternary rounded-t-lg" />
-                  )}
-                  {showItaBadge ? (
-                    <View
-                      className="absolute top-2 left-2 rounded-full px-2 py-0.5"
-                      style={{backgroundColor: primary}}>
-                      <Text className="text-black text-[10px] font-semibold">
-                        {t('ITA')}
+                    setIsSelecting(true);
+                    setEpisodeSelected([item.uri]);
+                  }}>
+                  <View
+                    style={{width: thumbnailWidth, aspectRatio: 16 / 9}}
+                    className="relative">
+                    {thumbnails[item.uri] ? (
+                      <Image
+                        source={{uri: thumbnails[item.uri]}}
+                        className="w-full h-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full h-full bg-quaternary" />
+                    )}
+                    {showItaBadge ? (
+                      <View
+                        className="absolute top-2 left-2 rounded-full px-2 py-0.5"
+                        style={{backgroundColor: primary}}>
+                        <Text
+                          style={settingsPresentation.bold}
+                          className="text-black text-[10px] font-semibold">
+                          {t('ITA')}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {isSelecting && (
+                      <>
+                        {selected && (
+                          <View className="absolute inset-0 bg-black/40" />
+                        )}
+                        <View className="absolute top-2 right-2 bg-black/70 rounded-full p-1">
+                          <MaterialCommunityIcons
+                            name={
+                              selected
+                                ? 'check-circle'
+                                : 'checkbox-blank-circle-outline'
+                            }
+                            size={18}
+                            color={selected ? primary : 'white'}
+                          />
+                        </View>
+                      </>
+                    )}
+                    <View className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded">
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white text-xs">
+                        {t('EP {{number}}', {number: episodeNumber})}
                       </Text>
                     </View>
-                  ) : null}
-                  {isSelecting && (
-                    <>
-                      {selected && <View className="absolute inset-0 bg-black/40" />}
-                      <View className="absolute top-2 right-2 bg-black/70 rounded-full p-1">
-                        <MaterialCommunityIcons
-                          name={
-                            selected
-                              ? 'check-circle'
-                              : 'checkbox-blank-circle-outline'
-                          }
-                          size={18}
-                          color={selected ? primary : 'white'}
-                        />
-                      </View>
-                    </>
+                  </View>
+                  {isSelecting && selected && (
+                    <View
+                      className="absolute inset-0"
+                      style={{backgroundColor: primary, opacity: 0.25}}
+                    />
                   )}
-                  <View className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded">
-                    <Text className="text-white text-xs">
-                      {t('EP {{number}}', {number: episodeNumber})}
+                  <View className="flex-1 p-3 justify-center">
+                    <Text
+                      style={settingsPresentation.medium}
+                      className="text-base text-white font-medium mb-1">
+                      {t('Episode {{number}}', {number: episodeNumber})}
+                    </Text>
+                    <Text
+                      style={settingsPresentation.body}
+                      numberOfLines={2}
+                      className="text-xs my-1 text-gray-400">
+                      {fileName}
+                    </Text>
+                    <Text
+                      style={settingsPresentation.body}
+                      className="text-sm text-gray-400">
+                      {(item.size / (1024 * 1024)).toFixed(1)} MB
                     </Text>
                   </View>
-                </View>
-                {isSelecting && selected && (
-                  <View
-                    className="absolute inset-0"
-                    style={{backgroundColor: primary, opacity: 0.25}}
-                  />
-                )}
-                <View className="flex-1 p-3 justify-center">
-                  <Text className="text-base text-white font-medium mb-1">
-                    {t('Episode {{number}}', {number: episodeNumber})}
-                  </Text>
-                  <Text className="text-[8px] my-1 text-gray-400">
-                    {fileName}
-                  </Text>
-                  <Text className="text-sm text-gray-400">
-                    {(item.size / (1024 * 1024)).toFixed(1)} MB
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

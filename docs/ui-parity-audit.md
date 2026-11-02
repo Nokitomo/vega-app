@@ -1,0 +1,50 @@
+# Audit UI del 2 novembre 2026
+
+Verifica delle route di `src/App.tsx`, dei componenti condivisi e dei pannelli
+secondari dopo i tre interventi su cronologia, impostazioni e libreria download.
+
+## Pagine allineate
+
+- Home, ricerca provider e ricerca globale, Info.
+- Lista da guardare: mantiene intenzionalmente la griglia con card coerenti
+  con la Home, come richiesto dall'utente.
+- ScrollList, catalogo/archivio/calendario.
+- ContinueWatchingAll e WatchHistory: font, card e griglia adattiva condivisi.
+- Settings, Preferences, Account, SubtitleSettings, About, Extensions e
+  componenti per DNS, chiavi, cartella download e provider.
+- Downloads e SeriesEpisodes: presentazione aggiornata, motore invariato.
+
+Info viene riutilizzata negli stack Home, ricerca, preferiti e cronologia;
+ScrollList negli stack Home e ricerca. Non esistono copie separate di queste
+pagine nelle route che richiedano una seconda migrazione. InfoDialog e
+InfoSeasonPicker appartengono gia al lavoro sulla pagina Info.
+
+## Presentazioni ancora distinte
+
+1. `Player.tsx`, `PlayerMenuRow`, `PlayerEpisodeSidebar`: controlli di
+   riproduzione e pannelli meritano un progetto UI separato, con test dei
+   gesti, tracce, sottotitoli e navigazione. Nessuna modifica in questo ciclo.
+2. `DownloadBottomSheet`, usato da `Downloader`: scelta video/sottotitoli
+   conserva superfici e tipografia precedenti. Non e la libreria download
+   appena aggiornata. Possibile prossimo intervento puramente visivo.
+3. `WebView.tsx`, condivisa da Home e ricerca: intestazione e pannello
+   diagnostico conservano il vecchio stile; il contenuto del sito e esterno.
+4. `WafWebViewDialog`: flusso tecnico distinto, da verificare separatamente
+   se si decide di uniformarlo, senza alterare il superamento delle challenge.
+
+`StreamModal` non risulta importato da altri file in src; la route
+`DisableProviders` e commentata. Non sono schermate attive da presentare
+come regressioni visive. I dialoghi nativi restano gestiti dal sistema.
+
+## Limiti della conclusione
+
+I tre interventi sono completati nel loro ambito UI. Questo non certifica
+assenza assoluta di bug su ogni dispositivo o parita pixel per pixel con
+Crunchyroll. Funzioni esclusive di Vega mantengono la propria organizzazione.
+Restano esclusi motore player/download, loghi scuri e scritte incorporate
+nelle immagini. iOS e smartphone fisico richiedono verifiche dedicate.
+
+Verifiche di questo ciclo: TypeScript, lint, suite completa 64/309; prove
+Android smartphone e tablet documentate in history-cruncy-ui.md,
+settings-cruncy-ui.md e downloads-cruncy-ui.md. Gli emulatori sono stati
+eseguiti anche separatamente per limitare la pressione sulla RAM dell'host.
