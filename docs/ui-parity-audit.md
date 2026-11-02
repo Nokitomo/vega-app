@@ -24,9 +24,9 @@ InfoSeasonPicker appartengono gia al lavoro sulla pagina Info.
 1. `Player.tsx`, `PlayerMenuRow`, `PlayerEpisodeSidebar`: controlli di
    riproduzione e pannelli meritano un progetto UI separato, con test dei
    gesti, tracce, sottotitoli e navigazione. Nessuna modifica in questo ciclo.
-2. `DownloadBottomSheet`, usato da `Downloader`: scelta video/sottotitoli
-   conserva superfici e tipografia precedenti. Non e la libreria download
-   appena aggiornata. Possibile prossimo intervento puramente visivo.
+2. `DownloadBottomSheet`, usato da `Downloader`: successivamente aggiornato
+   con font, superfici e accenti coerenti. Verifiche e limiti documentati in
+   `download-panel-cruncy-ui.md`; vale anche per la variante apertura server.
 3. `WebView.tsx`, condivisa da Home e ricerca: intestazione e pannello
    diagnostico conservano il vecchio stile; il contenuto del sito e esterno.
 4. `WafWebViewDialog`: flusso tecnico distinto, da verificare separatamente

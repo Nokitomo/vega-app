@@ -3,7 +3,7 @@ import {
   Modal,
   Pressable,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   ToastAndroid,
   View,
 } from 'react-native';
@@ -18,6 +18,8 @@ import {Clipboard} from 'react-native';
 import useThemeStore from '../lib/zustand/themeStore';
 import {TextTrackType} from 'react-native-video';
 import {settingsStorage} from '../lib/storage';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {HOME_FONT} from './homePresentation';
 
 type Props = {
   data: Stream[];
@@ -44,6 +46,11 @@ const DownloadBottomSheet = ({
   const {t} = useTranslation();
   const [activeTab, setActiveTab] = React.useState<1 | 2>(1);
 
+  const {width, height} = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const panelMargin = Math.max(0, (width - 640) / 2);
+  const expandedHeight = Math.min(450, height - insets.top - 16);
+
   const subtitle = data.map(server => {
     if (server.subtitles && server.subtitles.length > 0) {
       return server.subtitles;
@@ -63,48 +70,64 @@ const DownloadBottomSheet = ({
       }}
       visible={showModal}
       transparent={true}>
-      <GestureHandlerRootView>
+      <GestureHandlerRootView style={{flex: 1}}>
         <Pressable
           onPress={() => bottomSheetRef.current?.close()}
-          className="flex-1">
+          className="flex-1"
+          style={{backgroundColor: 'rgba(0,0,0,0.65)'}}>
           <BottomSheet
-            // detached={true}
             enablePanDownToClose={true}
-            snapPoints={['30%', 450]}
-            containerStyle={{marginHorizontal: 5}}
+            snapPoints={[
+              Math.min(height * 0.3, expandedHeight * 0.6),
+              expandedHeight,
+            ]}
+            containerStyle={{marginHorizontal: panelMargin}}
             ref={bottomSheetRef}
-            backgroundStyle={{backgroundColor: '#1a1a1a'}}
-            handleIndicatorStyle={{backgroundColor: '#333'}}
+            backgroundStyle={{backgroundColor: '#141519', borderRadius: 0}}
+            handleIndicatorStyle={{backgroundColor: '#a0a0a0', width: 40}}
             onClose={() => setModal(false)}>
             <Pressable className="flex-1" onPress={e => e.stopPropagation()}>
-              <Text className="text-white text-xl p-1 font-semibold text-center">
+              <Text
+                numberOfLines={2}
+                style={{
+                  fontFamily: HOME_FONT.heading,
+                  fontSize: 22,
+                  color: 'white',
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                }}>
                 {title}
               </Text>
               <BottomSheetScrollView
-                style={{padding: 5, marginBottom: 5}}
+                contentContainerStyle={{
+                  paddingHorizontal: 20,
+                  paddingBottom: Math.max(insets.bottom, 16),
+                }}
                 showsVerticalScrollIndicator={false}>
                 {subtitle &&
                   subtitle.length > 0 &&
                   subtitle[0] !== undefined && (
-                    <View className="flex-row items-center justify-center gap-x-3 w-full my-5">
+                    <View className="flex-row items-center w-full mb-4 border-b border-[#23252b]">
                       <Text
-                        className={'text-lg p-1 font-semibold text-center'}
+                        className="flex-1 text-base py-3 text-center"
                         style={{
+                          fontFamily: HOME_FONT.bold,
                           color: activeTab === 1 ? primary : 'white',
                           borderBottomWidth: activeTab === 1 ? 2 : 0,
                           borderBottomColor:
-                            activeTab === 1 ? 'white' : 'transparent',
+                            activeTab === 1 ? primary : 'transparent',
                         }}
                         onPress={() => setActiveTab(1)}>
                         {t('Video')}
                       </Text>
                       <Text
-                        className={'text-lg p-1 font-semibold text-center'}
+                        className="flex-1 text-base py-3 text-center"
                         style={{
+                          fontFamily: HOME_FONT.bold,
                           color: activeTab === 2 ? primary : 'white',
                           borderBottomWidth: activeTab === 2 ? 2 : 0,
                           borderBottomColor:
-                            activeTab === 2 ? 'white' : 'transparent',
+                            activeTab === 2 ? primary : 'transparent',
                         }}
                         onPress={() => setActiveTab(2)}>
                         {t('Subtitle')}
@@ -115,81 +138,97 @@ const DownloadBottomSheet = ({
                   ? Array.from({length: 4}).map((_, index) => (
                       <SkeletonLoader
                         key={index}
-                        width={Dimensions.get('window').width - 30}
-                        height={35}
+                        width={Math.max(0, width - panelMargin * 2 - 40)}
+                        height={48}
                         marginVertical={5}
                       />
                     ))
                   : activeTab === 1
-                  ? data.map(item => (
-                      <TouchableOpacity
-                        className="p-2 bg-white/30 rounded-md my-1"
-                        key={item.link}
-                        onLongPress={() => {
-                          if (settingsStorage.isHapticFeedbackEnabled()) {
-                            RNReactNativeHapticFeedback.trigger('effectTick', {
-                              enableVibrateFallback: true,
-                              ignoreAndroidSystemSettings: false,
-                            });
-                          }
-                          Clipboard.setString(item.link);
-                          ToastAndroid.show(
-                            t('Link copied'),
-                            ToastAndroid.SHORT,
-                          );
-                        }}
-                        onPress={() => {
-                          onPressVideo(item);
-                          bottomSheetRef.current?.close();
-                        }}>
-                        <Text style={{color: 'white'}}>{item.server}</Text>
-                      </TouchableOpacity>
-                    ))
-                  : subtitle.length > 0
-                  ? subtitle.map(
-                      subs =>
-                        subs?.map(item => (
-                          <TouchableOpacity
-                            className="p-2 bg-white/30 rounded-md my-1"
-                            key={item.uri}
-                            onLongPress={() => {
-                              if (settingsStorage.isHapticFeedbackEnabled()) {
-                                RNReactNativeHapticFeedback.trigger(
-                                  'effectTick',
-                                  {
-                                    enableVibrateFallback: true,
-                                    ignoreAndroidSystemSettings: false,
-                                  },
-                                );
-                              }
-                              Clipboard.setString(item.uri);
-                              ToastAndroid.show(
-                                t('Link copied'),
-                                ToastAndroid.SHORT,
+                    ? data.map(item => (
+                        <TouchableOpacity
+                          className="px-4 py-3 min-h-12 justify-center bg-[#23252b] mb-2"
+                          key={item.link}
+                          onLongPress={() => {
+                            if (settingsStorage.isHapticFeedbackEnabled()) {
+                              RNReactNativeHapticFeedback.trigger(
+                                'effectTick',
+                                {
+                                  enableVibrateFallback: true,
+                                  ignoreAndroidSystemSettings: false,
+                                },
                               );
-                            }}
-                            onPress={() => {
-                              onPressSubs({
-                                server: t('Subtitles'),
-                                link: item.uri,
-                                type:
-                                  item.type === TextTrackType.VTT
-                                    ? 'vtt'
-                                    : 'srt',
-                                title: item.title,
-                              });
-                              bottomSheetRef.current?.close();
+                            }
+                            Clipboard.setString(item.link);
+                            ToastAndroid.show(
+                              t('Link copied'),
+                              ToastAndroid.SHORT,
+                            );
+                          }}
+                          onPress={() => {
+                            onPressVideo(item);
+                            bottomSheetRef.current?.close();
+                          }}>
+                          <Text
+                            style={{
+                              color: 'white',
+                              fontFamily: HOME_FONT.medium,
+                              fontSize: 16,
                             }}>
-                            <Text style={{color: 'white'}}>
-                              {item.language}
-                              {' - '} {item.title}
-                            </Text>
-                          </TouchableOpacity>
-                        )),
-                    )
-                  : null}
+                            {item.server}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    : subtitle.length > 0
+                      ? subtitle.map(subs =>
+                          subs?.map(item => (
+                            <TouchableOpacity
+                              className="px-4 py-3 min-h-12 justify-center bg-[#23252b] mb-2"
+                              key={item.uri}
+                              onLongPress={() => {
+                                if (settingsStorage.isHapticFeedbackEnabled()) {
+                                  RNReactNativeHapticFeedback.trigger(
+                                    'effectTick',
+                                    {
+                                      enableVibrateFallback: true,
+                                      ignoreAndroidSystemSettings: false,
+                                    },
+                                  );
+                                }
+                                Clipboard.setString(item.uri);
+                                ToastAndroid.show(
+                                  t('Link copied'),
+                                  ToastAndroid.SHORT,
+                                );
+                              }}
+                              onPress={() => {
+                                onPressSubs({
+                                  server: t('Subtitles'),
+                                  link: item.uri,
+                                  type:
+                                    item.type === TextTrackType.VTT
+                                      ? 'vtt'
+                                      : 'srt',
+                                  title: item.title,
+                                });
+                                bottomSheetRef.current?.close();
+                              }}>
+                              <Text
+                                style={{
+                                  color: 'white',
+                                  fontFamily: HOME_FONT.medium,
+                                  fontSize: 16,
+                                }}>
+                                {item.language}
+                                {' - '} {item.title}
+                              </Text>
+                            </TouchableOpacity>
+                          )),
+                        )
+                      : null}
                 {data.length === 0 && !loading && (
-                  <Text className="text-red-500 text-lg text-center">
+                  <Text
+                    style={{fontFamily: HOME_FONT.regular}}
+                    className="text-red-400 text-base text-center py-4">
                     {error || t('No server found')}
                   </Text>
                 )}
