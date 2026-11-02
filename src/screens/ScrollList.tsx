@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
   type ViewStyle,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {HomeStackParamList, SearchStackParamList} from '../App';
@@ -23,16 +24,18 @@ import {providerManager} from '../lib/services/ProviderManager';
 import ProviderImage from '../components/ProviderImage';
 import {useTranslation} from 'react-i18next';
 import PostBadges from '../components/PostBadges';
-import {HOME_FONT, CATALOG_CARD_TITLE_STYLE, getHomeCardWidth} from '../components/homePresentation';
+import {
+  HOME_FONT,
+  CATALOG_CARD_TITLE_STYLE,
+  getHomeCardWidth,
+} from '../components/homePresentation';
 import ArchiveFilterModal from '../components/ArchiveFilterModal';
 import {
   buildArchiveFilter,
   hasActiveArchiveFilters,
   parseArchiveFilterSelection,
 } from '../lib/utils/archiveFilters';
-
 type Props = NativeStackScreenProps<HomeStackParamList, 'ScrollList'>;
-
 const CALENDAR_DAY_KEYS = [
   'monday',
   'tuesday',
@@ -43,7 +46,6 @@ const CALENDAR_DAY_KEYS = [
   'sunday',
   'undetermined',
 ] as const;
-
 const CALENDAR_DAY_MAP: Record<string, (typeof CALENDAR_DAY_KEYS)[number]> = {
   lunedì: 'monday',
   martedì: 'tuesday',
@@ -61,7 +63,6 @@ const CALENDAR_DAY_MAP: Record<string, (typeof CALENDAR_DAY_KEYS)[number]> = {
   sunday: 'sunday',
   undetermined: 'undetermined',
 };
-
 const CALENDAR_DAY_LABEL_KEYS: Record<
   (typeof CALENDAR_DAY_KEYS)[number],
   string
@@ -75,11 +76,7 @@ const CALENDAR_DAY_LABEL_KEYS: Record<
   sunday: 'Sunday',
   undetermined: 'Undetermined',
 };
-
-const GRID_MAX_POSTER_WIDTH = 112;
-const GRID_TITLE_LINE_HEIGHT = 15;
 const GRID_TITLE_LINES = 3;
-
 const ScrollList = ({route}: Props): React.ReactElement => {
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
@@ -111,7 +108,10 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const isArchiveView =
     !route.params.isSearch &&
     ['archive', 'catalog/all'].includes(
-      activeFilter.split('?', 1)[0].replace(/^\/+|\/+$/g, '').toLowerCase(),
+      activeFilter
+        .split('?', 1)[0]
+        .replace(/^\/+|\/+$/g, '')
+        .toLowerCase(),
     );
   const canFilterArchive =
     isArchiveView && Object.keys(archiveFilters).length > 0;
@@ -121,8 +121,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const [viewType, setViewType] = useState<number>(
     settingsStorage.getListViewType(),
   );
-  const isCalendarView =
-    activeFilter === 'calendar' && !route.params.isSearch;
+  const isCalendarView = activeFilter === 'calendar' && !route.params.isSearch;
   // Add abort controller to cancel API requests when unmounting
   const abortController = useRef<AbortController | null>(null);
   const isMounted = useRef(true);
@@ -154,23 +153,28 @@ const ScrollList = ({route}: Props): React.ReactElement => {
       }));
   }, [calendarDayOrder, isCalendarView, posts, t]);
   const gridFallbackHorizontalPadding = 32;
-  const searchAppearance = !!route.params.isSearch;
-  const gridMaxItemWidth = searchAppearance ? getHomeCardWidth(windowWidth) : GRID_MAX_POSTER_WIDTH;
+  const gridMaxItemWidth = getHomeCardWidth(
+    gridContainerWidth > 0 ? gridContainerWidth + 32 : windowWidth,
+  );
   const gridBaseWidth =
     gridContainerWidth > 0
       ? gridContainerWidth
       : Math.max(0, windowWidth - gridFallbackHorizontalPadding);
   const gridAvailableWidth = Math.max(0, gridBaseWidth);
-  const gridColumns = searchAppearance && windowWidth >= 600
-    ? Math.max(3, Math.floor(gridAvailableWidth / (gridMaxItemWidth + 16)))
-    : 3;
+  const gridColumns =
+    gridBaseWidth + 32 >= 600
+      ? Math.max(3, Math.floor(gridAvailableWidth / (gridMaxItemWidth + 16)))
+      : 3;
   const gridColumnWidth =
     gridAvailableWidth > 0
       ? Math.floor(gridAvailableWidth / gridColumns)
       : gridMaxItemWidth;
-  const gridItemWidth = Math.min(gridMaxItemWidth, Math.max(1, gridColumnWidth - (searchAppearance ? 12 : 0)));
+  const gridItemWidth = Math.min(
+    gridMaxItemWidth,
+    Math.max(1, gridColumnWidth - 12),
+  );
   const gridItemHeight = Math.round(gridItemWidth * 1.5);
-  const gridTitleWidth = searchAppearance ? gridItemWidth : Math.max(88, Math.min(gridItemWidth, gridColumnWidth) - 4);
+  const gridTitleWidth = gridItemWidth;
   const gridItemWrapperStyle: ViewStyle = {
     width: gridColumnWidth > 0 ? gridColumnWidth : gridMaxItemWidth,
     alignItems: 'center',
@@ -192,8 +196,8 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     setPage(1);
     setIsEnd(false);
   }, [routeFilter]);
-
   useEffect(() => {
+    isMounted.current = true;
     return () => {
       isMounted.current = false;
       if (abortController.current) {
@@ -201,7 +205,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
       }
     };
   }, []);
-
   useEffect(() => {
     // Clean up the previous controller if it exists
     if (abortController.current) {
@@ -210,21 +213,16 @@ const ScrollList = ({route}: Props): React.ReactElement => {
 
     // Create a new controller for this effect
     abortController.current = new AbortController();
-    const signal = abortController.current.signal;
-
+    const controller = abortController.current;
+    const signal = controller.signal;
     const fetchPosts = async () => {
       // Don't fetch if we're already at the end
-        if (isEnd) {
-          return;
-        }
-
+      if (isEnd) {
+        return;
+      }
       try {
         // Prevent concurrent loading calls
-        if (isLoadingMore.current) {
-          return;
-        }
         isLoadingMore.current = true;
-
         setIsLoading(true);
         setSearchError(false);
 
@@ -236,7 +234,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         if (!isMounted.current || signal.aborted) {
           return;
         }
-
         const getNewPosts = route.params.isSearch
           ? providerManager.getSearchPosts({
               searchQuery: routeFilter,
@@ -250,14 +247,12 @@ const ScrollList = ({route}: Props): React.ReactElement => {
               providerValue: effectiveProviderValue,
               signal,
             });
-
         const newPosts = await getNewPosts;
 
         // Skip if component unmounted or request was aborted
         if (!isMounted.current || signal.aborted) {
           return;
         }
-
         if (!newPosts || newPosts.length === 0) {
           console.log('end', page);
           setIsEnd(true);
@@ -265,14 +260,11 @@ const ScrollList = ({route}: Props): React.ReactElement => {
           isLoadingMore.current = false;
           return;
         }
-
         setPosts(prev => {
           const combined = page === 1 ? newPosts : [...prev, ...newPosts];
           const unique = new Map<string, Post>();
           combined.forEach(item => {
-            const key = `${item.provider || effectiveProviderValue}:${item.link}:${
-              item.episodeId ?? ''
-            }`;
+            const key = `${item.provider || effectiveProviderValue}:${item.link}:${item.episodeId ?? ''}`;
             if (!unique.has(key)) {
               unique.set(key, item);
             }
@@ -284,20 +276,24 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         }
       } catch (error) {
         // Skip handling if component unmounted or request was aborted
-        if (!isMounted.current || (error as any)?.name === 'AbortError') {
+        if (
+          !isMounted.current ||
+          signal.aborted ||
+          (error as any)?.name === 'AbortError'
+        ) {
           return;
         }
-        if (route.params.isSearch) {setSearchError(true);}
+        setSearchError(true);
         console.error('Error fetching posts:', error);
       } finally {
-        if (isMounted.current) {
+        if (isMounted.current && !signal.aborted) {
           setIsLoading(false);
           isLoadingMore.current = false;
         }
       }
     };
-
     fetchPosts();
+    return () => controller.abort();
   }, [
     activeFilter,
     effectiveProviderValue,
@@ -306,7 +302,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     route.params.isSearch,
     retryAttempt,
   ]);
-
   const applyArchiveFilters = (
     selection: ReturnType<typeof parseArchiveFilterSelection>,
   ) => {
@@ -319,67 +314,189 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     setIsLoading(true);
     isLoadingMore.current = false;
     setFilterModalVisible(false);
+    setRetryAttempt(value => value + 1);
   };
-
   const onEndReached = async () => {
     // Don't trigger more loading if we're already loading or at the end
-    if (isLoading || isEnd || isLoadingMore.current || (route.params.isSearch && searchError)) {
+    if (isLoading || isEnd || isLoadingMore.current || searchError) {
       return;
     }
+    isLoadingMore.current = true;
     setIsLoading(true);
     setPage(prevPage => prevPage + 1);
   };
 
   // Limit the number of skeletons to prevent unnecessary renders
   const renderSkeletons = () => {
-    const skeletonCount = viewType === 1 ? 6 : 3;
+    const skeletonCount =
+      isCalendarView || viewType === 1 ? gridColumns * 2 : 3;
     const itemWrapperStyle =
-      viewType === 1
+      isCalendarView || viewType === 1
         ? gridItemWrapperStyle
-        : {marginHorizontal: 12, marginVertical: 12};
+        : {
+            marginHorizontal: 12,
+            marginVertical: 12,
+          };
     const imageSize =
-      viewType === 1
-        ? {width: gridItemWidth, height: gridItemHeight}
-        : searchAppearance ? {width: 70, height: 105} : {width: 100, height: 150};
-    const textWidth = viewType === 1 ? gridTitleWidth : 97;
-    return Array.from({length: skeletonCount}).map((_, i) => (
+      isCalendarView || viewType === 1
+        ? {
+            width: gridItemWidth,
+            height: gridItemHeight,
+          }
+        : {
+            width: 70,
+            height: 105,
+          };
+    const textWidth = isCalendarView || viewType === 1 ? gridTitleWidth : 97;
+    return Array.from({
+      length: skeletonCount,
+    }).map((_, i) => (
       <View
-        className={searchAppearance && viewType !== 1 ? 'flex-row items-center' : 'gap-0 flex justify-center items-center'}
+        className={
+          !isCalendarView && viewType !== 1
+            ? 'flex-row items-center'
+            : 'gap-0 flex justify-center items-center'
+        }
         style={itemWrapperStyle}
         key={i}>
-        <SkeletonLoader height={imageSize.height} width={imageSize.width} style={searchAppearance ? {borderRadius: 0} : undefined} />
-        <SkeletonLoader height={searchAppearance ? 19 : 12} width={textWidth} style={searchAppearance && viewType !== 1 ? {marginLeft: 12} : undefined} />
+        <SkeletonLoader
+          height={imageSize.height}
+          width={imageSize.width}
+          style={{
+            borderRadius: 0,
+          }}
+        />
+        <SkeletonLoader
+          height={19}
+          width={textWidth}
+          style={
+            !isCalendarView && viewType !== 1
+              ? {
+                  marginLeft: 12,
+                }
+              : undefined
+          }
+        />
       </View>
     ));
   };
-
+  const renderError = () =>
+    searchError &&
+    !isLoading && (
+      <View
+        style={{
+          padding: 24,
+          alignItems: 'center',
+        }}
+        accessibilityLiveRegion="polite">
+        <Text
+          style={{
+            color: '#a0a0a0',
+          }}>
+          {t(
+            route.params.isSearch
+              ? 'Failed to search'
+              : 'Failed to load content',
+          )}
+        </Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => {
+            setSearchError(false);
+            setIsLoading(true);
+            setRetryAttempt(value => value + 1);
+          }}
+          style={{
+            minHeight: 48,
+            justifyContent: 'center',
+            paddingHorizontal: 16,
+          }}>
+          <Text
+            style={{
+              color: primary,
+            }}>
+            {t('Retry')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   return (
-    <View className="h-full w-full bg-black items-center p-4" style={{flex: 1}}>
-      <View className="w-full px-4 font-semibold my-6 flex-row justify-between items-center">
-        <View className="flex-row items-center gap-2" style={searchAppearance ? {flex: 1, minWidth: 0} : undefined}>
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Back')} style={route.params.isSearch ? {minWidth: 48, minHeight: 48, justifyContent: 'center'} : undefined} onPress={() => navigation.goBack()}>
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={{
+        flex: 1,
+        backgroundColor: 'black',
+      }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: '#23252b',
+        }}>
+        <View
+          className="flex-row items-center gap-2"
+          style={{
+            flex: 1,
+            minWidth: 0,
+          }}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('Back')}
+            style={{
+              minWidth: 48,
+              minHeight: 48,
+              justifyContent: 'center',
+            }}
+            onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={26} color="white" />
           </TouchableOpacity>
-          <Text numberOfLines={searchAppearance ? 2 : undefined} className="text-2xl font-bold" style={{flexShrink: 1, color: primary, ...(route.params.isSearch ? {fontFamily: HOME_FONT.heading, fontWeight: 'normal' as const} : {})}}>
+          <Text
+            numberOfLines={2}
+            className="text-2xl font-bold"
+            style={{
+              flexShrink: 1,
+              color: route.params.isSearch ? primary : 'white',
+              fontFamily: HOME_FONT.heading,
+              fontWeight: 'normal',
+              fontSize: 22,
+            }}>
             {route.params.title}
           </Text>
         </View>
         {!isCalendarView ? (
-          <View className="flex-row items-center gap-4">
+          <View className="flex-row items-center">
             {canFilterArchive ? (
               <TouchableOpacity
                 onPress={() => setFilterModalVisible(true)}
-                className="relative">
+                accessibilityRole="button"
+                accessibilityLabel={t('Filters')}
+                style={{
+                  minWidth: 48,
+                  minHeight: 48,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
                 <MaterialIcons name="tune" size={26} color="white" />
                 {hasActiveFilters ? (
                   <View
-                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
-                    style={{backgroundColor: primary}}
+                    className="absolute w-2.5 h-2.5 rounded-full"
+                    style={{backgroundColor: primary, top: 6, right: 6}}
                   />
                 ) : null}
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t(viewType === 1 ? 'Show list' : 'Show grid')}
+              style={{
+                minWidth: 48,
+                minHeight: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
               onPress={() => {
                 const newViewType = viewType === 1 ? 2 : 1;
                 setViewType(newViewType);
@@ -395,17 +512,24 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         ) : null}
       </View>
       <View
-        className="justify-center flex-row w-full"
-        style={{flex: 1}}
+        testID="catalog-viewport"
+        style={{
+          flex: 1,
+          marginHorizontal: 16,
+          paddingTop: 12,
+        }}
         onLayout={event =>
           setGridContainerWidth(event.nativeEvent.layout.width)
         }>
         {isCalendarView ? (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{paddingBottom: 80}}>
+            contentContainerStyle={{
+              paddingBottom: 24,
+              flexGrow: 1,
+            }}>
             {isLoading ? (
-              <View className="flex flex-row flex-wrap gap-1 justify-center items-center mb-16">
+              <View className="flex flex-row flex-wrap justify-center items-center mb-16">
                 {renderSkeletons()}
               </View>
             ) : (
@@ -413,66 +537,78 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                 <View key={section.title} className="mb-6">
                   <Text
                     className="text-xl font-bold mb-2"
-                    style={{color: primary}}>
+                    style={{
+                      color: 'white',
+                      fontFamily: HOME_FONT.heading,
+                    }}>
                     {section.title}
                   </Text>
-                  {chunkPosts(section.data, 3).map((row, rowIndex) => (
-                    <View
-                      key={`${section.title}-${rowIndex}`}
-                      className="flex flex-row"
-                      style={{width: gridAvailableWidth}}>
-                      {row.map(item => (
-                        <TouchableOpacity
-                          key={item.link}
-                          className="flex flex-col"
-                          style={gridItemWrapperStyle}
-                          onPress={() =>
-                            navigation.navigate('Info', {
-                              link: item.link,
-                              provider:
-                                route.params.providerValue || provider.value,
-                              poster: item?.image,
-                              variants: item.variants,
-                              dubStatus: item.dubStatus,
-                              dubStatusKey: item.dubStatusKey,
-                            })
-                          }>
-                          <View className="relative">
-                            <ProviderImage
-                              className="rounded-md"
-                              uri={item.image}
-                              link={item.link}
-                              providerValue={
-                                route.params.providerValue || provider.value
-                              }
-                              artworkHints={item.artworkHints}
+                  {chunkPosts(section.data, gridColumns).map(
+                    (row, rowIndex) => (
+                      <View
+                        key={`${section.title}-${rowIndex}`}
+                        className="flex flex-row"
+                        style={{
+                          width: gridAvailableWidth,
+                        }}>
+                        {row.map(item => (
+                          <TouchableOpacity
+                            key={item.link}
+                            className="flex flex-col"
+                            style={gridItemWrapperStyle}
+                            onPress={() =>
+                              navigation.navigate('Info', {
+                                link: item.link,
+                                provider:
+                                  route.params.providerValue || provider.value,
+                                poster: item?.image,
+                                variants: item.variants,
+                                dubStatus: item.dubStatus,
+                                dubStatusKey: item.dubStatusKey,
+                              })
+                            }>
+                            <View className="relative">
+                              <ProviderImage
+                                uri={item.image}
+                                link={item.link}
+                                providerValue={
+                                  route.params.providerValue || provider.value
+                                }
+                                artworkHints={item.artworkHints}
+                                style={{
+                                  width: gridItemWidth,
+                                  height: gridItemHeight,
+                                }}
+                              />
+                              <PostBadges post={item} primary={primary} />
+                            </View>
+                            <Text
+                              className="text-white text-center text-xs"
                               style={{
-                                width: gridItemWidth,
-                                height: gridItemHeight,
+                                width: gridTitleWidth,
+                                ...CATALOG_CARD_TITLE_STYLE,
                               }}
-                            />
-                            <PostBadges post={item} primary={primary} />
-                          </View>
-                          <Text
-                            className="text-white text-center text-xs"
-                            style={{
-                              width: gridTitleWidth,
-                              lineHeight: GRID_TITLE_LINE_HEIGHT,
-                              minHeight: GRID_TITLE_LINE_HEIGHT * GRID_TITLE_LINES,
-                            }}
-                            numberOfLines={GRID_TITLE_LINES}
-                            ellipsizeMode="tail">
-                            {item?.title}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ))}
+                              numberOfLines={GRID_TITLE_LINES}
+                              ellipsizeMode="tail">
+                              {item?.title}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ),
+                  )}
                 </View>
               ))
             )}
-            {!isLoading && calendarSections.length === 0 ? (
-              <View className="w-full h-full flex items-center justify-center">
+            {renderError()}
+            {!isLoading && !searchError && calendarSections.length === 0 ? (
+              <View
+                style={{
+                  flex: 1,
+                  padding: 24,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
                 <Text className="text-white text-center font-semibold text-lg">
                   {t('No Content Found')}
                 </Text>
@@ -482,44 +618,46 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         ) : (
           <FlashList
             estimatedItemSize={300}
+            ListEmptyComponent={
+              !isLoading && !searchError && posts.length === 0 ? (
+                <View
+                  style={{
+                    flex: 1,
+                    padding: 24,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Text className="text-white text-center font-semibold text-lg">
+                    {t('No Content Found')}
+                  </Text>
+                </View>
+              ) : null
+            }
             ListFooterComponent={
               <>
                 {isLoading && (
                   <View
-                    className={`flex ${
-                      viewType === 1 ? 'flex-row flex-wrap' : 'flex-col'
-                    } gap-1 justify-center items-center mb-16`}>
+                    className={`flex ${viewType === 1 ? 'flex-row flex-wrap' : 'flex-col'} justify-center items-center mb-16`}>
                     {renderSkeletons()}
                   </View>
                 )}
-                {route.params.isSearch && searchError && !isLoading && (
-                  <View style={{padding: 24, alignItems: 'center'}} accessibilityLiveRegion="polite">
-                    <Text style={{color: '#a0a0a0'}}>{t('Failed to search')}</Text>
-                    <TouchableOpacity accessibilityRole="button" onPress={() => {setSearchError(false); setIsLoading(true); setRetryAttempt(value => value + 1);}} style={{minHeight: 48, justifyContent: 'center', paddingHorizontal: 16}}>
-                      <Text style={{color: primary}}>{t('Retry')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                {renderError()}
                 <View className="h-32" />
               </>
             }
             data={posts}
             numColumns={viewType === 1 ? gridColumns : 1}
             key={`view-type-${viewType}-${viewType === 1 ? gridColumns : 1}`}
-            contentContainerStyle={{paddingBottom: 80}}
+            contentContainerStyle={{
+              paddingBottom: 80,
+            }}
             keyExtractor={(item, i) => `${item.title}-${i}`}
             renderItem={({item}) => (
               <TouchableOpacity
                 className={
-                  viewType === 1
-                    ? 'flex flex-col'
-                    : 'flex-row m-3 items-center'
+                  viewType === 1 ? 'flex flex-col' : 'flex-row m-3 items-center'
                 }
-                style={
-                  viewType === 1
-                    ? gridItemWrapperStyle
-                    : undefined
-                }
+                style={viewType === 1 ? gridItemWrapperStyle : undefined}
                 onPress={() =>
                   navigation.navigate('Info', {
                     link: item.link,
@@ -532,15 +670,20 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                 }>
                 <View className="relative">
                   <ProviderImage
-                    className={searchAppearance ? undefined : 'rounded-md'}
                     uri={item.image}
                     link={item.link}
                     providerValue={route.params.providerValue || provider.value}
                     artworkHints={item.artworkHints}
                     style={
                       viewType === 1
-                        ? {width: gridItemWidth, height: gridItemHeight}
-                        : {width: 70, height: searchAppearance ? 105 : 100}
+                        ? {
+                            width: gridItemWidth,
+                            height: gridItemHeight,
+                          }
+                        : {
+                            width: 70,
+                            height: 105,
+                          }
                     }
                   />
                   <PostBadges post={item} primary={primary} />
@@ -549,17 +692,21 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                   className={
                     viewType === 1
                       ? 'text-white text-center text-xs'
-                      : searchAppearance ? 'text-white ml-3' : 'text-white ml-3 w-72 font-semibold text-base'
+                      : 'text-white ml-3'
                   }
                   style={
                     viewType === 1
                       ? {
                           width: gridTitleWidth,
-                          lineHeight: GRID_TITLE_LINE_HEIGHT,
-                          minHeight: GRID_TITLE_LINE_HEIGHT * GRID_TITLE_LINES,
-                          ...(searchAppearance ? CATALOG_CARD_TITLE_STYLE : {}),
+                          ...CATALOG_CARD_TITLE_STYLE,
                         }
-                      : searchAppearance ? {...CATALOG_CARD_TITLE_STYLE, flex: 1, minWidth: 0, marginTop: 0, minHeight: 0} : undefined
+                      : {
+                          ...CATALOG_CARD_TITLE_STYLE,
+                          flex: 1,
+                          minWidth: 0,
+                          marginTop: 0,
+                          minHeight: 0,
+                        }
                   }
                   numberOfLines={viewType === 1 ? GRID_TITLE_LINES : 2}
                   ellipsizeMode="tail">
@@ -571,13 +718,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
             onEndReachedThreshold={0.5}
           />
         )}
-        {!isCalendarView && !isLoading && !searchError && posts.length === 0 ? (
-          <View className="w-full h-full flex items-center justify-center">
-            <Text className="text-white text-center font-semibold text-lg">
-              {t('No Content Found')}
-            </Text>
-          </View>
-        ) : null}
       </View>
       <ArchiveFilterModal
         visible={filterModalVisible}
@@ -587,8 +727,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         onApply={applyArchiveFilters}
         onClose={() => setFilterModalVisible(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 };
-
 export default ScrollList;

@@ -1,5 +1,11 @@
 # Ricerca: presentazione coerente con la Home
 
+Aggiornamento 2 novembre 2026: la presentazione condivisa di `ScrollList` e ora
+estesa anche agli elenchi Home, archivio e calendario; le indicazioni storiche
+qui sotto che li escludevano sono superate. Safe area e controlli accessibili
+sono condivisi, mentre ricerca e preferenze dei provider restano invariate.
+Dettagli e verifiche in [catalog-cruncy-ui.md](catalog-cruncy-ui.md).
+
 ## Ambito concordato
 
 - Ricerca Home: solo provider selezionato, nessuna cronologia, apertura con tastiera e collegamenti diretti invariati.

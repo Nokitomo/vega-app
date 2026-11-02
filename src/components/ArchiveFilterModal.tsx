@@ -8,14 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {HOME_FONT} from './homePresentation';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {Dropdown} from 'react-native-element-dropdown';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTranslation} from 'react-i18next';
-import type {
-  ArchiveFilterOption,
-  ArchiveFilters,
-} from '../lib/providers/types';
+import type {ArchiveFilterOption, ArchiveFilters} from '../lib/providers/types';
 import {
   ArchiveFilterSelection,
   createEmptyArchiveFilterSelection,
@@ -61,7 +59,10 @@ const ArchiveFilterModal = ({
     return definition
       .map(option => ({
         label: t(
-          option.titleKey || option.title || option.name || getOptionValue(option),
+          option.titleKey ||
+            option.title ||
+            option.name ||
+            getOptionValue(option),
         ),
         value: getOptionValue(option),
       }))
@@ -135,11 +136,33 @@ const ArchiveFilterModal = ({
       onRequestClose={onClose}>
       <View className="flex-1 bg-black/80 justify-end">
         <View
-          className="bg-[#171717] rounded-t-3xl max-h-[90%] px-5 pt-5"
-          style={{paddingBottom: Math.max(32, insets.bottom + 12)}}>
+          className="max-h-[90%] px-5 pt-5"
+          style={{
+            backgroundColor: '#23252b',
+            width: '100%',
+            maxWidth: 720,
+            alignSelf: 'center',
+            paddingBottom: Math.max(32, insets.bottom + 12),
+          }}>
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-white text-xl font-bold">{t('Filters')}</Text>
-            <TouchableOpacity onPress={onClose} className="p-2">
+            <Text
+              style={{
+                color: 'white',
+                fontFamily: HOME_FONT.heading,
+                fontSize: 22,
+              }}>
+              {t('Filters')}
+            </Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('Close')}
+              onPress={onClose}
+              style={{
+                minWidth: 48,
+                minHeight: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -150,7 +173,10 @@ const ArchiveFilterModal = ({
                 <TextInput
                   value={draft.title || ''}
                   onChangeText={title =>
-                    setDraft(current => ({...current, title: title || undefined}))
+                    setDraft(current => ({
+                      ...current,
+                      title: title || undefined,
+                    }))
                   }
                   placeholder={t('Search by title')}
                   placeholderTextColor="#737373"
@@ -213,7 +239,12 @@ const ArchiveFilterModal = ({
                           className={`text-xs ${
                             selected ? 'text-black' : 'text-white'
                           }`}>
-                          {t(option.titleKey || option.title || option.name || genre)}
+                          {t(
+                            option.titleKey ||
+                              option.title ||
+                              option.name ||
+                              genre,
+                          )}
                         </Text>
                       </TouchableOpacity>
                     );
