@@ -230,3 +230,18 @@ iOS e nuovi test runtime su smartphone non eseguiti. AnimeUnity indisponibile.
 Il renderer software dell'emulatore si chiudeva durante l'uso di Crunchyroll;
 le prove sono state completate con GPU host e Vulkan disabilitato, senza
 cancellare dati o sessione di login dell'AVD.
+
+## Correzione sfondo schede Info (3 novembre 2026)
+
+La fascia Episodi/Correlati ha ora uno sfondo nero opaco. In verticale,
+l'immagine collocata dietro il contenuto scorrevole poteva essere visibile
+attraverso questa fascia, prima trasparente. Non cambiano dimensioni, colonne,
+rotazione, selezione delle schede, callback o preferenze dei metadati.
+
+Verifica visiva sul dispositivo affidata all'utente: nessun emulatore avviato
+per questo intervento, come richiesto. Controllare lo scorrimento della pagina
+Info e il cambio scheda su smartphone e tablet nei due orientamenti.
+
+TypeScript (`npx tsc --noEmit`) e lint superati senza diagnostiche.
+Suite automatica completa: 70 suite e 326 test superati, incluso il controllo
+di conservazione dello stato e della CTA durante le rotazioni del layout Info.

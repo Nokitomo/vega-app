@@ -862,7 +862,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
           </View>
           <InfoAdaptiveLayout landscape={tabletLandscape} scrollY={scrollY} toolbarHeight={insets.top + 56}
             refreshControl={<RefreshControl colors={[primary]} tintColor={primary} progressBackgroundColor="black" refreshing={refreshing} onRefresh={handleRefresh} />}
-            tabs={(<View accessibilityRole="tablist" style={{flexDirection: 'row', justifyContent: tabletLandscape ? 'center' : 'flex-start', borderBottomWidth: 1, borderBottomColor: '#23252b', marginBottom: 0}}>
+            tabs={(<View accessibilityRole="tablist" style={{backgroundColor: 'black', flexDirection: 'row', justifyContent: tabletLandscape ? 'center' : 'flex-start', borderBottomWidth: 1, borderBottomColor: '#23252b', marginBottom: 0}}>
                         {(['episodes', 'related'] as const).map(tab => (
                           <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{selected: infoView === tab}}
                             onPress={() => setInfoView(tab)} style={{flex: isTabletDevice ? undefined : 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12,
