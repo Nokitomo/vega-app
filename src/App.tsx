@@ -289,7 +289,7 @@ function SettingsStackScreen() {
 function TabStack() {
   const {t} = useTranslation();
   const {primary} = useThemeStore(state => state);
-  const {useSideTabLayout} = useAdaptiveNavigation();
+  const {useSideTabLayout, tabBarHorizontalPadding, fontScale} = useAdaptiveNavigation();
   const showTabBarLables = useUiSettingsStore(
     state => state.showTabBarLabels,
   );
@@ -297,12 +297,13 @@ function TabStack() {
   // Keep tabs in normal layout so native screens cannot cover an absolute bar.
   const defaultTabBarStyle = !useSideTabLayout
     ? {
-        height: 55,
+        height: showTabBarLables ? Math.max(55, 34 + 18 * fontScale) : 55,
         borderRadius: 0,
         elevation: 0,
         borderTopWidth: 0,
         paddingTop: 5,
         paddingBottom: 0,
+        paddingHorizontal: tabBarHorizontalPadding,
       }
     : {};
 
@@ -670,6 +671,8 @@ const AppContent = () => {
             onReady={async () => {
               // Hide bootsplash
               await BootSplash.hide({fade: true});
+              // Orientation/activity recreation can unmount navigation during the fade.
+              if (!navigationRef.isReady()) {return;}
               applyOrientationForRoute(
                 navigationRef.getCurrentRoute()?.name,
               );

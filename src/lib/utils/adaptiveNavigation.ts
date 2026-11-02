@@ -1,13 +1,15 @@
 // Device classification must not change when the keyboard shrinks the window.
-// A wide content window gets a rail; compact/tablet portrait windows get tabs.
+// All orientations use bottom tabs; tablet items occupy a centered group.
 export function getAdaptiveNavigation(
   windowWidth: number,
   screenWidth: number,
   screenHeight: number,
+  fontScale = 1,
 ) {
   const isTabletDevice = Math.min(screenWidth, screenHeight) >= 600;
   return {
     isTabletDevice,
-    useSideTabLayout: isTabletDevice && windowWidth >= 900,
+    useSideTabLayout: false,
+    tabBarHorizontalPadding: isTabletDevice ? Math.max(0, (windowWidth - 400 * Math.max(1, Math.min(fontScale, 1.5))) / 2) : 0,
   };
 }

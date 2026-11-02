@@ -9,7 +9,7 @@ describe('home responsive bounds', () => {
   it.each([1, 1.3, 1.5, 2, 3])(
     'reserves room for all text and actions at font scale %s without depending on a slide',
     scale => {
-      for (const [width, height] of [[280, 640], [411, 914], [800, 1280], [1280, 800]]) {
+      for (const [width, height] of [[280, 640], [411, 914]]) {
         const layout = getHomeHeroLayout(width, height, scale, 32);
         expect(layout.frameHeight - 32 - 56).toBeGreaterThanOrEqual(layout.contentBudget + 32);
         expect(layout.frameHeight).toBeGreaterThanOrEqual(
@@ -28,12 +28,20 @@ describe('home responsive bounds', () => {
       expect(layout.minHeight).toBeLessThan(height);
     },
   );
-  it('does not grow the landscape artwork spacer with tablet width', () => {
+  it('uses a wide tablet hero in both orientations and grows for measured accessible content', () => {
     const portrait = getHomeHeroLayout(800, 1280);
     const landscape = getHomeHeroLayout(1280, 800);
-    expect(portrait.tablet && landscape.tablet).toBe(true);
-    expect(landscape.spacer).toBeLessThan(portrait.spacer);
-    expect(landscape.contentWidth).toBeLessThan(1280 / 2);
-    expect(landscape.minHeight).toBeLessThan(portrait.minHeight);
+    expect(portrait.frameHeight).toBe(400);
+    expect(landscape.frameHeight).toBe(640);
+    expect(portrait.contentWidth).toBe(400);
+    for (const [width, height] of [[600, 960], [800, 1280], [1280, 800]]) {
+      const expanded = getHomeHeroLayout(width, height, 2, 32, 700);
+      expect(expanded.frameHeight).toBeGreaterThanOrEqual(32 + 56 + 16 + 700);
+    }
+  });
+  it('keeps tablet catalog density consistent across rotation without changing phone cards', () => {
+    expect(getHomeCardWidth(800)).toBe(getHomeCardWidth(1280));
+    expect(getHomeCardWidth(800)).toBe(146);
+    expect(getHomeCardWidth(411)).toBeCloseTo(411 * 0.37);
   });
 });

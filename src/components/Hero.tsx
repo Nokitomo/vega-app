@@ -41,6 +41,8 @@ import {uniqueHeroPosts} from '../lib/utils/heroPolicy';
 import {getHomeHeroLayout, HOME_FONT} from './homePresentation';
 
 type HeroCardProps = {
+  layout: ReturnType<typeof getHomeHeroLayout>;
+  onContentHeight: (height: number) => void;
   hero: Post;
   provider: {value: string};
   reducedMotion: boolean;
@@ -49,14 +51,11 @@ type HeroCardProps = {
 };
 
 const HeroCard = memo(
-  ({hero, provider, reducedMotion, onFailure, onReady}: HeroCardProps) => {
+  ({hero, provider, reducedMotion, onFailure, onReady, layout, onContentHeight}: HeroCardProps) => {
     const {t} = useTranslation();
     const primary = useThemeStore(state => state.primary);
     const onPrimary = foregroundOnPrimary(primary);
-    const navigationSize = useWindowDimensions();
-    const {width, height, fontScale} = navigationSize;
     const insets = useSafeAreaInsets();
-    const layout = getHomeHeroLayout(width, height, fontScale, insets.top);
     const [failedImages, setFailedImages] = useState<Set<string>>(
       () => new Set(),
     );
@@ -230,8 +229,10 @@ const HeroCard = memo(
     return (
       <View style={{backgroundColor: 'black'}}>
         <View
+          testID="hero-frame"
           style={{
-            height: layout.frameHeight,
+            height: layout.tablet ? undefined : layout.frameHeight,
+            minHeight: layout.tablet ? layout.frameHeight : undefined,
             paddingTop: insets.top + 56,
           }}>
           <Pressable
@@ -278,6 +279,10 @@ const HeroCard = memo(
 
           <View style={{flex: 1}} />
           <View
+            testID="hero-content"
+            onLayout={event => {
+              if (layout.tablet) {onContentHeight(event.nativeEvent.layout.height);}
+            }}
             style={{
               paddingHorizontal: layout.inset,
               maxWidth: layout.tablet
@@ -305,7 +310,7 @@ const HeroCard = memo(
                 uri={logoUri}
                 width={Math.min(
                   layout.contentWidth - layout.inset * 2,
-                  layout.tablet ? 480 : 380,
+                  layout.tablet ? 200 : 380,
                 )}
                 height={layout.logoHeight}
                 onError={handleLogoError}
@@ -464,7 +469,17 @@ const Hero = memo(
     const initialHero = providerScope === scope ? storedHero : undefined;
     const {width, height, fontScale} = useWindowDimensions();
     const insets = useSafeAreaInsets();
-    const layout = getHomeHeroLayout(width, height, fontScale, insets.top);
+    const measureKey = `${scope}:${width}:${height}:${fontScale}:${insets.top}`;
+    const [contentMeasure, setContentMeasure] = useState({key: '', height: 0});
+    const onContentHeight = useCallback((contentHeight: number) => {
+      const measured = Math.ceil(contentHeight);
+      setContentMeasure(previous => {
+        if (previous.key === measureKey && previous.height >= measured) {return previous;}
+        return {key: measureKey, height: measured};
+      });
+    }, [measureKey]);
+    const layout = getHomeHeroLayout(width, height, fontScale, insets.top,
+      contentMeasure.key === measureKey ? contentMeasure.height : 0);
     const [selectedLink, setSelectedLink] = useState('');
     const slides = React.useMemo(() => {
       return uniqueHeroPosts(
@@ -679,6 +694,8 @@ const Hero = memo(
                 {zIndex: shown ? 1 : 0},
               ]}>
               <HeroCard
+                layout={layout}
+                onContentHeight={onContentHeight}
                 hero={post}
                 provider={provider}
                 reducedMotion={reducedMotion}

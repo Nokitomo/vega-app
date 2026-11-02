@@ -531,6 +531,34 @@ describe('Hero carousel resilience', () => {
     expect(currentImage().props.source.uri).toBe('second.jpg');
   });
 
+  it('shares the largest measured tablet content across slides and resets it after rotation', async () => {
+    const dimensions = jest.spyOn(require('react-native'), 'useWindowDimensions');
+    let resize!: React.Dispatch<React.SetStateAction<import('react-native').ScaledSize>>;
+    dimensions.mockImplementation(() => {
+      const [size, setSize] = React.useState({width: 800, height: 1280, scale: 2, fontScale: 2});
+      resize = setSize;
+      return size;
+    });
+    await render();
+    await act(async () => {
+      tree.root.findAllByProps({testID: 'hero-content'})[0].props.onLayout({
+        nativeEvent: {layout: {height: 700}},
+      });
+    });
+    for (const frame of tree.root.findAllByProps({testID: 'hero-frame'})) {
+      expect(frame.props.style.minHeight).toBe(772);
+      expect(frame.props.style.height).toBeUndefined();
+    }
+    await act(async () => {
+      tree.root.findAllByProps({testID: 'hero-content'})[0].props.onLayout({
+        nativeEvent: {layout: {height: 200}},
+      });
+    });
+    expect(tree.root.findAllByProps({testID: 'hero-frame'})[0].props.style.minHeight).toBe(772);
+    await act(async () => resize({width: 1280, height: 800, scale: 2, fontScale: 1}));
+    expect(tree.root.findAllByProps({testID: 'hero-frame'})[0].props.style.minHeight).toBe(640);
+  });
+
   it('does not request metadata for a hero belonging to the previous provider', async () => {
     contentStoreMock.mockImplementation(
       selectorStoreMock({

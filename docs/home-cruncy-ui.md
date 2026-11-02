@@ -539,7 +539,8 @@ icone/etichette inattive #DADADA e colore attivo del tema. Rimosso il precedente
 blur/gradiente delle altre schede. L'area sicura inferiore Android segue il
 fondo della barra in tutte le quattro sezioni e nei rispettivi dettagli.
 WebView con barra nascosta e player mantengono il fondo nero; restano invariate
-geometria, destinazioni, gestione tastiera e disposizione laterale tablet.
+destinazioni e gestione tastiera. La disposizione tablet e ora inferiore e
+centrata, come descritto in `tablet-responsive-verification.md`.
 
 TypeScript e lint senza diagnostiche; 34 test superati per selezione della
 scheda attiva, WebView/player, layout, temi e interazioni Home. Su
@@ -551,3 +552,12 @@ Android a tre pulsanti mantenuta. Screenshot `bar-*.png` nella cartella locale
 `.codex/screenshots/home-theme-polish/`, esclusi da Git. iOS e tablet fisico non
 verificati; player/WebView coperti qui dai test di selezione route, non da una
 nuova prova di riproduzione.
+
+## Adattamento tablet della Home
+
+Il confronto tablet del 2 novembre 2026 ha portato a un hero proporzionato alla
+larghezza, con contenuto nella meta sinistra e spazio adattivo per testi grandi.
+Le card dei caroselli e delle ricerche usano 146 dp nelle finestre da 600 dp;
+la barra di navigazione resta in basso con pulsanti centrati. Dettagli, evidenze
+e limiti sono in `tablet-responsive-verification.md`. Fonti metadata e ordine
+dei fallback non cambiano.
