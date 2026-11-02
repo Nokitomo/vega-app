@@ -88,3 +88,16 @@ avvio del primo episodio di Dexter dal pulsante fisso e riproduzione osservata
 film Drive, barra durante scroll e nei correlati, aggiunta e rimozione dai
 preferiti (stato originario ripristinato). Evidenze `step3-footer.png`,
 `step3-player-exit.png`, `step3-film-save.png`, `step3-related.png`.
+
+## Passaggio 4: tab e stagioni
+
+Tab Episodi/Correlati con sottolineatura e stato accessibile. Selettore stagioni
+in modal a schermo intero con lista virtualizzata e indicazione della scelta.
+Usa gli stessi oggetti, etichette localizzate, ordine e handleSeasonChange.
+Non altera catalogo, ricerca o ordinamento degli episodi.
+
+TypeScript e lint superati. Su Medium_Phone_API_35: ricerca StreamingUnity di
+Breaking Bad, apertura dai risultati, picker con cinque stagioni, selezione
+stagione 2 e verifica episodi (Tutto cambia, Grigliato). Passaggio Correlati /
+Episodi conserva stagione 2; riapertura e Back chiudono senza cambiare scelta.
+Evidenze `step4-picker.png`, `step4-season2.png`, `step4-season2-rows.png`.

@@ -22,7 +22,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Feather from '@expo/vector-icons/Feather';
-import {Dropdown} from 'react-native-element-dropdown';
+import InfoSeasonPicker from './InfoSeasonPicker';
+import {HOME_FONT} from './homePresentation';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -3018,53 +3019,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   if (episodeLoading) {
     return (
       <View>
-        {LinkList.length > 1 && (
-          <Dropdown
-            selectedTextStyle={{
-              color: primary,
-              fontWeight: 'bold',
-              fontSize: 14,
-              lineHeight: 18,
-              textAlignVertical: 'center',
-              includeFontPadding: false,
-            }}
-            labelField={'displayTitle'}
-            valueField={'seasonValue'}
-            onChange={handleSeasonChange}
-            value={activeSeasonValue?.seasonValue}
-            data={linkListWithDisplayTitle}
-            style={{
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor: '#2f302f',
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              backgroundColor: 'black',
-              minHeight: 40,
-              justifyContent: 'center',
-              paddingVertical: 8,
-            }}
-            containerStyle={{
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor: 'gray',
-              borderRadius: 8,
-              backgroundColor: 'black',
-            }}
-            renderItem={item => (
-              <View
-                className={`px-3 py-2 bg-black text-white flex-row justify-start items-center border-b border-gray-500 text-center ${
-                  activeSeasonValue && isSameSeason(activeSeasonValue, item)
-                    ? 'bg-quaternary'
-                    : ''
-                }`}>
-                <Text className="text-white">
-                  {item?.displayTitle || item?.title || t('Unknown')}
-                </Text>
-              </View>
-            )}
-          />
-        )}
+        <InfoSeasonPicker items={linkListWithDisplayTitle} selected={activeSeasonValue} onSelect={handleSeasonChange} />
 
         <View
           style={{
@@ -3126,53 +3081,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
       )}
       {/* Season Selector */}
       {LinkList.length > 1 ? (
-        <Dropdown
-          selectedTextStyle={{
-            color: primary,
-            fontWeight: 'bold',
-            fontSize: 14,
-            lineHeight: 18,
-            textAlignVertical: 'center',
-            includeFontPadding: false,
-          }}
-          labelField={'displayTitle'}
-          valueField={'seasonValue'}
-          onChange={handleSeasonChange}
-          value={activeSeasonValue?.seasonValue}
-          data={linkListWithDisplayTitle}
-          style={{
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: '#2f302f',
-            paddingHorizontal: 12,
-            borderRadius: 8,
-            backgroundColor: 'black',
-            paddingVertical: 8,
-            minHeight: 40,
-            justifyContent: 'center',
-          }}
-          containerStyle={{
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: 'gray',
-            borderRadius: 8,
-            backgroundColor: 'black',
-          }}
-          renderItem={item => (
-            <View
-              className={`px-3 py-2 bg-black text-white flex-row justify-start items-center border-b border-gray-500 text-center ${
-                activeSeasonValue && isSameSeason(activeSeasonValue, item)
-                  ? 'bg-quaternary'
-                  : ''
-              }`}>
-              <Text className="text-white">
-                {item?.displayTitle || item?.title || t('Unknown')}
-              </Text>
-            </View>
-          )}
-        />
+        <InfoSeasonPicker items={linkListWithDisplayTitle} selected={activeSeasonValue} onSelect={handleSeasonChange} />
       ) : (
-        <Text className="text-red-600 text-lg font-semibold px-2">
+        <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 18, paddingVertical: 16}}>
           {resolveTitle(LinkList[0]) || t('Unknown Season')}
         </Text>
       )}

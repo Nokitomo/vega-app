@@ -1176,29 +1176,16 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </View>
                   ) : (
                     <>
-                      <View className="flex-row gap-2 mb-4">
-                        <TouchableOpacity
-                          onPress={() => setInfoView('episodes')}
-                          className={`px-3 py-1 rounded-md ${
-                            infoView === 'episodes'
-                              ? 'bg-tertiary'
-                              : 'bg-quaternary'
-                          }`}>
-                          <Text className="text-white text-xs font-semibold">
-                            {t('Episodes')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => setInfoView('related')}
-                          className={`px-3 py-1 rounded-md ${
-                            infoView === 'related'
-                              ? 'bg-tertiary'
-                              : 'bg-quaternary'
-                          }`}>
-                          <Text className="text-white text-xs font-semibold">
-                            {t('Related')}
-                          </Text>
-                        </TouchableOpacity>
+                      <View accessibilityRole="tablist" style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#23252b', marginBottom: 16}}>
+                        {(['episodes', 'related'] as const).map(tab => (
+                          <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{selected: infoView === tab}}
+                            onPress={() => setInfoView(tab)} style={{flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12,
+                              borderBottomWidth: 3, borderBottomColor: infoView === tab ? primary : 'transparent'}}>
+                            <Text style={{color: infoView === tab ? 'white' : '#a0a0a8', fontFamily: HOME_FONT.bold, fontSize: 16}}>
+                              {t(tab === 'episodes' ? 'Episodes' : 'Related')}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
                       </View>
                       <View style={{display: infoView === 'episodes' ? 'flex' : 'none'}}>
                         <SeasonList
