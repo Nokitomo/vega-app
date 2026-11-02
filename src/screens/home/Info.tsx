@@ -10,6 +10,7 @@ import {
   Pressable,
   useWindowDimensions,
   Animated,
+  ScrollView,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
@@ -935,12 +936,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                   <View className="flex-row gap-x-3 gap-y-1 flex-wrap items-center mb-4">
                     {/* badges */}
                     {badgeYear && (
-                      <Text className="text-white text-xs bg-tertiary px-2 rounded-md">
+                      <Text style={{color: '#b8b8bd', fontFamily: HOME_FONT.regular, fontSize: 12}}>
                         {badgeYear}
                       </Text>
                     )}
                     {badgeRuntime && (
-                      <Text className="text-white text-xs bg-tertiary px-2 rounded-md">
+                      <Text style={{color: '#b8b8bd', fontFamily: HOME_FONT.regular, fontSize: 12}}>
                         {badgeRuntime}
                       </Text>
                     )}
@@ -948,12 +949,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       badgeGenres.map((genre: string) => (
                         <Text
                           key={genre}
-                          className="text-white text-xs bg-tertiary px-2 rounded-md">
+                          style={{color: '#b8b8bd', fontFamily: HOME_FONT.regular, fontSize: 12}}>
                           {genre}
                         </Text>
                       ))}
                     {info?.episodesCount ? (
-                      <Text className="text-white text-xs bg-tertiary px-2 rounded-md">
+                      <Text style={{color: '#b8b8bd', fontFamily: HOME_FONT.regular, fontSize: 12}}>
                         {t('Episodes: {{count}}', {
                           count: info.episodesCount,
                         })}
@@ -962,55 +963,16 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     {displayTags.map((tag: string) => (
                       <Text
                         key={tag}
-                        className="text-white text-xs bg-tertiary px-2 rounded-md">
+                        style={{color: '#b8b8bd', fontFamily: HOME_FONT.regular, fontSize: 12}}>
                         {tag}
                       </Text>
                     ))}
                   </View>
-                  {/* Awards */}
-                  {meta?.awards && (
-                    <View className="mb-2 w-full flex-row items-baseline gap-2">
-                      <Text className="text-white text- font-semibold">
-                        {t('Awards:')}
-                      </Text>
-                      <Text className="text-white text-xs px-1 bg-tertiary rounded-sm">
-                        {meta?.awards?.length > 50
-                          ? meta?.awards.slice(0, 50) + '...'
-                          : meta?.awards}
-                      </Text>
-                    </View>
-                  )}
-                  {/* cast  */}
-                  {hasCast && (
-                    <View className="mb-2 w-full flex-row items-start gap-2">
-                      <Text className="text-white text-lg font-semibold pt-[0.9px]">
-                        {t('Cast')}
-                      </Text>
-                      <View className="flex-row gap-1 flex-wrap">
-                        {displayCast
-                          .slice(0, 3)
-                          .map((actor: string, index: number) => (
-                            <Text
-                              key={`${actor}-${index}`}
-                              numberOfLines={1}
-                              className={`text-xs bg-tertiary p-1 px-2 rounded-md ${
-                                index % 3 === 0
-                                  ? 'text-red-500'
-                                  : index % 3 === 1
-                                    ? 'text-blue-500'
-                                    : 'text-green-500'
-                              }`}>
-                              {actor}
-                            </Text>
-                          ))}
-                      </View>
-                    </View>
-                  )}
                   {/* synopsis */}
                   <View className="mb-2 w-full flex-row items-center justify-between">
                     <SkeletonLoader show={infoLoading} height={25} width={180}>
                       <View className="flex-row items-center gap-2">
-                        <Text className="text-white text-lg font-semibold">
+                        <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 18}}>
                           {t('Synopsis')}
                         </Text>
                         <Text className="text-white text-xs bg-tertiary p-1 px-2 rounded-md">
@@ -1122,51 +1084,90 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </View>
                   </View>
                   <SkeletonLoader show={infoLoading} height={85} width={'100%'}>
-                    <Text className="text-gray-200 text-sm px-2 py-1 bg-tertiary rounded-md">
-                      {synopsis.length > 180 && !readMore
-                        ? synopsis.slice(0, 180) + '... '
-                        : synopsis}
-                      {synopsis.length > 180 && !readMore && (
-                        <Text
-                          onPress={() => setReadMore(!readMore)}
-                          className="text-white font-extrabold text-xs px-2 bg-tertiary rounded-md">
-                          {t('read more')}
-                        </Text>
-                      )}
+                    <Text numberOfLines={3} style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14, lineHeight: 21}}>
+                      {synopsis}
                     </Text>
                   </SkeletonLoader>
-                  {showInfoDetails ? (
-                    <View className="mt-2">
-                      {allowProviderStudio ? (
-                        <Text className="text-gray-400 text-xs">
-                          {t('Studio: {{name}}', {name: info.studio})}
-                        </Text>
-                      ) : null}
-                      {allowProviderGenres &&
-                      info?.genres &&
-                      info.genres.length > 0 ? (
-                        <Text className="text-gray-400 text-xs mt-1">
-                          {t('Genres: {{list}}', {
-                            list: localizedGenres.join(' · '),
-                          })}
-                        </Text>
-                      ) : null}
-                      {showProviderFallback &&
-                      !hasAnimeExternalIds &&
-                      info?.country ? (
-                        <Text className="text-gray-400 text-xs mt-1">
-                          {t('Country: {{name}}', {name: info.country})}
-                        </Text>
-                      ) : null}
-                      {showProviderFallback &&
-                      !hasAnimeExternalIds &&
-                      info?.director ? (
-                        <Text className="text-gray-400 text-xs mt-1">
-                          {t('Director: {{name}}', {name: info.director})}
-                        </Text>
-                      ) : null}
+                  <TouchableOpacity accessibilityRole="button" onPress={() => setReadMore(true)}
+                    style={{minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start'}}>
+                    <Text style={{color: primary, fontFamily: HOME_FONT.bold, fontSize: 14}}>{t('More details')}</Text>
+                  </TouchableOpacity>
+                  <Modal visible={readMore} animationType="slide" onRequestClose={() => setReadMore(false)}>
+                    <View style={{flex: 1, backgroundColor: '#000', paddingTop: insets.top, paddingBottom: insets.bottom}}>
+                      <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12}}>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
+                          onPress={() => setReadMore(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
+                          <Ionicons name="close" size={28} color="white" />
+                        </TouchableOpacity>
+                        <Text style={{flex: 1, color: 'white', fontFamily: HOME_FONT.heading, fontSize: 22}}>{t('More details')}</Text>
+                      </View>
+                      <ScrollView contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+                        <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 24}}>{displayTitle}</Text>
+                        <Text style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 16, lineHeight: 24}}>{synopsis}</Text>
+                        {/* Awards */}
+                        {meta?.awards && (
+                          <View className="mb-2 w-full flex-row items-baseline gap-2">
+                            <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
+                              {t('Awards:')}
+                            </Text>
+                            <Text style={{flex: 1, color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
+                              {meta.awards}
+                            </Text>
+                          </View>
+                        )}
+                        {/* cast  */}
+                        {hasCast && (
+                          <View className="mb-2 w-full flex-row items-start gap-2">
+                            <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
+                              {t('Cast')}
+                            </Text>
+                            <View className="flex-1 flex-row gap-1 flex-wrap">
+                              {displayCast
+                                .map((actor: string, index: number) => (
+                                  <Text
+                                    key={`${actor}-${index}`}
+                                    style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
+                                    {`${index > 0 ? ' · ' : ''}${actor}`}
+                                  </Text>
+                                ))}
+                            </View>
+                          </View>
+                        )}
+                        {showInfoDetails ? (
+                          <View className="mt-2">
+                            {allowProviderStudio ? (
+                              <Text className="text-gray-400 text-xs">
+                                {t('Studio: {{name}}', {name: info.studio})}
+                              </Text>
+                            ) : null}
+                            {allowProviderGenres &&
+                            info?.genres &&
+                            info.genres.length > 0 ? (
+                              <Text className="text-gray-400 text-xs mt-1">
+                                {t('Genres: {{list}}', {
+                                  list: localizedGenres.join(' · '),
+                                })}
+                              </Text>
+                            ) : null}
+                            {showProviderFallback &&
+                            !hasAnimeExternalIds &&
+                            info?.country ? (
+                              <Text className="text-gray-400 text-xs mt-1">
+                                {t('Country: {{name}}', {name: info.country})}
+                              </Text>
+                            ) : null}
+                            {showProviderFallback &&
+                            !hasAnimeExternalIds &&
+                            info?.director ? (
+                              <Text className="text-gray-400 text-xs mt-1">
+                                {t('Director: {{name}}', {name: info.director})}
+                              </Text>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </ScrollView>
                     </View>
-                  ) : null}
+                  </Modal>
                   {/* cast */}
                 </View>
                 <View className="p-4 bg-black">

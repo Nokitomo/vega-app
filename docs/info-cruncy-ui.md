@@ -55,3 +55,19 @@ iOS richiede un dispositivo con build compatibile. I warning runtime osservati
 riguardano il ciclo di import del downloader, SafeAreaView deprecata e Legacy
 Architecture, componenti non modificati da questo passaggio. Un ANR della Home
 prima della prova non si e ripetuto durante la navigazione della scheda.
+
+## Passaggio 2: informazioni e dettagli
+
+Metadata compatti con font Home; sinossi limitata a tre righe nella scheda.
+Altri dettagli apre una vista scorrevole con sinossi integrale, cast, premi
+e informazioni aggiuntive alle stesse condizioni di disponibilita precedenti.
+Premi e cast non vengono piu troncati nel dettaglio. Varianti, trailer,
+preferiti e menu restano disponibili; selezione e preferenze metadata invariate.
+
+TypeScript e lint superati (corretto un warning di spazi finali).
+Su Medium_Phone_API_35 verificati caricamento reale di Dexter: Resurrection
+con StreamingUnity, apertura dettagli, chiusura con Back Android e con X,
+e ritorno agli episodi. Evidenze locali `step2-dexter-ready.png`,
+`step2-details-final.png`, `step2-details-back.png`, `step2-episodes.png`.
+AnimeUnity indisponibile secondo conferma dell'utente: i successivi test
+remoti usano StreamingUnity. Nessuna modifica ai provider.
