@@ -97,6 +97,7 @@ import {setClipboardString} from '../lib/utils/clipboard';
 import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 import EpisodeMetadata from './EpisodeMetadata';
+import {infoCtaKey} from '../lib/utils/infoCta';
 import {getFillerEpisodes} from '../lib/services/fillerDatabase';
 import {readMetadata, writeMetadata} from '../lib/storage/MetadataDatabase';
 import {needsPrePlayRefresh, resolvePrePlayEpisodes} from '../lib/utils/prePlayEpisodes';
@@ -118,6 +119,7 @@ export interface InfoPlaybackAction {
 }
 
 interface SeasonListProps {
+  tabletColumns?: number;
   playbackActionRef?: React.MutableRefObject<(() => void) | null>;
   onPlaybackActionChange?: (action: InfoPlaybackAction | null) => void;
   LinkList: Link[];
@@ -410,6 +412,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   refreshing: _refreshing,
   refreshVersion = 0,
   playbackActionRef,
+  tabletColumns = 1,
   onPlaybackActionChange,
   routeParams,
 }) => {
@@ -2688,13 +2691,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
   ]);
 
   // Publish presentation only; the fixed action invokes the existing playback handler.
-  const actionLabel = playbackSelection.playFromBeginning
-    ? t('Play from beginning')
-    : canResumePlayback ? t('Resume') : t('Play');
+  const actionLabel = t(infoCtaKey(contentInfo || {type}, {
+    playFromBeginning: !!playbackSelection.playFromBeginning,
+    canResume: canResumePlayback,
+    hasEpisodeTarget: !!playbackSelection.target && !!resumeEpisodeLabel,
+  }), {episode: resumeEpisodeLabel || ''});
   const actionDetail = [resumeEpisodeLabel,
     playbackSelection.resetPlayback ||
     (playbackSelection.target && playbackSelection.target.link !== resumeProgress?.episodeLink)
-      ? '' : formatResumeTime(resumeProgress?.currentTime ?? 0),
+      ? '' : canResumePlayback ? formatResumeTime(resumeProgress?.currentTime ?? 0) : '',
   ].filter(Boolean).join(' · ');
   const actionAvailable = !episodeLoading && !(episodeError && episodeList.length === 0) &&
     (resumeProgress?.currentTime != null || filteredAndSortedEpisodes.length > 0 || filteredAndSortedDirectLinks.length > 0);
@@ -3168,9 +3173,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
         {/* Episodes List */}
         {filteredAndSortedEpisodes.length > 0 && (
           <FlatList
+            key={`episodes-${tabletColumns}`}
+            numColumns={tabletColumns}
+            columnWrapperStyle={tabletColumns > 1 ? {gap: 24} : undefined}
+            scrollEnabled={false}
             data={filteredAndSortedEpisodes}
             keyExtractor={(item, index) => `episode-${item.link}-${index}`}
-            renderItem={renderEpisodeItem}
+            renderItem={item => <View style={{flex: 1, maxWidth: tabletColumns > 1 ? '50%' : '100%'}}>{renderEpisodeItem(item)}</View>}
             maxToRenderPerBatch={10}
             windowSize={10}
             removeClippedSubviews={true}
@@ -3181,6 +3190,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         {filteredAndSortedDirectLinks.length > 0 && (
           <View className="w-full justify-center items-center gap-y-2 mt-5 p-2">
             <FlatList
+              scrollEnabled={false}
               data={filteredAndSortedDirectLinks}
               keyExtractor={(item, index) => `direct-${item.link}-${index}`}
               renderItem={renderDirectLinkItem}

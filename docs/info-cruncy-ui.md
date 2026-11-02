@@ -163,3 +163,70 @@ non usato per test remoti. Player e download end-to-end non certificati da quest
 intervento UI; resta il blocco emulatore descritto al punto 5. Gli stati e le
 funzioni esclusivi di Crunchyroll non presenti in Vega non vengono aggiunti.
 La copertura non equivale a una garanzia di assenza di bug su ogni dispositivo.
+
+## Passaggio 7: confronto diretto e layout tablet (2026-11-02)
+
+Il limite centrale di 840 dp descritto al passaggio 6 e stato sostituito.
+Confronto effettuato dopo login su Crunchyroll Android 3.126.0, sullo stesso
+Medium_Tablet_API_35 (2560x1600, densita 320): schede di Hello, I am a Witch
+e Our Last Crusade, in verticale e orizzontale, episodi, correlati, stagioni
+e dettagli. Il layout APK `layout-sw600dp-land/activity_show_page.xml`
+conferma la divisione 0.63 osservata sul dispositivo.
+
+- Tablet orizzontale con almeno 900 dp disponibili: riepilogo al 63%, episodi
+  e correlati al 37%; scorrimenti indipendenti, tab fissi sul pannello destro
+  e azioni fisse sotto quello sinistro. Il rail Vega resta disponibile.
+- Verticale: pagina unica, episodi su due colonne da 720 dp disponibili;
+  correlati su cinque colonne (due nel pannello orizzontale). Le finestre
+  piu strette mantengono il riepilogo sopra gli episodi.
+- Stagioni e dettagli: dialog centrali scuri su tablet, chiusura a destra;
+  su smartphone rimangono a schermo intero.
+- Logo allineato a sinistra su tablet; CTA a pillola su entrambe le classi
+  di dispositivo. Il riferimento smartphone archiviato conferma la forma
+  arrotondata, correggendo la precedente interpretazione squadrata.
+- Testo CTA iniziale condiviso con Home tramite heroCtaKey: serie "Inizia a
+  guardare E1", film "Riproduci". Riprendi, prossimo episodio e ricomincia
+  mantengono la selezione di riproduzione esistente. Nessun cambiamento a
+  handler, preferenze metadata, fallback immagini o classificazione provider.
+- La struttura dei componenti resta stabile durante la rotazione: stagione
+  e filtro non si perdono. Gli scroller disabilitati azzerano il loro offset
+  per evitare contenuto fuori schermo passando da una disposizione all'altra.
+
+Verifiche: TypeScript e lint puliti; 37 test in sei suite (InfoAdaptiveLayout,
+infoCta, heroCta, EpisodeMetadata, continueWatchingFixes, adaptiveNavigation).
+Il test di rotazione controlla che lo stato della stagione sopravviva e non
+compaiano CTA duplicate; i test CTA includono una serie terminata con 12 episodi,
+che non deve essere trattata come film.
+
+Su dev client Android con StreamingUnity: Breaking Bad, cinque stagioni,
+selezione stagione 2, rotazioni ripetute, scorrimento fino al tredicesimo episodio
+in verticale e ritorno in orizzontale, dettagli, chiusura dialog con Back.
+Sul bundle finale ricontrollati CTA serie, picker, film El Camino (Riproduci),
+correlati popolati e scorrimento indipendente, aggiunta/rimozione preferito con
+ripristino dello stato iniziale. Scala testo al 150% verificata su serie in
+entrambi gli orientamenti, inclusi episodi e correlati; poi ripristinata a 100%.
+Ripristinata anche la preferenza iniziale di rotazione tablet (disattivata)
+e le impostazioni Android di rotazione automatica precedenti.
+
+Evidenze locali fuori Git in `D:\codex-temp\vega-search-cards-20261030`:
+`crunchy-tablet-landscape-clean.png`, `crunchy-tablet-long-list.png`,
+`crunchy-tablet-portrait-top.png`, `crunchy-tablet-season-landscape.png`,
+`crunchy-tablet-details.png`; risultato finale `final-series-ready.png`,
+`final-season-picker.png`, `final-film-check.png`, `final-details.png`,
+`final-film-related.png`, `final-related-bottom.png`,
+`final-film-bookmark.png`, `final-bookmark-restored.png`,
+`final-large-series-ready.png`, `final-portrait-large.png`,
+`final-portrait-related.png`. Le precedenti prove di scorrimento sono in
+`vega-tablet-portrait-bottom2.png` e `vega-tablet-rotate-from-bottom.png`.
+
+Limiti del confronto: questa e la riproduzione della struttura tablet adattata
+alle funzioni Vega, non una certificazione di identita pixel per pixel.
+Restano intenzionalmente ricerca/ordinamento, sinossi degli episodi, overlay
+Play, valutazioni e dati provider di Vega: le righe episodi risultano quindi
+piu alte del riferimento. Il dialog dettagli mantiene i campi informativi Vega.
+Non sono state introdotte funzioni esclusive del servizio Crunchyroll.
+In questo passaggio non sono stati avviati stream o download, come richiesto;
+iOS e nuovi test runtime su smartphone non eseguiti. AnimeUnity indisponibile.
+Il renderer software dell'emulatore si chiudeva durante l'uso di Crunchyroll;
+le prove sono state completate con GPU host e Vulkan disabilitato, senza
+cancellare dati o sessione di login dell'AVD.

@@ -19,6 +19,8 @@ import {
 } from '@react-navigation/native-stack';
 import {HomeStackParamList, TabStackParamList} from '../../App';
 import LinearGradient from 'react-native-linear-gradient';
+import InfoDialog from '../../components/InfoDialog';
+import InfoAdaptiveLayout from '../../components/InfoAdaptiveLayout';
 import SeasonList, {type InfoPlaybackAction} from '../../components/SeasonList';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {settingsStorage, watchHistoryStorage, watchListStorage} from '../../lib/storage';
@@ -86,10 +88,13 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const {t} = useTranslation();
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
-  const {width: windowWidth} = useWindowDimensions();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const {isTabletDevice} = useAdaptiveNavigation();
   const [contentWidth, setContentWidth] = useState(windowWidth);
+  const [contentHeight, setContentHeight] = useState(windowHeight);
+  const tabletLandscape = isTabletDevice && contentWidth > contentHeight && contentWidth >= 900;
+  const summaryWidth = tabletLandscape ? contentWidth * 0.63 : contentWidth;
   const playbackActionRef = useRef<(() => void) | null>(null);
   const [playbackAction, setPlaybackAction] = useState<InfoPlaybackAction | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -133,9 +138,9 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   );
   const infoHeaderHeight = useMemo(() => {
     const width =
-      Number.isFinite(contentWidth) && contentWidth > 0 ? contentWidth : 390;
+      Number.isFinite(summaryWidth) && summaryWidth > 0 ? summaryWidth : 390;
     return Math.round(width * (isTabletDevice ? 9 / 16 : 3 / 2));
-  }, [contentWidth, isTabletDevice]);
+  }, [summaryWidth, isTabletDevice]);
   const toolbarOpacity = scrollY.interpolate({
     inputRange: [Math.max(0, infoHeaderHeight - insets.top - 260), Math.max(1, infoHeaderHeight - insets.top - 180)],
     outputRange: [0, 1],
@@ -765,7 +770,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
           onPress={handleClose} style={{width: 56, height: 56, alignItems: 'center', justifyContent: 'center'}}>
           <Ionicons name="close" size={28} color="white" />
         </TouchableOpacity>
-        <ScrollView contentContainerStyle={{padding: 16, width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+        <ScrollView contentContainerStyle={{padding: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
           <View accessible accessibilityLabel={t('Loading content')} accessibilityState={{busy: true}}>
             <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden pointerEvents="none">
               <SkeletonLoader height={Math.min(360, infoHeaderHeight / 2)} width="100%" />
@@ -818,6 +823,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
         className="h-full w-full"
         onLayout={event => {
           setContentWidth(event.nativeEvent.layout.width);
+          setContentHeight(event.nativeEvent.layout.height);
           markPerfNavigationStage('first_layout');
         }}>
         <StatusBar
@@ -854,6 +860,20 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             ) : null}
             </View>
           </View>
+          <InfoAdaptiveLayout landscape={tabletLandscape} scrollY={scrollY} toolbarHeight={insets.top + 56}
+            refreshControl={<RefreshControl colors={[primary]} tintColor={primary} progressBackgroundColor="black" refreshing={refreshing} onRefresh={handleRefresh} />}
+            tabs={(<View accessibilityRole="tablist" style={{flexDirection: 'row', justifyContent: tabletLandscape ? 'center' : 'flex-start', borderBottomWidth: 1, borderBottomColor: '#23252b', marginBottom: 0}}>
+                        {(['episodes', 'related'] as const).map(tab => (
+                          <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{selected: infoView === tab}}
+                            onPress={() => setInfoView(tab)} style={{flex: isTabletDevice ? undefined : 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12,
+                              borderBottomWidth: 3, borderBottomColor: infoView === tab ? primary : 'transparent'}}>
+                            <Text style={{color: infoView === tab ? 'white' : '#a0a0a8', fontFamily: HOME_FONT.bold, fontSize: 16}}>
+                              {t(tab === 'episodes' ? 'Episodes' : 'Related')}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>)}
+            background={(
           <View className="absolute w-full" style={{height: infoHeaderHeight}}>
             <SkeletonLoader
               show={infoLoading}
@@ -867,33 +887,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               />
             </SkeletonLoader>
           </View>
-
-          {
-            // manifest[route.params.provider || provider.value].blurImage && (
-            //   <BlurView
-            //     intensity={4}
-            //     blurReductionFactor={1}
-            //     experimentalBlurMethod="dimezisBlurView"
-            //     tint="default"
-            //     style={{
-            //       position: 'absolute',
-            //       top: 0,
-            //       left: 0,
-            //       right: 0,
-            //       bottom: 0,
-            //       height: 256,
-            //       width: '100%',
-            //     }}
-            //   />
-            // )
-          }
-          <Animated.FlatList
-            style={{flex: 1}}
-            data={[]}
-            keyExtractor={(_, i) => i.toString()}
-            renderItem={() => <View />}
-            ListHeaderComponent={
-              <>
+            )}
+            summary={<>
                 <View
                   className="relative w-full"
                   style={{minHeight: infoHeaderHeight, justifyContent: 'flex-end'}}>
@@ -902,9 +897,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     locations={[0, 0.45, 1]}
                     style={{position: 'absolute', top: 0, bottom: 0, left: 0, right: 0}}
                   />
-                  <View style={{alignItems: 'center', paddingHorizontal: 24, paddingTop: insets.top + 72, paddingBottom: 16, gap: 12}}>
+                  <View style={{alignItems: isTabletDevice ? 'flex-start' : 'center', paddingHorizontal: 24, paddingTop: insets.top + 72, paddingBottom: 16, gap: 12}}>
                     {logoImage ? (
                       <RemoteLogo
+                        align={isTabletDevice ? 'left' : 'center'}
                         uri={logoImage}
                         width={Math.min(320, Math.max(1, contentWidth - 48))}
                         height={100}
@@ -935,7 +931,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                   </View>
                 </View>
                 <View style={{backgroundColor: 'black', width: '100%'}}>
-                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
                   {variants.length > 1 ? (
                     <View className="mb-4">
                       <Text className="text-gray-300 text-xs mb-2">
@@ -1110,19 +1106,19 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </Text>
                   </SkeletonLoader>
                   <TouchableOpacity accessibilityRole="button" onPress={() => setReadMore(true)}
-                    style={{minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start'}}>
+                    style={{minHeight: 48, justifyContent: 'center', alignSelf: isTabletDevice ? 'center' : 'flex-start'}}>
                     <Text style={{color: primary, fontFamily: HOME_FONT.bold, fontSize: 14}}>{t('More details')}</Text>
                   </TouchableOpacity>
-                  <Modal visible={readMore} animationType="slide" onRequestClose={() => setReadMore(false)}>
-                    <View style={{flex: 1, backgroundColor: '#000', paddingTop: insets.top, paddingBottom: insets.bottom}}>
-                      <View style={{flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12}}>
+                  <InfoDialog visible={readMore} onClose={() => setReadMore(false)}>
+                    <View style={{flex: 1}}>
+                      <View style={{flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12}}>
                         <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
                           onPress={() => setReadMore(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
                           <Ionicons name="close" size={28} color="white" />
                         </TouchableOpacity>
                         <Text style={{flex: 1, color: 'white', fontFamily: HOME_FONT.heading, fontSize: 22}}>{t('More details')}</Text>
                       </View>
-                      <ScrollView contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+                      <ScrollView contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
                         <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 24}}>{displayTitle}</Text>
                         <Text style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 16, lineHeight: 24}}>{synopsis}</Text>
                         {/* Awards */}
@@ -1188,10 +1184,38 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         ) : null}
                       </ScrollView>
                     </View>
-                  </Modal>
+                  </InfoDialog>
                   {/* cast */}
                 </View>
-                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: 840, alignSelf: 'center'}}>
+                </View>
+
+            </>}
+            footer={(
+
+            <View style={{backgroundColor: 'black', paddingVertical: 12, paddingHorizontal: isTabletDevice ? 20 : 16, flexDirection: 'row', alignItems: 'center', gap: 12}}>
+              <TouchableOpacity accessibilityRole="button"
+                accessibilityState={{disabled: !playbackAction?.available, busy: playbackAction?.loading}}
+                disabled={!playbackAction?.available}
+                onPress={() => playbackActionRef.current?.()}
+                style={{flex: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 10,
+                  borderRadius: 999, backgroundColor: primary, opacity: playbackAction?.available ? 1 : 0.5,
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10}}>
+                <Ionicons name="play-outline" size={22} color="black" />
+                <View style={{flexShrink: 1}}>
+                  <Text style={{fontFamily: HOME_FONT.bold, color: 'black', fontSize: 16}}>{playbackAction?.label || t('Play')}</Text>
+                  {playbackAction?.detail ? <Text style={{fontFamily: HOME_FONT.regular, color: 'black', fontSize: 12}}>{playbackAction.detail}</Text> : null}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel={t(inLibrary ? 'Remove from watch list' : 'Add to watch list')}
+                onPress={() => inLibrary ? removeLibrary() : addLibrary()}
+                style={{flex: isTabletDevice ? 1 : undefined, minWidth: 48, minHeight: 48, borderRadius: 999, borderWidth: 2, borderColor: primary, flexDirection: 'row', gap: 8, paddingHorizontal: isTabletDevice ? 16 : 0, alignItems: 'center', justifyContent: 'center'}}>
+                <Ionicons name={inLibrary ? 'bookmark' : 'bookmark-outline'} size={28} color={primary} />
+                {isTabletDevice && <Text style={{color: primary, fontFamily: HOME_FONT.bold, fontSize: 16, flexShrink: 1}}>{t(inLibrary ? 'Remove from watch list' : 'Add to watch list')}</Text>}
+              </TouchableOpacity>
+            </View>
+            )}>
+                <View style={{padding: 16, backgroundColor: 'black', width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
                   {infoLoading ? (
                     <View className="gap-y-3 items-start mb-4 p-3">
                       <SkeletonLoader show={true} height={30} width={80} />
@@ -1209,19 +1233,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </View>
                   ) : (
                     <>
-                      <View accessibilityRole="tablist" style={{flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#23252b', marginBottom: 16}}>
-                        {(['episodes', 'related'] as const).map(tab => (
-                          <TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{selected: infoView === tab}}
-                            onPress={() => setInfoView(tab)} style={{flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', padding: 12,
-                              borderBottomWidth: 3, borderBottomColor: infoView === tab ? primary : 'transparent'}}>
-                            <Text style={{color: infoView === tab ? 'white' : '#a0a0a8', fontFamily: HOME_FONT.bold, fontSize: 16}}>
-                              {t(tab === 'episodes' ? 'Episodes' : 'Related')}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+
                       <View style={{display: infoView === 'episodes' ? 'flex' : 'none'}}>
                         <SeasonList
+                          tabletColumns={isTabletDevice && !tabletLandscape && contentWidth >= 720 ? 2 : 1}
                           playbackActionRef={playbackActionRef}
                           onPlaybackActionChange={setPlaybackAction}
                           key={activeLink}
@@ -1257,7 +1272,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                         />
                       </View>
                       {infoView === 'related' && (
-                        <View className="gap-3">
+                        <View style={{flexDirection: isTabletDevice ? 'row' : 'column', flexWrap: 'wrap', gap: 12}}>
                           {relatedItems.length === 0 ? (
                             <Text accessibilityLiveRegion="polite" style={{color: '#a0a0a8', fontFamily: HOME_FONT.regular, fontSize: 14, textAlign: 'center', paddingVertical: 32}}>
                               {t('No related items available.')}
@@ -1272,7 +1287,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                 return (
                                   <TouchableOpacity
                                     key={`${item.link}-${index}`}
-                                    className="flex-row items-center gap-3 bg-quaternary p-2 rounded-md"
+                                    className={isTabletDevice ? undefined : 'flex-row items-center gap-3 bg-quaternary p-2 rounded-md'}
+                                    style={isTabletDevice ? {width: tabletLandscape ? (contentWidth * 0.37 - 44) / 2 : (contentWidth - 32 - 48) / 5, gap: 8} : undefined}
                                     onPress={() =>
                                       navigation.dispatch(
                                         StackActions.push('Info', {
@@ -1296,7 +1312,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                             item.image ||
                                             'https://placehold.jp/24/363636/ffffff/100x150.png?text=Vega',
                                         }}
-                                        style={{width: 60, height: 90}}
+                                        style={isTabletDevice ? {width: '100%', aspectRatio: 2 / 3} : {width: 60, height: 90}}
                                       />
                                       {hasItalianVariant ? (
                                         <View
@@ -1309,7 +1325,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                                       ) : null}
                                     </View>
                                     <View className="flex-1">
-                                      <Text className="text-white text-sm font-semibold">
+                                      <Text numberOfLines={isTabletDevice ? 2 : undefined} className="text-white text-sm font-semibold">
                                         {item.title}
                                       </Text>
                                       <Text className="text-gray-400 text-xs mt-1">
@@ -1328,47 +1344,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     </>
                   )}
                 </View>
-                </View>
-              </>
-            }
-            ListFooterComponent={<View style={{height: 64, backgroundColor: 'black'}} />}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-            onScroll={Animated.event([{nativeEvent: {contentOffset: {y: scrollY}}}], {useNativeDriver: true})}
-            scrollEventThrottle={16} // Optimize scroll performance
-            refreshControl={
-              <RefreshControl
-                colors={[primary]}
-                tintColor={primary}
-                progressBackgroundColor={'black'}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-            }
-          />
-          {!infoLoading && info ? (
-            <View style={{backgroundColor: '#141519', paddingVertical: 16, paddingHorizontal: Math.max(16, (contentWidth - 808) / 2), flexDirection: 'row', alignItems: 'center', gap: 12}}>
-              <TouchableOpacity accessibilityRole="button"
-                accessibilityState={{disabled: !playbackAction?.available, busy: playbackAction?.loading}}
-                disabled={!playbackAction?.available}
-                onPress={() => playbackActionRef.current?.()}
-                style={{flex: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 10,
-                  backgroundColor: primary, opacity: playbackAction?.available ? 1 : 0.5,
-                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10}}>
-                <Ionicons name="play" size={22} color="black" />
-                <View style={{flexShrink: 1}}>
-                  <Text style={{fontFamily: HOME_FONT.bold, color: 'black', fontSize: 16}}>{playbackAction?.label || t('Play')}</Text>
-                  {playbackAction?.detail ? <Text style={{fontFamily: HOME_FONT.regular, color: 'black', fontSize: 12}}>{playbackAction.detail}</Text> : null}
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button"
-                accessibilityLabel={t(inLibrary ? 'Remove from watch list' : 'Add to watch list')}
-                onPress={() => inLibrary ? removeLibrary() : addLibrary()}
-                style={{minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center'}}>
-                <Ionicons name={inLibrary ? 'bookmark' : 'bookmark-outline'} size={28} color={primary} />
-              </TouchableOpacity>
-            </View>
-          ) : null}
+
+          </InfoAdaptiveLayout>
         </View>
       </View>
     </QueryErrorBoundary>

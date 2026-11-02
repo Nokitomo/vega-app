@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
-import {FlatList, Modal, Text, TouchableOpacity, View} from 'react-native';
+import {FlatList, Text, TouchableOpacity, View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import InfoDialog from './InfoDialog';
+import useAdaptiveNavigation from '../lib/hooks/useAdaptiveNavigation';
 import {useTranslation} from 'react-i18next';
 import useThemeStore from '../lib/zustand/themeStore';
 import {HOME_FONT} from './homePresentation';
@@ -13,7 +14,7 @@ export default function InfoSeasonPicker<T extends SeasonOption>({items, selecte
   onSelect: (item: T) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const insets = useSafeAreaInsets();
+  const {isTabletDevice} = useAdaptiveNavigation();
   const {t} = useTranslation();
   const {primary} = useThemeStore();
   if (!items.length) {return null;}
@@ -27,9 +28,9 @@ export default function InfoSeasonPicker<T extends SeasonOption>({items, selecte
         </Text>
         <Ionicons name="chevron-down" color="white" size={24} />
       </TouchableOpacity>
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={{flex: 1, backgroundColor: '#000', paddingTop: insets.top, paddingBottom: insets.bottom}}>
-          <View style={{paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12}}>
+      <InfoDialog width={420} visible={open} onClose={() => setOpen(false)}>
+        <View style={{flex: 1}}>
+          <View style={{paddingHorizontal: 24, flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', gap: 12}}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
               onPress={() => setOpen(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
               <Ionicons name="close" size={28} color="white" />
@@ -49,7 +50,7 @@ export default function InfoSeasonPicker<T extends SeasonOption>({items, selecte
               </TouchableOpacity>;
             }} />
         </View>
-      </Modal>
+      </InfoDialog>
     </>
   );
 }
