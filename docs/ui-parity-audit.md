@@ -27,10 +27,11 @@ InfoSeasonPicker appartengono gia al lavoro sulla pagina Info.
 2. `DownloadBottomSheet`, usato da `Downloader`: successivamente aggiornato
    con font, superfici e accenti coerenti. Verifiche e limiti documentati in
    `download-panel-cruncy-ui.md`; vale anche per la variante apertura server.
-3. `WebView.tsx`, condivisa da Home e ricerca: intestazione e pannello
-   diagnostico conservano il vecchio stile; il contenuto del sito e esterno.
-4. `WafWebViewDialog`: flusso tecnico distinto, da verificare separatamente
-   se si decide di uniformarlo, senza alterare il superamento delle challenge.
+3. `WebView.tsx`, condivisa da Home e ricerca: intestazione e pannello AdBlock
+   successivamente aggiornati; il contenuto del sito resta esterno.
+4. `WafWebViewDialog`: cornice e controlli successivamente aggiornati,
+   mantenendo il flusso tecnico. Verifiche e limiti di entrambi gli interventi
+   in `browser-waf-cruncy-ui.md`, inclusa la mancata prova nativa Gecko.
 
 `StreamModal` non risulta importato da altri file in src; la route
 `DisableProviders` e commentata. Non sono schermate attive da presentare

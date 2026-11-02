@@ -19,6 +19,8 @@ import {
   pickUserAgent,
 } from '../lib/services/cookieManager';
 import {useWafStore, WafRequest} from '../lib/zustand/wafStore';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {HOME_FONT} from './homePresentation';
 import useThemeStore from '../lib/zustand/themeStore';
 
 const GRAB_HTML_JS =
@@ -117,11 +119,7 @@ const WafWebViewDialog = () => {
     (event: WebViewMessageEvent) => {
       try {
         const message = JSON.parse(event.nativeEvent.data);
-        if (
-          message?.__vegaWaf &&
-          typeof message.html === 'string' &&
-          request
-        ) {
+        if (message?.__vegaWaf && typeof message.html === 'string' && request) {
           htmlRef.current = message.html;
           if (typeof message.url === 'string' && message.url.length > 0) {
             currentUrlRef.current = message.url;
@@ -199,23 +197,31 @@ const WafWebViewDialog = () => {
       visible={true}
       transparent={true}
       onRequestClose={cancel}>
-      <View className="flex-1 bg-black/70 justify-center items-center px-4 py-6">
+      <SafeAreaView
+        edges={['top', 'bottom', 'left', 'right']}
+        className="flex-1 bg-black/70 justify-center items-center px-4 py-4">
         <View
-          className="bg-tertiary overflow-hidden w-full rounded-lg"
+          className="bg-[#141519] overflow-hidden w-full"
           style={{height: '82%', maxWidth: 560}}>
-          <View className="flex-row items-center justify-between px-4 py-3">
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-[#23252b]">
             <View className="flex-1 pr-3">
-              <Text className="text-white text-base font-bold" numberOfLines={1}>
+              <Text
+                style={{fontFamily: HOME_FONT.heading, fontSize: 22}}
+                className="text-white"
+                numberOfLines={2}>
                 {request.title || t('Verify you are human')}
               </Text>
-              <Text className="text-white/60 text-xs mt-1" numberOfLines={2}>
+              <Text
+                style={{fontFamily: HOME_FONT.regular}}
+                className="text-white/70 text-sm mt-1"
+                numberOfLines={3}>
                 {request.description ||
                   t('Complete the challenge below, then tap Done.')}
               </Text>
             </View>
             <Pressable
               accessibilityLabel={t('Cancel')}
-              className="p-2"
+              className="p-2 min-h-12 min-w-12 items-center justify-center"
               hitSlop={8}
               onPress={cancel}>
               <MaterialIcons name="close" size={22} color="#c1c4c9" />
@@ -254,23 +260,29 @@ const WafWebViewDialog = () => {
             )}
           </View>
 
-          <View className="flex-row items-center gap-3 px-4 py-3">
+          <View className="flex-row items-center gap-3 px-4 py-3 border-t border-[#23252b]">
             <Pressable
-              className="px-4 py-2 rounded-md bg-white/10"
+              className="px-4 py-3 min-h-12 justify-center bg-[#23252b]"
               onPress={() => webViewRef.current?.reload()}>
-              <Text className="text-white text-sm">{t('Reload')}</Text>
+              <Text
+                style={{fontFamily: HOME_FONT.medium}}
+                className="text-white text-sm">
+                {t('Reload')}
+              </Text>
             </Pressable>
             <Pressable
-              className="flex-1 px-4 py-2 rounded-md items-center"
+              className="flex-1 px-4 py-3 min-h-12 justify-center items-center"
               style={{backgroundColor: primary}}
               onPress={resolveWithPage}>
-              <Text className="text-white text-sm font-semibold">
+              <Text
+                style={{fontFamily: HOME_FONT.bold}}
+                className="text-black text-sm">
                 {t('Done')}
               </Text>
             </Pressable>
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };

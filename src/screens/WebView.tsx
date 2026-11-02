@@ -1,7 +1,6 @@
 import {
   View,
   Text,
-  SafeAreaView,
   Linking,
   Platform,
   NativeSyntheticEvent,
@@ -9,6 +8,7 @@ import {
   AppState,
   Switch,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {WebView as LegacyWebView} from 'react-native-webview';
@@ -27,12 +27,18 @@ import Orientation from 'react-native-orientation-locker';
 import {applyAndroidUserOrientation} from '../lib/utils/vegaOrientation';
 import {useFocusEffect} from '@react-navigation/native';
 import {resolveWebViewLink} from '../lib/utils/providerLinks';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {HOME_FONT} from '../components/homePresentation';
+import useThemeStore from '../lib/zustand/themeStore';
 import {USER_WEBVIEW_ENABLED} from '../lib/config/features';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Webview'>;
 
 const Webview = ({route, navigation}: Props) => {
   const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
+  const {width} = useWindowDimensions();
+  const {primary} = useThemeStore(state => state);
   const [forceLegacyWebView, setForceLegacyWebView] = useState(false);
   const [isWebContentFullscreen, setIsWebContentFullscreen] = useState(false);
   const [showAdBlockPanel, setShowAdBlockPanel] = useState(false);
@@ -257,8 +263,12 @@ const Webview = ({route, navigation}: Props) => {
 
   if (!USER_WEBVIEW_ENABLED) {
     return (
-      <SafeAreaView className="bg-black w-full h-full items-center justify-center px-6">
-        <Text className="text-white text-base text-center">
+      <SafeAreaView
+        edges={['top', 'bottom', 'left', 'right']}
+        className="bg-black flex-1 items-center justify-center px-6">
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-white text-base text-center">
           {t('Opening in external browser')}
         </Text>
       </SafeAreaView>
@@ -266,13 +276,21 @@ const Webview = ({route, navigation}: Props) => {
   }
 
   return (
-    <SafeAreaView className="bg-black w-full h-full">
+    <SafeAreaView
+      edges={isWebContentFullscreen ? [] : ['top', 'bottom', 'left', 'right']}
+      className="bg-black flex-1">
       {!isWebContentFullscreen && (
-        <View className="bg-black w-full mt-6 h-16 flex flex-row justify-between p-3 items-center">
-          <Text className="text-white text-lg font-bold">{t('Webview')}</Text>
+        <View className="bg-black w-full h-16 flex flex-row justify-between px-4 items-center border-b border-[#23252b]">
+          <Text
+            style={{fontFamily: HOME_FONT.heading, fontSize: 22}}
+            className="text-white flex-1"
+            numberOfLines={1}>
+            {t('Webview')}
+          </Text>
           <View className="flex flex-row items-center gap-5">
             <MaterialIcons
               name="open-in-browser"
+              style={{padding: 10}}
               size={24}
               color="white"
               onPress={() => {
@@ -282,6 +300,7 @@ const Webview = ({route, navigation}: Props) => {
             {canUseGecko && (
               <MaterialIcons
                 name={adBlockEnabled ? 'gpp-good' : 'gpp-bad'}
+                style={{padding: 10}}
                 size={24}
                 color={adBlockEnabled ? '#4ADE80' : '#9CA3AF'}
                 onPress={() => {
@@ -291,6 +310,7 @@ const Webview = ({route, navigation}: Props) => {
             )}
             <MaterialIcons
               name="close"
+              style={{padding: 10}}
               size={24}
               color="white"
               onPress={() => {
@@ -305,17 +325,22 @@ const Webview = ({route, navigation}: Props) => {
           style={{
             position: 'absolute',
             right: 12,
-            top: 84,
+            top: insets.top + 64,
             zIndex: 30,
-            width: 260,
-            borderRadius: 12,
-            backgroundColor: '#111827',
-            borderColor: '#374151',
+            width: Math.min(300, width - insets.left - insets.right - 24),
+            borderRadius: 0,
+            backgroundColor: '#141519',
+            borderColor: '#23252b',
             borderWidth: 1,
             padding: 12,
             gap: 10,
           }}>
-          <Text style={{color: '#F9FAFB', fontSize: 16, fontWeight: '700'}}>
+          <Text
+            style={{
+              color: '#F9FAFB',
+              fontSize: 16,
+              fontFamily: HOME_FONT.bold,
+            }}>
             {t('AdBlock Settings')}
           </Text>
           <View
@@ -324,13 +349,26 @@ const Webview = ({route, navigation}: Props) => {
               alignItems: 'center',
               justifyContent: 'space-between',
             }}>
-            <Text style={{color: '#E5E7EB'}}>{t('AdBlock Enabled')}</Text>
+            <Text
+              style={{
+                color: '#E5E7EB',
+                fontFamily: HOME_FONT.regular,
+                flex: 1,
+              }}>
+              {t('AdBlock Enabled')}
+            </Text>
             <Switch
+              trackColor={{false: '#52525b', true: primary}}
               value={adBlockEnabled}
               onValueChange={handleToggleAdBlock}
             />
           </View>
-          <Text style={{color: '#D1D5DB', fontSize: 12}}>
+          <Text
+            style={{
+              color: '#D1D5DB',
+              fontSize: 14,
+              fontFamily: HOME_FONT.regular,
+            }}>
             {adBlockStatus.installing
               ? t('AdBlock Installing')
               : adBlockEnabled && adBlockStatus.installed
@@ -340,7 +378,12 @@ const Webview = ({route, navigation}: Props) => {
                   : t('AdBlock Disabled')}
           </Text>
           {Boolean(adBlockStatus.error) && (
-            <Text style={{color: '#FCA5A5', fontSize: 12}}>
+            <Text
+              style={{
+                color: '#FCA5A5',
+                fontSize: 14,
+                fontFamily: HOME_FONT.regular,
+              }}>
               {adBlockStatus.error}
             </Text>
           )}
@@ -351,10 +394,16 @@ const Webview = ({route, navigation}: Props) => {
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: 8,
-                backgroundColor: '#1F2937',
+                minHeight: 44,
+                justifyContent: 'center',
+                backgroundColor: '#23252b',
               }}>
-              <Text style={{color: '#F9FAFB', fontSize: 12}}>
+              <Text
+                style={{
+                  color: '#F9FAFB',
+                  fontSize: 14,
+                  fontFamily: HOME_FONT.regular,
+                }}>
                 {t('Retry install')}
               </Text>
             </Pressable>
@@ -363,10 +412,18 @@ const Webview = ({route, navigation}: Props) => {
               style={{
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                borderRadius: 8,
-                backgroundColor: '#374151',
+                minHeight: 44,
+                justifyContent: 'center',
+                backgroundColor: '#23252b',
               }}>
-              <Text style={{color: '#F9FAFB', fontSize: 12}}>{t('Close')}</Text>
+              <Text
+                style={{
+                  color: '#F9FAFB',
+                  fontSize: 14,
+                  fontFamily: HOME_FONT.regular,
+                }}>
+                {t('Close')}
+              </Text>
             </Pressable>
           </View>
         </View>
