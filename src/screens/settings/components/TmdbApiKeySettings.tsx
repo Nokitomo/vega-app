@@ -1,3 +1,4 @@
+import {settingsPresentation} from '../../../components/settingsPresentation';
 import React, {useState} from 'react';
 import {Alert, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
@@ -37,12 +38,20 @@ const TmdbApiKeySettings = ({primary}: {primary: string}) => {
 
   return (
     <View className="mb-6">
-      <Text className="text-gray-400 text-sm mb-3">{t('Metadata')}</Text>
-      <View className="bg-[#1A1A1A] rounded-xl p-4">
-        <Text className="text-white text-base font-medium">
+      <Text
+        style={settingsPresentation.body}
+        className="text-gray-400 text-sm mb-3">
+        {t('Metadata')}
+      </Text>
+      <View className="bg-[#141519] rounded-none p-4">
+        <Text
+          style={settingsPresentation.medium}
+          className="text-white text-base font-medium">
           {t('TMDB API key')}
         </Text>
-        <Text className="text-gray-400 text-sm mt-1 mb-3">
+        <Text
+          style={settingsPresentation.body}
+          className="text-gray-400 text-sm mt-1 mb-3">
           {t('Optional. Used by compatible installed providers.')}
         </Text>
         <TextInput
@@ -54,12 +63,18 @@ const TmdbApiKeySettings = ({primary}: {primary: string}) => {
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={configured ? t('Enter a new key to replace the saved one') : t('Enter TMDB API key v3')}
+          placeholder={
+            configured
+              ? t('Enter a new key to replace the saved one')
+              : t('Enter TMDB API key v3')
+          }
           placeholderTextColor="#888888"
           accessibilityLabel={t('TMDB API key')}
           className="text-white bg-[#262626] rounded-lg px-3 py-3"
         />
-        <Text className="text-gray-400 text-xs mt-2">
+        <Text
+          style={settingsPresentation.body}
+          className="text-gray-400 text-xs mt-2">
           {configured ? t('TMDB key saved') : t('No TMDB key saved')}
         </Text>
         <View className="flex-row gap-3 mt-4">
@@ -67,8 +82,13 @@ const TmdbApiKeySettings = ({primary}: {primary: string}) => {
             disabled={!keyInput.trim()}
             onPress={save}
             className="rounded-lg px-4 py-3"
-            style={{backgroundColor: primary, opacity: keyInput.trim() ? 1 : 0.5}}>
-            <Text className="text-white font-medium">
+            style={{
+              backgroundColor: primary,
+              opacity: keyInput.trim() ? 1 : 0.5,
+            }}>
+            <Text
+              style={settingsPresentation.medium}
+              className="text-white font-medium">
               {saved ? t('Saved') : t('Save')}
             </Text>
           </TouchableOpacity>
@@ -76,7 +96,11 @@ const TmdbApiKeySettings = ({primary}: {primary: string}) => {
             <TouchableOpacity
               onPress={remove}
               className="bg-[#262626] rounded-lg px-4 py-3">
-              <Text className="text-white font-medium">{t('Remove')}</Text>
+              <Text
+                style={settingsPresentation.medium}
+                className="text-white font-medium">
+                {t('Remove')}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>

@@ -1,3 +1,5 @@
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
 import React, {useState, useEffect, useMemo} from 'react';
 import {
   View,
@@ -110,7 +112,10 @@ const Extensions = ({navigation}: Props) => {
         await checkForUpdates();
 
         // Try to fetch latest providers if we don't have any
-        if (author && (!availableProviders || availableProviders.length === 0)) {
+        if (
+          author &&
+          (!availableProviders || availableProviders.length === 0)
+        ) {
           await refreshProviders(author);
         }
       } catch (error) {
@@ -137,9 +142,13 @@ const Extensions = ({navigation}: Props) => {
       )?.modules.settings;
       return {
         ...provider,
-        hasSettings: !usesAppTmdbApiKey(provider.value) && Boolean(
-          provider.hasSettings || manifestEntry?.hasSettings || cachedSettings,
-        ),
+        hasSettings:
+          !usesAppTmdbApiKey(provider.value) &&
+          Boolean(
+            provider.hasSettings ||
+            manifestEntry?.hasSettings ||
+            cachedSettings,
+          ),
       };
     });
     const available = selectedAuthor
@@ -397,8 +406,8 @@ const Extensions = ({navigation}: Props) => {
     );
     const isInstalling = installingProvider === itemKey;
     const isUpdating = updatingProvider === itemKey;
-    const updateInfo = updateInfos.find(
-      info => isSameProvider(info.provider, item),
+    const updateInfo = updateInfos.find(info =>
+      isSameProvider(info.provider, item),
     );
     const hasUpdate = updateInfo?.hasUpdate || false;
 
@@ -411,39 +420,50 @@ const Extensions = ({navigation}: Props) => {
           {item.icon ? (
             <Image
               source={{uri: item.icon}}
-              className="w-12 h-12 rounded-xl border-2 bg-quaternary"
+              className="w-12 h-12 rounded-none border-2 bg-quaternary"
               style={{resizeMode: 'cover', borderColor: primary}}
             />
           ) : (
-            <View className="px-3 py-2 bg-quaternary rounded-xl border border-gray-700">
+            <View className="px-3 py-2 bg-quaternary rounded-none border border-gray-700">
               <RenderProviderFlagIcon type={item.type} />
             </View>
           )}
           {/* Middle: Info */}
           <View className="flex-1 mx-3">
             <View className="flex-row items-center flex-wrap">
-              <Text className="text-white text-lg font-bold tracking-wide">
+              <Text
+                style={settingsPresentation.bold}
+                className="text-white text-lg font-bold tracking-wide">
                 {item.display_name || t('Unknown Provider')}
               </Text>
               {hasUpdate && updateInfo && (
                 <View
                   style={{backgroundColor: primary}}
                   className="px-2 py-0.5 rounded-full ml-1">
-                  <Text className="text-xs text-white font-semibold bg-gray-800">
+                  <Text
+                    style={settingsPresentation.bold}
+                    className="text-xs text-white font-semibold bg-gray-800">
                     {t('Update')}
                   </Text>
                 </View>
               )}
             </View>
-            <Text className="text-gray-400 text-sm ">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm ">
               {t('Version')}{' '}
-              <Text className="text-white font-medium">
+              <Text
+                style={settingsPresentation.medium}
+                className="text-white font-medium">
                 {item.version || t('Unknown')}
               </Text>{' '}
               • {item.type || t('Unknown')}
             </Text>
             {item.source?.author && (
-              <Text className="text-gray-500 text-xs" numberOfLines={1}>
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-500 text-xs"
+                numberOfLines={1}>
                 {item.source.author}
               </Text>
             )}
@@ -545,119 +565,131 @@ const Extensions = ({navigation}: Props) => {
   }, [activeTab, installedProviders, availableProviders]);
 
   return (
-    <View className="flex-1 bg-black pt-10 pb-16">
-      <StatusBar backgroundColor="black" barStyle="light-content" />
-      {/* Header */}
-      <View className="flex-row items-center justify-between p-4 border-b border-gray-800">
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <AntDesign name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <Text className="text-white text-xl font-semibold">
-          {t('Providers')}
-        </Text>
-        <TouchableOpacity onPress={handleRefresh}>
-          <Feather name="refresh-cw" size={24} color={primary} />
-        </TouchableOpacity>
-      </View>
-      {/* Tabs */}
-      <View className="flex-row bg-quaternary mx-4 mt-4 rounded-xl">
-        <TouchableOpacity
-          onPress={() => handleTabChange('installed')}
-          className="flex-1 py-3 rounded-xl"
-          style={{
-            backgroundColor:
-              activeTab === 'installed' ? primary : 'transparent',
-          }}>
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <View className="flex-1 bg-black">
+        <StatusBar backgroundColor="black" barStyle="light-content" />
+        {/* Header */}
+        <View className="flex-row items-center justify-between p-4 border-b border-gray-800">
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <AntDesign name="arrow-left" size={24} color="white" />
+          </TouchableOpacity>
           <Text
-            className={`text-center font-medium ${
-              activeTab === 'installed' ? 'text-white' : 'text-gray-400'
-            }`}>
-            {t('Installed ({{count}})', {
-              count: (installedProviders || []).length,
-            })}
+            style={settingsPresentation.title}
+            className="text-white text-xl font-semibold">
+            {t('Providers')}
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={handleRefresh}>
+            <Feather name="refresh-cw" size={24} color={primary} />
+          </TouchableOpacity>
+        </View>
+        {/* Tabs */}
+        <View className="flex-row bg-quaternary mx-4 mt-4 rounded-none">
+          <TouchableOpacity
+            onPress={() => handleTabChange('installed')}
+            className="flex-1 py-3 rounded-none"
+            style={{
+              backgroundColor:
+                activeTab === 'installed' ? primary : 'transparent',
+            }}>
+            <Text
+              style={settingsPresentation.medium}
+              className={`text-center font-medium ${
+                activeTab === 'installed' ? 'text-white' : 'text-gray-400'
+              }`}>
+              {t('Installed ({{count}})', {
+                count: (installedProviders || []).length,
+              })}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => handleTabChange('available')}
-          className="flex-1 py-3 rounded-xl"
-          style={{
-            backgroundColor:
-              activeTab === 'available' ? primary : 'transparent',
-          }}>
-          <Text
-            className={`text-center font-medium ${
-              activeTab === 'available' ? 'text-white' : 'text-gray-400'
-            }`}>
-            {t('Available ({{count}})', {
-              count: (availableProviders || []).length,
-            })}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={() => handleTabChange('available')}
+            className="flex-1 py-3 rounded-none"
+            style={{
+              backgroundColor:
+                activeTab === 'available' ? primary : 'transparent',
+            }}>
+            <Text
+              style={settingsPresentation.medium}
+              className={`text-center font-medium ${
+                activeTab === 'available' ? 'text-white' : 'text-gray-400'
+              }`}>
+              {t('Available ({{count}})', {
+                count: (availableProviders || []).length,
+              })}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      <ProviderSourceManager
-        visible={activeTab === 'available'}
-        primary={primary}
-        onSourceChanged={async (
-          source: ProviderSource | undefined,
-          options?: {skipRefresh?: boolean},
-        ) => {
-          const author = source?.author || '';
-          setActiveSourceAuthor(author);
-          loadProviders(author);
-          if (options?.skipRefresh) {
-            await checkForUpdates();
-            return;
+        <ProviderSourceManager
+          visible={activeTab === 'available'}
+          primary={primary}
+          onSourceChanged={async (
+            source: ProviderSource | undefined,
+            options?: {skipRefresh?: boolean},
+          ) => {
+            const author = source?.author || '';
+            setActiveSourceAuthor(author);
+            loadProviders(author);
+            if (options?.skipRefresh) {
+              await checkForUpdates();
+              return;
+            }
+            await refreshProviders(author);
+          }}
+        />
+        {/* Provider list */}
+        <FlatList
+          data={currentData}
+          keyExtractor={(item, index) =>
+            item?.value
+              ? `${activeTab}-${getProviderKey(item)}`
+              : `provider-${index}`
           }
-          await refreshProviders(author);
-        }}
-      />
-      {/* Provider list */}
-      <FlatList
-        data={currentData}
-        keyExtractor={(item, index) =>
-          item?.value
-            ? `${activeTab}-${getProviderKey(item)}`
-            : `provider-${index}`
-        }
-        renderItem={renderProviderCard}
-        className="flex-1 mt-4"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[primary]}
-            tintColor={primary}
-            progressBackgroundColor="black"
-          />
-        }
-        ListEmptyComponent={
-          <View className="flex-1 justify-center items-center py-20">
-            <MaterialCommunityIcons
-              name="package-variant"
-              size={64}
-              color="gray"
+          renderItem={renderProviderCard}
+          className="flex-1 mt-4"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[primary]}
+              tintColor={primary}
+              progressBackgroundColor="black"
             />
-            <Text className="text-gray-400 text-lg mt-4">
-              {activeTab === 'installed'
-                ? t('No providers installed')
-                : t('No providers available')}
-            </Text>
-            <Text className="text-gray-500 text-sm mt-2 text-center px-8">
-              {activeTab === 'installed'
-                ? t('Install providers from the Available tab to get started')
-                : t('Pull to refresh to check for available providers')}
-            </Text>
-          </View>
-        }
-      />
-      <ProviderSettingsModal
-        visible={settingsProvider !== null}
-        provider={settingsProvider}
-        onClose={() => setSettingsProvider(null)}
-      />
-    </View>
+          }
+          ListEmptyComponent={
+            <View className="flex-1 justify-center items-center py-20">
+              <MaterialCommunityIcons
+                name="package-variant"
+                size={64}
+                color="gray"
+              />
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-lg mt-4">
+                {activeTab === 'installed'
+                  ? t('No providers installed')
+                  : t('No providers available')}
+              </Text>
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-500 text-sm mt-2 text-center px-8">
+                {activeTab === 'installed'
+                  ? t('Install providers from the Available tab to get started')
+                  : t('Pull to refresh to check for available providers')}
+              </Text>
+            </View>
+          }
+        />
+        <ProviderSettingsModal
+          visible={settingsProvider !== null}
+          provider={settingsProvider}
+          onClose={() => setSettingsProvider(null)}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
 

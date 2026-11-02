@@ -1,3 +1,4 @@
+import {settingsPresentation} from '../../../components/settingsPresentation';
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
@@ -153,17 +154,21 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
   const renderField = (field: SettingsField) => {
     const value = values[field.key];
     const fieldContainer =
-      'bg-quaternary border border-gray-700 rounded-xl p-4';
+      'bg-quaternary border border-gray-700 rounded-none p-4';
 
     if (field.type === 'toggle') {
       return (
         <View key={field.key} className={`${fieldContainer} flex-row gap-4`}>
           <View className="flex-1">
-            <Text className="text-white text-base font-semibold">
+            <Text
+              style={settingsPresentation.bold}
+              className="text-white text-base font-semibold">
               {field.label}
             </Text>
             {field.description ? (
-              <Text className="text-gray-400 text-sm mt-1">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mt-1">
                 {field.description}
               </Text>
             ) : null}
@@ -181,11 +186,15 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
       const selected = Array.isArray(value) ? value : [];
       return (
         <View key={field.key} className={fieldContainer}>
-          <Text className="text-white text-base font-semibold">
+          <Text
+            style={settingsPresentation.bold}
+            className="text-white text-base font-semibold">
             {field.label}
           </Text>
           {field.description ? (
-            <Text className="text-gray-400 text-sm mt-1 mb-3">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm mt-1 mb-3">
               {field.description}
             </Text>
           ) : (
@@ -229,7 +238,11 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
                     size={20}
                     color="white"
                   />
-                  <Text className="text-white ml-2 flex-1">{option.label}</Text>
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white ml-2 flex-1">
+                    {option.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -243,11 +256,15 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
     const revealed = revealedFields.has(field.key);
     return (
       <View key={field.key} className={fieldContainer}>
-        <Text className="text-white text-base font-semibold">
+        <Text
+          style={settingsPresentation.bold}
+          className="text-white text-base font-semibold">
           {field.label}
         </Text>
         {field.description ? (
-          <Text className="text-gray-400 text-sm mt-1">
+          <Text
+            style={settingsPresentation.body}
+            className="text-gray-400 text-sm mt-1">
             {field.description}
           </Text>
         ) : null}
@@ -317,12 +334,16 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
           style={{paddingBottom: Math.max(insets.bottom, 16) + 12}}>
           <View className="flex-row items-center pb-4 border-b border-gray-700">
             <View className="flex-1">
-              <Text className="text-white text-xl font-bold">
+              <Text
+                style={settingsPresentation.bold}
+                className="text-white text-xl font-bold">
                 {t('{{provider}} settings', {
                   provider: provider.display_name,
                 })}
               </Text>
-              <Text className="text-gray-400 text-sm mt-1">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mt-1">
                 {t('Configure this provider')}
               </Text>
             </View>
@@ -334,22 +355,34 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
           {loading ? (
             <View className="items-center py-14">
               <ActivityIndicator size="large" color={primary} />
-              <Text className="text-gray-400 mt-3">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 mt-3">
                 {t('Loading settings...')}
               </Text>
             </View>
           ) : error ? (
             <View className="items-center py-12">
-              <Text className="text-red-400 text-center">{error}</Text>
+              <Text
+                style={settingsPresentation.body}
+                className="text-red-400 text-center">
+                {error}
+              </Text>
               <TouchableOpacity
                 onPress={load}
                 className="mt-4 px-4 py-2 rounded-lg"
                 style={{backgroundColor: primary}}>
-                <Text className="text-white font-semibold">{t('Retry')}</Text>
+                <Text
+                  style={settingsPresentation.bold}
+                  className="text-white font-semibold">
+                  {t('Retry')}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : fields.length === 0 ? (
-            <Text className="text-gray-400 text-center py-12">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-center py-12">
               {t('This provider has no configurable settings.')}
             </Text>
           ) : (
@@ -365,18 +398,22 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
             <TouchableOpacity
               disabled={loading || saving || fields.length === 0}
               onPress={handleReset}
-              className="w-12 h-12 rounded-xl bg-quaternary items-center justify-center">
+              className="w-12 h-12 rounded-none bg-quaternary items-center justify-center">
               <MaterialCommunityIcons name="restore" size={22} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onClose}
-              className="flex-1 h-12 rounded-xl bg-quaternary items-center justify-center">
-              <Text className="text-white font-semibold">{t('Cancel')}</Text>
+              className="flex-1 h-12 rounded-none bg-quaternary items-center justify-center">
+              <Text
+                style={settingsPresentation.bold}
+                className="text-white font-semibold">
+                {t('Cancel')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               disabled={loading || saving || fields.length === 0}
               onPress={handleSave}
-              className="flex-1 h-12 rounded-xl items-center justify-center"
+              className="flex-1 h-12 rounded-none items-center justify-center"
               style={{
                 backgroundColor: primary,
                 opacity: loading || saving || fields.length === 0 ? 0.5 : 1,
@@ -384,7 +421,11 @@ const ProviderSettingsModal = ({visible, provider, onClose}: Props) => {
               {saving ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text className="text-white font-semibold">{t('Save')}</Text>
+                <Text
+                  style={settingsPresentation.bold}
+                  className="text-white font-semibold">
+                  {t('Save')}
+                </Text>
               )}
             </TouchableOpacity>
           </View>

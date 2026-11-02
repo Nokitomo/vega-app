@@ -1,3 +1,4 @@
+import {settingsPresentation} from '../../../components/settingsPresentation';
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -236,9 +237,11 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
   return (
     <View className="mx-4 mt-4">
       <View className="flex-row items-center gap-2">
-        <View className="flex-1 bg-tertiary rounded-xl px-3 py-2 border border-quaternary">
+        <View className="flex-1 bg-tertiary rounded-none px-3 py-2 border border-quaternary">
           <View className="flex-row items-center mb-1">
-            <Text className="text-gray-400 text-xs">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-xs">
               {t('Provider Source')}
             </Text>
             {defaultSource && (
@@ -298,10 +301,15 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                 <View className="px-4 py-3 border-b border-quaternary">
                   <View className="flex-row items-center justify-between">
                     <View className="flex-1 pr-2">
-                      <Text className="text-white font-medium">
+                      <Text
+                        style={settingsPresentation.medium}
+                        className="text-white font-medium">
                         {item.label}
                       </Text>
-                      <Text className="text-gray-400 text-xs" numberOfLines={1}>
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-gray-400 text-xs"
+                        numberOfLines={1}>
                         {item.url}
                       </Text>
                     </View>
@@ -329,7 +337,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
         </View>
 
         <TouchableOpacity
-          className="w-11 h-11 rounded-xl items-center justify-center"
+          className="w-11 h-11 rounded-none items-center justify-center"
           style={{backgroundColor: primary}}
           onPress={() => setShowAddDialog(true)}>
           <MaterialCommunityIcons name="plus" size={24} color="white" />
@@ -363,6 +371,7 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
               }>
               <View className="flex-row items-center justify-between mb-3">
                 <Text
+                  style={settingsPresentation.bold}
                   className="text-white text-base font-semibold flex-1"
                   numberOfLines={1}>
                   {t('Add Source')}
@@ -375,16 +384,19 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                   />
                 </TouchableOpacity>
               </View>
-              <Text className="text-white text-sm font-medium">
+              <Text
+                style={settingsPresentation.medium}
+                className="text-white text-sm font-medium">
                 {t('Enter source name or url to add provider')}
               </Text>
-              <Text className="text-gray-400 text-sm leading-5 mt-2">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm leading-5 mt-2">
                 {t('How to get source url check instructions')}{' '}
                 <Text
+                  style={settingsPresentation.body}
                   className="text-blue-400 text-sm leading-5"
-                  onPress={() =>
-                    Linking.openURL(PROVIDER_SOURCE_GUIDE_URL)
-                  }>
+                  onPress={() => Linking.openURL(PROVIDER_SOURCE_GUIDE_URL)}>
                   {t('here')}
                 </Text>
               </Text>
@@ -405,7 +417,11 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                   disabled={isValidatingSource}
                   style={{opacity: isValidatingSource ? 0.6 : 1}}
                   onPress={closeDialog}>
-                  <Text className="text-white font-medium">{t('Cancel')}</Text>
+                  <Text
+                    style={settingsPresentation.medium}
+                    className="text-white font-medium">
+                    {t('Cancel')}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -419,7 +435,9 @@ const ProviderSourceManager = ({primary, visible, onSourceChanged}: Props) => {
                   {isValidatingSource ? (
                     <ActivityIndicator size="small" color="white" />
                   ) : (
-                    <Text className="text-white font-medium">
+                    <Text
+                      style={settingsPresentation.medium}
+                      className="text-white font-medium">
                       {t('Confirm')}
                     </Text>
                   )}

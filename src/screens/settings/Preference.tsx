@@ -1,3 +1,5 @@
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
 import {
   View,
   Text,
@@ -5,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ToastAndroid,
-  StatusBar,
 } from 'react-native';
 import React, {useState} from 'react';
 import useAdaptiveNavigation from '../../lib/hooks/useAdaptiveNavigation';
@@ -106,9 +107,7 @@ const Preferences = () => {
     settingsStorage.showFillerEpisodes(),
   );
 
-  const showTabBarLables = useUiSettingsStore(
-    state => state.showTabBarLabels,
-  );
+  const showTabBarLables = useUiSettingsStore(state => state.showTabBarLabels);
   const setShowTabBarLables = useUiSettingsStore(
     state => state.setShowTabBarLabels,
   );
@@ -138,116 +137,36 @@ const Preferences = () => {
   );
 
   return (
-    <ScrollView
-      className="w-full h-full bg-black"
-      contentContainerStyle={{
-        paddingTop: StatusBar.currentHeight || 0,
-      }}>
-      <View className="p-5">
-        <Text className="text-2xl font-bold text-white mb-6">
-          {t('Preferences')}
-        </Text>
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <ScrollView
+        className="w-full h-full bg-black"
+        contentContainerStyle={{
+          paddingBottom: 24,
+        }}>
+        <View className="p-5">
+          <Text
+            style={settingsPresentation.title}
+            className="text-2xl font-bold text-white mb-6">
+            {t('Preferences')}
+          </Text>
 
-        {/* Language Section */}
-        <View className="mb-6">
-          <Text className="text-gray-400 text-sm mb-3">{t('Language')}</Text>
-          <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-            <View className="flex-row items-center px-4 justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('App Language')}
-              </Text>
-              <View className="w-36">
-                <Dropdown
-                  selectedTextStyle={{
-                    color: 'white',
-                    fontSize: 14,
-                    fontWeight: '500',
-                  }}
-                  containerStyle={{
-                    backgroundColor: '#262626',
-                    borderRadius: 8,
-                    borderWidth: 0,
-                    marginTop: 4,
-                  }}
-                  itemTextStyle={{color: 'white'}}
-                  activeColor="#3A3A3A"
-                  itemContainerStyle={{
-                    backgroundColor: '#262626',
-                    borderWidth: 0,
-                  }}
-                  style={{
-                    backgroundColor: '#262626',
-                    borderWidth: 0,
-                  }}
-                  iconStyle={{tintColor: 'white'}}
-                  placeholderStyle={{color: 'white'}}
-                  labelField="label"
-                  valueField="value"
-                  data={languageOptions}
-                  value={language}
-                  onChange={item => {
-                    const nextLanguage = item.value as SupportedLanguage;
-                    setLanguage(nextLanguage);
-                    setAppLanguage(nextLanguage);
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <DnsSettings primary={primary} />
-
-        <TmdbApiKeySettings primary={primary} />
-
-        {/* Theme Section */}
-        <View className="mb-6">
-          <Text className="text-gray-400 text-sm mb-3">{t('Appearance')}</Text>
-          <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-            {/* Theme Selector */}
-            <View className="flex-row items-center px-4 justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">{t('Theme')}</Text>
-              <View className="w-36">
-                {isCustom ? (
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      style={{
-                        color: 'white',
-                        backgroundColor: '#262626',
-                        borderRadius: 8,
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        fontSize: 14,
-                      }}
-                      placeholder={t('Hex Color')}
-                      placeholderTextColor="gray"
-                      value={customColor}
-                      onChangeText={setCustomColor}
-                      onSubmitEditing={e => {
-                        if (e.nativeEvent.text.length < 7) {
-                          ToastAndroid.show(
-                            t('Invalid Color'),
-                            ToastAndroid.SHORT,
-                          );
-                          return;
-                        }
-                        settingsStorage.setCustomColor(e.nativeEvent.text);
-                        setPrimary(e.nativeEvent.text);
-                      }}
-                    />
-                    <TouchableOpacity
-                      onPress={() => {
-                        setCustom(false);
-                        setPrimary(DEFAULT_PRIMARY);
-                      }}>
-                      <MaterialCommunityIcons
-                        name="close"
-                        size={20}
-                        color="gray"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
+          {/* Language Section */}
+          <View className="mb-6">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm mb-3">
+              {t('Language')}
+            </Text>
+            <View className="bg-[#141519] rounded-none overflow-hidden">
+              <View className="flex-row items-center px-4 justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('App Language')}
+                </Text>
+                <View className="w-36">
                   <Dropdown
                     selectedTextStyle={{
                       color: 'white',
@@ -273,379 +192,533 @@ const Preferences = () => {
                     iconStyle={{tintColor: 'white'}}
                     placeholderStyle={{color: 'white'}}
                     labelField="label"
-                    valueField="color"
-                    data={themes.map(theme => ({
-                      ...theme,
-                      label:
-                        theme.name === 'Custom'
-                          ? t('Custom')
-                          : theme.name,
-                    }))}
-                    value={primary}
-                    onChange={value => {
-                      if (value.name === 'Custom') {
-                        setCustom(true);
-                        setPrimary(customColor);
-                        return;
-                      }
-                      setPrimary(value.color);
+                    valueField="value"
+                    data={languageOptions}
+                    value={language}
+                    onChange={item => {
+                      const nextLanguage = item.value as SupportedLanguage;
+                      setLanguage(nextLanguage);
+                      setAppLanguage(nextLanguage);
                     }}
                   />
-                )}
+                </View>
               </View>
             </View>
+          </View>
 
-            {/* Haptic Feedback */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Haptic Feedback')}
-              </Text>
-              <Switch
-                thumbColor={hapticFeedback ? primary : 'gray'}
-                value={hapticFeedback}
-                onValueChange={() => {
-                  settingsStorage.setHapticFeedbackEnabled(!hapticFeedback);
-                  setHapticFeedback(!hapticFeedback);
-                }}
-              />
-            </View>
+          <DnsSettings primary={primary} />
 
-            {/* Analytics & Crashlytics Opt-In */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Usage & Crash Reports')}
-              </Text>
-              <Switch
-                thumbColor={telemetryOptIn ? primary : 'gray'}
-                value={telemetryOptIn}
-                onValueChange={async () => {
-                  const next = !telemetryOptIn;
-                  setTelemetryOptIn(next);
-                  settingsStorage.setTelemetryOptIn(next);
-                  if (hasFirebase) {
-                    try {
-                      const crashlytics = getCrashlytics();
-                      crashlytics &&
-                        (await crashlytics().setCrashlyticsCollectionEnabled(
-                          next,
-                        ));
-                    } catch {}
-                    try {
-                      const analytics = getAnalytics();
-                      analytics &&
-                        (await analytics().setAnalyticsCollectionEnabled(next));
-                      // Also update consent for completeness
-                      analytics &&
-                        (await analytics().setConsent({
-                          analytics_storage: next,
-                          ad_storage: next,
-                          ad_user_data: next,
-                          ad_personalization: next,
-                        }));
-                    } catch {}
-                  }
-                }}
-              />
-            </View>
+          <TmdbApiKeySettings primary={primary} />
 
-            {/* Show Tab Bar Labels */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Show Tab Bar Labels')}
-              </Text>
-              <Switch
-                thumbColor={showTabBarLables ? primary : 'gray'}
-                value={showTabBarLables}
-                onValueChange={() => {
-                  setShowTabBarLables(!showTabBarLables);
-                }}
-              />
-            </View>
+          {/* Theme Section */}
+          <View className="mb-6">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm mb-3">
+              {t('Appearance')}
+            </Text>
+            <View className="bg-[#141519] rounded-none overflow-hidden">
+              {/* Theme Selector */}
+              <View className="flex-row items-center px-4 justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Theme')}
+                </Text>
+                <View className="w-36">
+                  {isCustom ? (
+                    <View className="flex-row items-center gap-2">
+                      <TextInput
+                        style={{
+                          color: 'white',
+                          backgroundColor: '#262626',
+                          borderRadius: 8,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          fontSize: 14,
+                        }}
+                        placeholder={t('Hex Color')}
+                        placeholderTextColor="gray"
+                        value={customColor}
+                        onChangeText={setCustomColor}
+                        onSubmitEditing={e => {
+                          if (e.nativeEvent.text.length < 7) {
+                            ToastAndroid.show(
+                              t('Invalid Color'),
+                              ToastAndroid.SHORT,
+                            );
+                            return;
+                          }
+                          settingsStorage.setCustomColor(e.nativeEvent.text);
+                          setPrimary(e.nativeEvent.text);
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          setCustom(false);
+                          setPrimary(DEFAULT_PRIMARY);
+                        }}>
+                        <MaterialCommunityIcons
+                          name="close"
+                          size={20}
+                          color="gray"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Dropdown
+                      selectedTextStyle={{
+                        color: 'white',
+                        fontSize: 14,
+                        fontWeight: '500',
+                      }}
+                      containerStyle={{
+                        backgroundColor: '#262626',
+                        borderRadius: 8,
+                        borderWidth: 0,
+                        marginTop: 4,
+                      }}
+                      itemTextStyle={{color: 'white'}}
+                      activeColor="#3A3A3A"
+                      itemContainerStyle={{
+                        backgroundColor: '#262626',
+                        borderWidth: 0,
+                      }}
+                      style={{
+                        backgroundColor: '#262626',
+                        borderWidth: 0,
+                      }}
+                      iconStyle={{tintColor: 'white'}}
+                      placeholderStyle={{color: 'white'}}
+                      labelField="label"
+                      valueField="color"
+                      data={themes.map(theme => ({
+                        ...theme,
+                        label:
+                          theme.name === 'Custom' ? t('Custom') : theme.name,
+                      }))}
+                      value={primary}
+                      onChange={value => {
+                        if (value.name === 'Custom') {
+                          setCustom(true);
+                          setPrimary(customColor);
+                          return;
+                        }
+                        setPrimary(value.color);
+                      }}
+                    />
+                  )}
+                </View>
+              </View>
 
-            {/* Show Hamburger Menu */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Show Hamburger Menu')}
-              </Text>
-              <Switch
-                thumbColor={showHamburgerMenu ? primary : 'gray'}
-                value={showHamburgerMenu}
-                onValueChange={() => {
-                  setShowHamburgerMenu(!showHamburgerMenu);
-                }}
-              />
-            </View>
-
-            {/* Show Recently Watched */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Show Recently Watched')}
-              </Text>
-              <Switch
-                thumbColor={showRecentlyWatched ? primary : 'gray'}
-                value={showRecentlyWatched}
-                onValueChange={() => {
-                  setShowRecentlyWatched(!showRecentlyWatched);
-                }}
-              />
-            </View>
-
-            {/* Disable Drawer */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">{t('Disable Drawer')}</Text>
-              <Switch
-                thumbColor={disableDrawer ? primary : 'gray'}
-                value={disableDrawer}
-                onValueChange={() => {
-                  setDisableDrawer(!disableDrawer);
-                }}
-              />
-            </View>
-
-            {/* Tablet Rotation */}
-            {isTabletDevice && (
-              <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                <Text className="text-white text-base flex-1">
-                  {t('Allow Screen Rotation on Tablet')}
+              {/* Haptic Feedback */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Haptic Feedback')}
                 </Text>
                 <Switch
-                  thumbColor={tabletRotationEnabled ? primary : 'gray'}
-                  value={tabletRotationEnabled}
+                  thumbColor={hapticFeedback ? primary : 'gray'}
+                  value={hapticFeedback}
                   onValueChange={() => {
-                    setTabletRotationEnabled(!tabletRotationEnabled);
+                    settingsStorage.setHapticFeedbackEnabled(!hapticFeedback);
+                    setHapticFeedback(!hapticFeedback);
                   }}
                 />
               </View>
-            )}
 
-            <DownloadLocationPreference primary={primary} />
-
-            {/* Always Use External Downloader */}
-            <View className="flex-row items-center justify-between p-4">
-              <Text className="text-white text-base flex-1">
-                {t('Always Use External Downloader')}
-              </Text>
-              <Switch
-                thumbColor={alwaysUseExternalDownload ? primary : 'gray'}
-                value={alwaysUseExternalDownload}
-                onValueChange={() => {
-                  settingsStorage.setBool(
-                    'alwaysExternalDownloader',
-                    !alwaysUseExternalDownload,
-                  );
-                  setAlwaysUseExternalDownload(!alwaysUseExternalDownload);
-                }}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Player Settings */}
-        <View className="mb-6">
-          <Text className="text-gray-400 text-sm mb-3">{t('Player')}</Text>
-          <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-            {/* Cast Provider */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">{t('Cast Provider')}</Text>
-              <View className="w-44">
-                <Dropdown
-                  selectedTextStyle={{
-                    color: 'white',
-                    fontSize: 14,
-                    fontWeight: '500',
-                    textAlign: 'right',
-                  }}
-                  containerStyle={{
-                    backgroundColor: '#262626',
-                    borderRadius: 8,
-                    borderWidth: 0,
-                    marginTop: 4,
-                  }}
-                  itemTextStyle={{color: 'white'}}
-                  activeColor="#3A3A3A"
-                  itemContainerStyle={{
-                    backgroundColor: '#262626',
-                    borderWidth: 0,
-                  }}
-                  style={{
-                    backgroundColor: '#262626',
-                    borderWidth: 0,
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                  }}
-                  iconStyle={{tintColor: 'white'}}
-                  placeholderStyle={{color: 'white'}}
-                  labelField="label"
-                  valueField="value"
-                  data={castProviderOptions}
-                  value={castProvider}
-                  onChange={item => {
-                    const nextProvider = item.value as
-                      | 'native'
-                      | 'wvc'
-                      | 'vega';
-                    setCastProvider(nextProvider);
-                    settingsStorage.setCastProvider(nextProvider);
-                  }}
-                />
-              </View>
-            </View>
-
-            {/* External Player */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base flex-1">
-                {t('Always Use External Player')}
-              </Text>
-              <Switch
-                thumbColor={OpenExternalPlayer ? primary : 'gray'}
-                value={OpenExternalPlayer}
-                onValueChange={val => {
-                  settingsStorage.setBool('useExternalPlayer', val);
-                  setOpenExternalPlayer(val);
-                }}
-              />
-            </View>
-
-            {/* Video skip database */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <View className="flex-1 pr-4">
-                <Text className="text-white text-base">
-                  {t('Skip timestamps')}
+              {/* Analytics & Crashlytics Opt-In */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Usage & Crash Reports')}
                 </Text>
-                <Text className="text-white/50 text-xs mt-1">
-                  {t('Show skip buttons from supported databases.')}
-                </Text>
-              </View>
-              <Switch
-                thumbColor={enableVideoSkip ? primary : 'gray'}
-                value={enableVideoSkip}
-                onValueChange={value => {
-                  settingsStorage.setVideoSkipEnabled(value);
-                  setEnableVideoSkip(value);
-                }}
-              />
-            </View>
-
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <View className="flex-1 pr-4">
-                <Text className="text-white text-base">
-                  {t('Filler episodes')}
-                </Text>
-                <Text className="text-white/50 text-xs mt-1">
-                  {t('Mark filler episodes in anime episode lists.')}
-                </Text>
-              </View>
-              <Switch
-                thumbColor={showFillerEpisodes ? primary : 'gray'}
-                value={showFillerEpisodes}
-                onValueChange={value => {
-                  settingsStorage.setShowFillerEpisodes(value);
-                  setShowFillerEpisodes(value);
-                }}
-              />
-            </View>
-
-            {/* Media Controls */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Media Controls')}
-              </Text>
-              <Switch
-                thumbColor={showMediaControls ? primary : 'gray'}
-                value={showMediaControls}
-                onValueChange={() => {
-                  settingsStorage.setShowMediaControls(!showMediaControls);
-                  setShowMediaControls(!showMediaControls);
-                }}
-              />
-            </View>
-
-            {/* Hide Seek Buttons */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Hide Seek Buttons')}
-              </Text>
-              <Switch
-                thumbColor={hideSeekButtons ? primary : 'gray'}
-                value={hideSeekButtons}
-                onValueChange={() => {
-                  settingsStorage.setHideSeekButtons(!hideSeekButtons);
-                  setHideSeekButtons(!hideSeekButtons);
-                }}
-              />
-            </View>
-
-            {/* Swipe Gestures */}
-            <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-              <Text className="text-white text-base">
-                {t('Enable Swipe Gestures')}
-              </Text>
-              <Switch
-                thumbColor={enableSwipeGesture ? primary : 'gray'}
-                value={enableSwipeGesture}
-                onValueChange={() => {
-                  settingsStorage.setSwipeGestureEnabled(!enableSwipeGesture);
-                  setEnableSwipeGesture(!enableSwipeGesture);
-                }}
-              />
-            </View>
-
-            {/* 2x Gesture */}
-            <View className="flex-row items-center justify-between p-4">
-              <Text className="text-white text-base">
-                {t('Enable 2x Gesture')}
-              </Text>
-              <Switch
-                thumbColor={enable2xGesture ? primary : 'gray'}
-                value={enable2xGesture}
-                onValueChange={() => {
-                  const next = !enable2xGesture;
-                  settingsStorage.setEnable2xGesture(next);
-                  setEnable2xGesture(next);
-                }}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Quality Settings */}
-        <View className="mb-6">
-          <Text className="text-gray-400 text-sm mb-3">{t('Quality')}</Text>
-          <View className="bg-[#1A1A1A] rounded-xl p-4">
-            <Text className="text-white text-base mb-3">
-              {t('Excluded Qualities')}
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {['360p', '480p', '720p'].map((quality, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => {
-                    if (settingsStorage.isHapticFeedbackEnabled()) {
-                      RNReactNativeHapticFeedback.trigger('effectTick');
+                <Switch
+                  thumbColor={telemetryOptIn ? primary : 'gray'}
+                  value={telemetryOptIn}
+                  onValueChange={async () => {
+                    const next = !telemetryOptIn;
+                    setTelemetryOptIn(next);
+                    settingsStorage.setTelemetryOptIn(next);
+                    if (hasFirebase) {
+                      try {
+                        const crashlytics = getCrashlytics();
+                        crashlytics &&
+                          (await crashlytics().setCrashlyticsCollectionEnabled(
+                            next,
+                          ));
+                      } catch {}
+                      try {
+                        const analytics = getAnalytics();
+                        analytics &&
+                          (await analytics().setAnalyticsCollectionEnabled(
+                            next,
+                          ));
+                        // Also update consent for completeness
+                        analytics &&
+                          (await analytics().setConsent({
+                            analytics_storage: next,
+                            ad_storage: next,
+                            ad_user_data: next,
+                            ad_personalization: next,
+                          }));
+                      } catch {}
                     }
-                    const newExcluded = ExcludedQualities.includes(quality)
-                      ? ExcludedQualities.filter(q => q !== quality)
-                      : [...ExcludedQualities, quality];
-                    setExcludedQualities(newExcluded);
-                    settingsStorage.setExcludedQualities(newExcluded);
                   }}
-                  style={{
-                    backgroundColor: ExcludedQualities.includes(quality)
-                      ? primary
-                      : '#262626',
+                />
+              </View>
+
+              {/* Show Tab Bar Labels */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Show Tab Bar Labels')}
+                </Text>
+                <Switch
+                  thumbColor={showTabBarLables ? primary : 'gray'}
+                  value={showTabBarLables}
+                  onValueChange={() => {
+                    setShowTabBarLables(!showTabBarLables);
                   }}
-                  className="px-4 py-2 rounded-lg">
-                  <Text className="text-white text-sm">{quality}</Text>
-                </TouchableOpacity>
-              ))}
+                />
+              </View>
+
+              {/* Show Hamburger Menu */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Show Hamburger Menu')}
+                </Text>
+                <Switch
+                  thumbColor={showHamburgerMenu ? primary : 'gray'}
+                  value={showHamburgerMenu}
+                  onValueChange={() => {
+                    setShowHamburgerMenu(!showHamburgerMenu);
+                  }}
+                />
+              </View>
+
+              {/* Show Recently Watched */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Show Recently Watched')}
+                </Text>
+                <Switch
+                  thumbColor={showRecentlyWatched ? primary : 'gray'}
+                  value={showRecentlyWatched}
+                  onValueChange={() => {
+                    setShowRecentlyWatched(!showRecentlyWatched);
+                  }}
+                />
+              </View>
+
+              {/* Disable Drawer */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Disable Drawer')}
+                </Text>
+                <Switch
+                  thumbColor={disableDrawer ? primary : 'gray'}
+                  value={disableDrawer}
+                  onValueChange={() => {
+                    setDisableDrawer(!disableDrawer);
+                  }}
+                />
+              </View>
+
+              {/* Tablet Rotation */}
+              {isTabletDevice && (
+                <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white text-base flex-1">
+                    {t('Allow Screen Rotation on Tablet')}
+                  </Text>
+                  <Switch
+                    thumbColor={tabletRotationEnabled ? primary : 'gray'}
+                    value={tabletRotationEnabled}
+                    onValueChange={() => {
+                      setTabletRotationEnabled(!tabletRotationEnabled);
+                    }}
+                  />
+                </View>
+              )}
+
+              <DownloadLocationPreference primary={primary} />
+
+              {/* Always Use External Downloader */}
+              <View className="flex-row items-center justify-between p-4">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base flex-1">
+                  {t('Always Use External Downloader')}
+                </Text>
+                <Switch
+                  thumbColor={alwaysUseExternalDownload ? primary : 'gray'}
+                  value={alwaysUseExternalDownload}
+                  onValueChange={() => {
+                    settingsStorage.setBool(
+                      'alwaysExternalDownloader',
+                      !alwaysUseExternalDownload,
+                    );
+                    setAlwaysUseExternalDownload(!alwaysUseExternalDownload);
+                  }}
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        <View className="h-16" />
-      </View>
-    </ScrollView>
+          {/* Player Settings */}
+          <View className="mb-6">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm mb-3">
+              {t('Player')}
+            </Text>
+            <View className="bg-[#141519] rounded-none overflow-hidden">
+              {/* Cast Provider */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Cast Provider')}
+                </Text>
+                <View className="w-44">
+                  <Dropdown
+                    selectedTextStyle={{
+                      color: 'white',
+                      fontSize: 14,
+                      fontWeight: '500',
+                      textAlign: 'right',
+                    }}
+                    containerStyle={{
+                      backgroundColor: '#262626',
+                      borderRadius: 8,
+                      borderWidth: 0,
+                      marginTop: 4,
+                    }}
+                    itemTextStyle={{color: 'white'}}
+                    activeColor="#3A3A3A"
+                    itemContainerStyle={{
+                      backgroundColor: '#262626',
+                      borderWidth: 0,
+                    }}
+                    style={{
+                      backgroundColor: '#262626',
+                      borderWidth: 0,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                    }}
+                    iconStyle={{tintColor: 'white'}}
+                    placeholderStyle={{color: 'white'}}
+                    labelField="label"
+                    valueField="value"
+                    data={castProviderOptions}
+                    value={castProvider}
+                    onChange={item => {
+                      const nextProvider = item.value as
+                        | 'native'
+                        | 'wvc'
+                        | 'vega';
+                      setCastProvider(nextProvider);
+                      settingsStorage.setCastProvider(nextProvider);
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* External Player */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base flex-1">
+                  {t('Always Use External Player')}
+                </Text>
+                <Switch
+                  thumbColor={OpenExternalPlayer ? primary : 'gray'}
+                  value={OpenExternalPlayer}
+                  onValueChange={val => {
+                    settingsStorage.setBool('useExternalPlayer', val);
+                    setOpenExternalPlayer(val);
+                  }}
+                />
+              </View>
+
+              {/* Video skip database */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <View className="flex-1 pr-4">
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white text-base">
+                    {t('Skip timestamps')}
+                  </Text>
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white/50 text-xs mt-1">
+                    {t('Show skip buttons from supported databases.')}
+                  </Text>
+                </View>
+                <Switch
+                  thumbColor={enableVideoSkip ? primary : 'gray'}
+                  value={enableVideoSkip}
+                  onValueChange={value => {
+                    settingsStorage.setVideoSkipEnabled(value);
+                    setEnableVideoSkip(value);
+                  }}
+                />
+              </View>
+
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <View className="flex-1 pr-4">
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white text-base">
+                    {t('Filler episodes')}
+                  </Text>
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white/50 text-xs mt-1">
+                    {t('Mark filler episodes in anime episode lists.')}
+                  </Text>
+                </View>
+                <Switch
+                  thumbColor={showFillerEpisodes ? primary : 'gray'}
+                  value={showFillerEpisodes}
+                  onValueChange={value => {
+                    settingsStorage.setShowFillerEpisodes(value);
+                    setShowFillerEpisodes(value);
+                  }}
+                />
+              </View>
+
+              {/* Media Controls */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Media Controls')}
+                </Text>
+                <Switch
+                  thumbColor={showMediaControls ? primary : 'gray'}
+                  value={showMediaControls}
+                  onValueChange={() => {
+                    settingsStorage.setShowMediaControls(!showMediaControls);
+                    setShowMediaControls(!showMediaControls);
+                  }}
+                />
+              </View>
+
+              {/* Hide Seek Buttons */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Hide Seek Buttons')}
+                </Text>
+                <Switch
+                  thumbColor={hideSeekButtons ? primary : 'gray'}
+                  value={hideSeekButtons}
+                  onValueChange={() => {
+                    settingsStorage.setHideSeekButtons(!hideSeekButtons);
+                    setHideSeekButtons(!hideSeekButtons);
+                  }}
+                />
+              </View>
+
+              {/* Swipe Gestures */}
+              <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Enable Swipe Gestures')}
+                </Text>
+                <Switch
+                  thumbColor={enableSwipeGesture ? primary : 'gray'}
+                  value={enableSwipeGesture}
+                  onValueChange={() => {
+                    settingsStorage.setSwipeGestureEnabled(!enableSwipeGesture);
+                    setEnableSwipeGesture(!enableSwipeGesture);
+                  }}
+                />
+              </View>
+
+              {/* 2x Gesture */}
+              <View className="flex-row items-center justify-between p-4">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Enable 2x Gesture')}
+                </Text>
+                <Switch
+                  thumbColor={enable2xGesture ? primary : 'gray'}
+                  value={enable2xGesture}
+                  onValueChange={() => {
+                    const next = !enable2xGesture;
+                    settingsStorage.setEnable2xGesture(next);
+                    setEnable2xGesture(next);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Quality Settings */}
+          <View className="mb-6">
+            <Text
+              style={settingsPresentation.body}
+              className="text-gray-400 text-sm mb-3">
+              {t('Quality')}
+            </Text>
+            <View className="bg-[#141519] rounded-none p-4">
+              <Text
+                style={settingsPresentation.body}
+                className="text-white text-base mb-3">
+                {t('Excluded Qualities')}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {['360p', '480p', '720p'].map((quality, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      if (settingsStorage.isHapticFeedbackEnabled()) {
+                        RNReactNativeHapticFeedback.trigger('effectTick');
+                      }
+                      const newExcluded = ExcludedQualities.includes(quality)
+                        ? ExcludedQualities.filter(q => q !== quality)
+                        : [...ExcludedQualities, quality];
+                      setExcludedQualities(newExcluded);
+                      settingsStorage.setExcludedQualities(newExcluded);
+                    }}
+                    style={{
+                      backgroundColor: ExcludedQualities.includes(quality)
+                        ? primary
+                        : '#262626',
+                    }}
+                    className="px-4 py-2 rounded-lg">
+                    <Text
+                      style={settingsPresentation.body}
+                      className="text-white text-sm">
+                      {quality}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          <View className="h-16" />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

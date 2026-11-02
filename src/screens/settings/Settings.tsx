@@ -1,3 +1,5 @@
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
 import {
   View,
   Text,
@@ -5,7 +7,7 @@ import {
   TouchableOpacity,
   TouchableNativeFeedback,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   Alert,
 } from 'react-native';
 import React, {useCallback, useMemo} from 'react';
@@ -56,6 +58,7 @@ const isSameProvider = (left: ProviderExtension, right: ProviderExtension) => {
 
 const Settings = ({navigation}: Props) => {
   const {t} = useTranslation();
+  const {width, fontScale} = useWindowDimensions();
   const tabNavigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
   const {primary} = useThemeStore(state => state);
@@ -93,27 +96,32 @@ const Settings = ({navigation}: Props) => {
           isSelected ? 'bg-[#333333]' : 'bg-[#262626]'
         }`}
         style={{
-          width: Dimensions.get('window').width * 0.3, // Shows 2.5 items
-          height: 65, // Increased height
+          width: Math.min(180, Math.max(120, width * 0.3)),
+          minHeight: 65 * Math.max(1, fontScale),
           borderWidth: 1.5,
           borderColor: isSelected ? primary : '#333333',
         }}>
-        <View className="flex-col items-center justify-center h-full p-2">
+        <View className="flex-col items-center justify-center p-2">
           <RenderProviderFlagIcon type={item.type} />
           <Text
+            style={settingsPresentation.medium}
             numberOfLines={1}
             className="text-white text-xs font-medium text-center mt-2">
             {item.display_name}
           </Text>
           {isSelected && (
-            <Text style={{position: 'absolute', top: 6, right: 6}}>
+            <Text
+              style={[
+                settingsPresentation.body,
+                {position: 'absolute', top: 6, right: 6},
+              ]}>
               <MaterialIcons name="check-circle" size={16} color={primary} />
             </Text>
           )}
         </View>
       </TouchableOpacity>
     ),
-    [handleProviderSelect, primary],
+    [handleProviderSelect, primary, width, fontScale],
   );
 
   const providersList = useMemo(
@@ -150,7 +158,9 @@ const Settings = ({navigation}: Props) => {
     }
     Alert.alert(
       t('Clear Watch History'),
-      t('Delete all watch history? This also clears Continue Watching and all saved progress.'),
+      t(
+        'Delete all watch history? This also clears Continue Watching and all saved progress.',
+      ),
       [
         {text: t('Cancel'), style: 'cancel'},
         {text: t('Clear All'), style: 'destructive', onPress: clearHistory},
@@ -173,143 +183,162 @@ const Settings = ({navigation}: Props) => {
   );
 
   return (
-    <Animated.ScrollView
-      className="w-full h-full bg-black"
-      showsVerticalScrollIndicator={false}
-      bounces={true}
-      overScrollMode="always"
-      entering={FadeInUp.springify()}
-      layout={Layout.springify()}
-      contentContainerStyle={{
-        paddingTop: 15,
-        paddingBottom: 24,
-        flexGrow: 1,
-      }}>
-      <View className="p-5">
-        <Animated.View entering={FadeInUp.springify()}>
-          <Text className="text-2xl font-bold text-white mb-6">
-            {t('Settings')}
-          </Text>
-        </Animated.View>
-
-        {/* Content provider section */}
-        <AnimatedSection delay={100}>
-          <View className="mb-6 flex-col gap-3">
-            <Text className="text-gray-400 text-sm mb-1">
-              {t('Content Provider')}
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <Animated.ScrollView
+        className="w-full h-full bg-black"
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        overScrollMode="always"
+        entering={FadeInUp.springify()}
+        layout={Layout.springify()}
+        contentContainerStyle={{
+          paddingTop: 0,
+          paddingBottom: 24,
+          flexGrow: 1,
+        }}>
+        <View className="p-5">
+          <Animated.View entering={FadeInUp.springify()}>
+            <Text
+              style={settingsPresentation.title}
+              className="text-2xl font-bold text-white mb-6">
+              {t('Settings')}
             </Text>
-            <View className="bg-[#1A1A1A] rounded-xl py-4">
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 10,
-                }}>
-                {providersList}
-                {installedProviders.length === 0 && (
-                  <Text className="text-gray-500 text-sm">
-                    {t('No providers installed')}
-                  </Text>
-                )}
-              </ScrollView>
-            </View>
-            {/* Extensions */}
-            <View className="bg-[#1A1A1A] rounded-xl overflow-hidden mb-3">
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('Extensions')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4">
-                  <View
-                    className="flex-row items-center flex-1"
-                    style={{minWidth: 0}}>
-                    <MaterialCommunityIcons
-                      name="puzzle"
-                      size={22}
-                      color={primary}
-                    />
+          </Animated.View>
+
+          {/* Content provider section */}
+          <AnimatedSection delay={100}>
+            <View className="mb-6 flex-col gap-3">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mb-1">
+                {t('Content Provider')}
+              </Text>
+              <View className="bg-[#141519] rounded-none py-4">
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingHorizontal: 10,
+                  }}>
+                  {providersList}
+                  {installedProviders.length === 0 && (
                     <Text
-                      className="text-white ml-3 text-base"
-                      numberOfLines={1}
-                      style={{flexShrink: 1}}>
-                      {t('Provider Manager')}
+                      style={settingsPresentation.body}
+                      className="text-gray-500 text-sm">
+                      {t('No providers installed')}
                     </Text>
+                  )}
+                </ScrollView>
+              </View>
+              {/* Extensions */}
+              <View className="bg-[#141519] rounded-none overflow-hidden mb-3">
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('Extensions')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4">
+                    <View
+                      className="flex-row items-center flex-1"
+                      style={{minWidth: 0}}>
+                      <MaterialCommunityIcons
+                        name="puzzle"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        className="text-white ml-3 text-base"
+                        numberOfLines={1}
+                        style={[settingsPresentation.body, {flexShrink: 1}]}>
+                        {t('Provider Manager')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
                   </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
+              </View>
             </View>
-          </View>
-        </AnimatedSection>
+          </AnimatedSection>
 
-        {/* Main options section */}
-        <AnimatedSection delay={200}>
-          <View className="mb-6">
-            <Text className="text-gray-400 text-sm mb-3">{t('Options')}</Text>
-            <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-              {/* Account */}
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('Account')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View className="flex-row items-center">
-                    <MaterialCommunityIcons
-                      name="account-circle-outline"
-                      size={22}
-                      color={primary}
-                    />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Account')}
-                    </Text>
+          {/* Main options section */}
+          <AnimatedSection delay={200}>
+            <View className="mb-6">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mb-3">
+                {t('Options')}
+              </Text>
+              <View className="bg-[#141519] rounded-none overflow-hidden">
+                {/* Account */}
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('Account')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center">
+                      <MaterialCommunityIcons
+                        name="account-circle-outline"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Account')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
                   </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
 
-              {/* Downloads */}
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('Downloads')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View className="flex-row items-center">
-                    <MaterialCommunityIcons
-                      name="folder-download"
-                      size={22}
-                      color={primary}
-                    />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Downloads')}
-                    </Text>
+                {/* Downloads */}
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('Downloads')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center">
+                      <MaterialCommunityIcons
+                        name="folder-download"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Downloads')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
                   </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
 
-              {/* Subtitle Style */}
-              <TouchableNativeFeedback
-                onPress={async () => {
-                  navigation.navigate('SubTitlesPreferences');
-                }}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View className="flex-row items-center">
-                    <MaterialCommunityIcons
-                      name="subtitles"
-                      size={22}
-                      color={primary}
-                    />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Subtitle Style')}
-                    </Text>
+                {/* Subtitle Style */}
+                <TouchableNativeFeedback
+                  onPress={async () => {
+                    navigation.navigate('SubTitlesPreferences');
+                  }}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center">
+                      <MaterialCommunityIcons
+                        name="subtitles"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Subtitle Style')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
                   </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
 
-              {/* Disable Providers */}
-              {/* <TouchableNativeFeedback
+                {/* Disable Providers */}
+                {/* <TouchableNativeFeedback
                 onPress={() => navigation.navigate('DisableProviders')}
                 background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
+                <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
                   <View className="flex-row items-center">
                     <MaterialIcons name="block" size={22} color={primary} />
                     <Text className="text-white ml-3 text-base">
@@ -320,146 +349,168 @@ const Settings = ({navigation}: Props) => {
                 </View>
               </TouchableNativeFeedback> */}
 
-              {/* Watch History */}
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('WatchHistoryStack')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View
-                    className="flex-row items-center flex-1"
-                    style={{minWidth: 0}}>
+                {/* Watch History */}
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('WatchHistoryStack')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View
+                      className="flex-row items-center flex-1"
+                      style={{minWidth: 0}}>
+                      <MaterialCommunityIcons
+                        name="history"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        className="text-white ml-3 text-base"
+                        numberOfLines={1}
+                        style={[settingsPresentation.body, {flexShrink: 1}]}>
+                        {t('Watch History')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
+                  </View>
+                </TouchableNativeFeedback>
+
+                {/* Preferences */}
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('Preferences')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4">
+                    <View className="flex-row items-center">
+                      <MaterialIcons
+                        name="room-preferences"
+                        size={22}
+                        color={primary}
+                      />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Preferences')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
+                  </View>
+                </TouchableNativeFeedback>
+              </View>
+            </View>
+          </AnimatedSection>
+
+          {/* Data Management section */}
+          <AnimatedSection delay={300}>
+            <View className="mb-6">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mb-3">
+                {t('Data Management')}
+              </Text>
+              <View className="bg-[#141519] rounded-none overflow-hidden">
+                {/* Clear Cache */}
+                <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white text-base">
+                    {t('Clear Cache')}
+                  </Text>
+                  <TouchableOpacity
+                    className="bg-[#262626] px-4 py-2 rounded-lg"
+                    onPress={clearCacheHandler}>
                     <MaterialCommunityIcons
-                      name="history"
-                      size={22}
+                      name="delete-outline"
+                      size={20}
                       color={primary}
                     />
-                    <Text
-                      className="text-white ml-3 text-base"
-                      numberOfLines={1}
-                      style={{flexShrink: 1}}>
-                      {t('Watch History')}
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
+                  </TouchableOpacity>
                 </View>
-              </TouchableNativeFeedback>
 
-              {/* Preferences */}
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('Preferences')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                {/* Clear Watch History */}
                 <View className="flex-row items-center justify-between p-4">
-                  <View className="flex-row items-center">
-                    <MaterialIcons
-                      name="room-preferences"
-                      size={22}
+                  <Text
+                    style={settingsPresentation.body}
+                    className="text-white text-base flex-1"
+                    numberOfLines={1}>
+                    {t('Clear Watch History')}
+                  </Text>
+                  <TouchableOpacity
+                    className="bg-[#262626] px-4 py-2 rounded-lg"
+                    onPress={clearHistoryHandler}>
+                    <MaterialCommunityIcons
+                      name="delete-outline"
+                      size={20}
                       color={primary}
                     />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Preferences')}
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
+                  </TouchableOpacity>
                 </View>
-              </TouchableNativeFeedback>
-            </View>
-          </View>
-        </AnimatedSection>
-
-        {/* Data Management section */}
-        <AnimatedSection delay={300}>
-          <View className="mb-6">
-            <Text className="text-gray-400 text-sm mb-3">
-              {t('Data Management')}
-            </Text>
-            <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-              {/* Clear Cache */}
-              <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                <Text className="text-white text-base">{t('Clear Cache')}</Text>
-                <TouchableOpacity
-                  className="bg-[#262626] px-4 py-2 rounded-lg"
-                  onPress={clearCacheHandler}>
-                  <MaterialCommunityIcons
-                    name="delete-outline"
-                    size={20}
-                    color={primary}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Clear Watch History */}
-              <View className="flex-row items-center justify-between p-4">
-                <Text className="text-white text-base flex-1" numberOfLines={1}>
-                  {t('Clear Watch History')}
-                </Text>
-                <TouchableOpacity
-                  className="bg-[#262626] px-4 py-2 rounded-lg"
-                  onPress={clearHistoryHandler}>
-                  <MaterialCommunityIcons
-                    name="delete-outline"
-                    size={20}
-                    color={primary}
-                  />
-                </TouchableOpacity>
               </View>
             </View>
-          </View>
-        </AnimatedSection>
+          </AnimatedSection>
 
-        {/* About & GitHub section */}
-        <AnimatedSection delay={400}>
-          <View className="mb-6">
-            <Text className="text-gray-400 text-sm mb-3">{t('About')}</Text>
-            <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
-              {/* About */}
-              <TouchableNativeFeedback
-                onPress={() => navigation.navigate('About')}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View className="flex-row items-center">
-                    <Feather name="info" size={22} color={primary} />
-                    <Text className="text-white ml-3 text-base">
-                      {t('About')}
-                    </Text>
+          {/* About & GitHub section */}
+          <AnimatedSection delay={400}>
+            <View className="mb-6">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm mb-3">
+                {t('About')}
+              </Text>
+              <View className="bg-[#141519] rounded-none overflow-hidden">
+                {/* About */}
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('About')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center">
+                      <Feather name="info" size={22} color={primary} />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('About')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
                   </View>
-                  <Feather name="chevron-right" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
 
-              {/* GitHub */}
-              <TouchableNativeFeedback
-                onPress={() => Linking.openURL(socialLinks.github)}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4 border-b border-[#262626]">
-                  <View className="flex-row items-center">
-                    <AntDesign name="github" size={22} color={primary} />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Give a star ⭐')}
-                    </Text>
+                {/* GitHub */}
+                <TouchableNativeFeedback
+                  onPress={() => Linking.openURL(socialLinks.github)}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center">
+                      <AntDesign name="github" size={22} color={primary} />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Give a star ⭐')}
+                      </Text>
+                    </View>
+                    <Feather name="external-link" size={20} color="gray" />
                   </View>
-                  <Feather name="external-link" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
 
-              {/* sponsore */}
-              <TouchableNativeFeedback
-                onPress={() => Linking.openURL(socialLinks.sponsor)}
-                background={TouchableNativeFeedback.Ripple('#333333', false)}>
-                <View className="flex-row items-center justify-between p-4">
-                  <View className="flex-row items-center">
-                    <AntDesign name="heart" size={22} color="#ff69b4" />
-                    <Text className="text-white ml-3 text-base">
-                      {t('Sponsor Project')}
-                    </Text>
+                {/* sponsore */}
+                <TouchableNativeFeedback
+                  onPress={() => Linking.openURL(socialLinks.sponsor)}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4">
+                    <View className="flex-row items-center">
+                      <AntDesign name="heart" size={22} color="#ff69b4" />
+                      <Text
+                        style={settingsPresentation.body}
+                        className="text-white ml-3 text-base">
+                        {t('Sponsor Project')}
+                      </Text>
+                    </View>
+                    <Feather name="external-link" size={20} color="gray" />
                   </View>
-                  <Feather name="external-link" size={20} color="gray" />
-                </View>
-              </TouchableNativeFeedback>
+                </TouchableNativeFeedback>
+              </View>
             </View>
-          </View>
-        </AnimatedSection>
-      </View>
-    </Animated.ScrollView>
+          </AnimatedSection>
+        </View>
+      </Animated.ScrollView>
+    </SafeAreaView>
   );
 };
 

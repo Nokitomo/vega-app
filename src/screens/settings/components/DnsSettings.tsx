@@ -1,3 +1,4 @@
+import {settingsPresentation} from '../../../components/settingsPresentation';
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -252,7 +253,9 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
     } catch (error) {
       console.warn('Unable to update WARP:', error);
       setWarpStatus(current =>
-        current ? {...current, state: 'error', running: false, port: null} : current,
+        current
+          ? {...current, state: 'error', running: false, port: null}
+          : current,
       );
       ToastAndroid.show(t('Failed to update WARP'), ToastAndroid.LONG);
     } finally {
@@ -280,21 +283,30 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
 
   return (
     <View className="mb-6">
-      <Text className="text-gray-400 text-sm mb-3">{t('Network')}</Text>
-      <View className="bg-[#1A1A1A] rounded-xl overflow-hidden">
+      <Text
+        style={settingsPresentation.body}
+        className="text-gray-400 text-sm mb-3">
+        {t('Network')}
+      </Text>
+      <View className="bg-[#141519] rounded-none overflow-hidden">
         {warpService.isAvailable && (
-          <View className="p-4 border-b border-[#262626]">
+          <View className="p-4 border-b border-[#23252b]">
             <View className="flex-row items-center justify-between gap-4">
               <View className="flex-1">
-                <Text className="text-white text-base font-medium">
+                <Text
+                  style={settingsPresentation.medium}
+                  className="text-white text-base font-medium">
                   {t('Cloudflare WARP')}
                 </Text>
-                <Text className="text-gray-400 text-xs mt-1">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-gray-400 text-xs mt-1">
                   {t(
                     'Route supported Vega requests and internal player traffic through WARP. It does not affect WebView, casting or other apps.',
                   )}
                 </Text>
                 <Text
+                  style={settingsPresentation.body}
                   className={`text-xs mt-2 ${
                     warpStatus?.running
                       ? 'text-green-400'
@@ -325,14 +337,20 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
             </View>
           </View>
         )}
-        <View className="p-4 border-b border-[#262626]">
+        <View className="p-4 border-b border-[#23252b]">
           <View className="flex-row items-center justify-between gap-4">
             <View className="flex-1">
-              <Text className="text-white text-base font-medium">
+              <Text
+                style={settingsPresentation.medium}
+                className="text-white text-base font-medium">
                 {t('DNS over HTTPS')}
               </Text>
-              <Text className="text-gray-400 text-xs mt-1">
-                {t('Encrypt DNS lookups used by Vega requests and the internal player.')}
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-xs mt-1">
+                {t(
+                  'Encrypt DNS lookups used by Vega requests and the internal player.',
+                )}
               </Text>
             </View>
             <View className="w-48">
@@ -376,12 +394,18 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
               )}
             </View>
           </View>
-          <Text className="text-gray-500 text-xs mt-3">
-            {t('WebView, casting and external apps use their own DNS settings.')}
+          <Text
+            style={settingsPresentation.body}
+            className="text-gray-500 text-xs mt-3">
+            {t(
+              'WebView, casting and external apps use their own DNS settings.',
+            )}
           </Text>
           {selectedProviderId === 'custom' && (
             <View className="mt-4">
-              <Text className="text-gray-300 text-sm mb-2">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-300 text-sm mb-2">
                 {t('Custom DoH URL')}
               </Text>
               <TextInput
@@ -400,13 +424,17 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
                 placeholderTextColor="#737373"
                 className="bg-[#262626] text-white rounded-lg px-3 py-3"
               />
-              <Text className="text-gray-500 text-xs mt-2">
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-500 text-xs mt-2">
                 {t(
                   'Use an HTTPS DoH endpoint. Credentials, query parameters and fragments are not allowed.',
                 )}
               </Text>
               {customUrlError && (
-                <Text className="text-red-400 text-xs mt-2">
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-red-400 text-xs mt-2">
                   {customUrlError}
                 </Text>
               )}
@@ -421,7 +449,11 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
                 {isUpdating ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
-                  <Text className="text-white font-medium">{t('Apply')}</Text>
+                  <Text
+                    style={settingsPresentation.medium}
+                    className="text-white font-medium">
+                    {t('Apply')}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -430,17 +462,28 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
 
         <View className="p-4 flex-row items-center justify-between gap-4">
           <View className="flex-1">
-            <Text className="text-white text-base">{t('DNS diagnostics')}</Text>
+            <Text
+              style={settingsPresentation.body}
+              className="text-white text-base">
+              {t('DNS diagnostics')}
+            </Text>
             {testStatus?.kind === 'success' && (
-              <Text className="text-green-400 text-xs mt-1">
-                {t('DNS test successful in {{latency}} ms ({{count}} addresses)', {
-                  latency: testStatus.latencyMs,
-                  count: testStatus.addressCount,
-                })}
+              <Text
+                style={settingsPresentation.body}
+                className="text-green-400 text-xs mt-1">
+                {t(
+                  'DNS test successful in {{latency}} ms ({{count}} addresses)',
+                  {
+                    latency: testStatus.latencyMs,
+                    count: testStatus.addressCount,
+                  },
+                )}
               </Text>
             )}
             {testStatus?.kind === 'error' && (
-              <Text className="text-red-400 text-xs mt-1">
+              <Text
+                style={settingsPresentation.body}
+                className="text-red-400 text-xs mt-1">
                 {t('DNS test failed')}
               </Text>
             )}
@@ -461,7 +504,11 @@ const DnsSettings = ({primary}: DnsSettingsProps) => {
             {isTesting ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <Text className="text-white font-medium">{t('Test DNS')}</Text>
+              <Text
+                style={settingsPresentation.medium}
+                className="text-white font-medium">
+                {t('Test DNS')}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

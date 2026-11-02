@@ -1,3 +1,4 @@
+import {settingsPresentation} from '../../../components/settingsPresentation';
 import React, {useState} from 'react';
 import {
   Platform,
@@ -113,13 +114,18 @@ const DownloadLocationPreference = ({
   };
 
   return (
-    <View className="border-b border-[#262626]">
+    <View className="border-b border-[#23252b]">
       <View className="p-4">
-        <Text className="text-white text-base mb-3">
+        <Text
+          style={settingsPresentation.body}
+          className="text-white text-base mb-3">
           {t('Download Location')}
         </Text>
         <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-gray-300 text-sm flex-1" numberOfLines={2}>
+          <Text
+            style={settingsPresentation.body}
+            className="text-gray-300 text-sm flex-1"
+            numberOfLines={2}>
             {downloadLocation}
           </Text>
           <TouchableOpacity
@@ -142,7 +148,9 @@ const DownloadLocationPreference = ({
           showToast(t('Download location reset'));
         }}
         className="flex-row items-center justify-between px-4 pb-4">
-        <Text className="text-white text-base flex-1">
+        <Text
+          style={settingsPresentation.body}
+          className="text-white text-base flex-1">
           {t('Reset Download Location')}
         </Text>
         <MaterialCommunityIcons name="restore" size={24} color={primary} />

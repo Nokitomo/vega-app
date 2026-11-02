@@ -1,5 +1,8 @@
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {settingsPresentation} from '../../components/settingsPresentation';
 import {
   View,
+  ScrollView,
   Text,
   TouchableNativeFeedback,
   ToastAndroid,
@@ -41,7 +44,8 @@ type DeviceAbiNativeModule = {
   supportedAbis?: string[];
 };
 
-const GITHUB_RELEASES_API = 'https://api.github.com/repos/Nokitomo/vega-app/releases';
+const GITHUB_RELEASES_API =
+  'https://api.github.com/repos/Nokitomo/vega-app/releases';
 const GITHUB_RELEASES_PAGE = 'https://github.com/Nokitomo/vega-app/releases';
 
 const markPendingUpdateArtifact = (apkName: string) => {
@@ -120,7 +124,9 @@ const getAndroidSupportedAbis = (): string[] => {
     return [];
   }
 
-  const nativeModule = NativeModules.DeviceAbi as DeviceAbiNativeModule | undefined;
+  const nativeModule = NativeModules.DeviceAbi as
+    | DeviceAbiNativeModule
+    | undefined;
   const supportedAbis = nativeModule?.supportedAbis;
   if (!Array.isArray(supportedAbis)) {
     return [];
@@ -180,8 +186,8 @@ const pickAndroidApkAsset = (
 
   const priority = getPreferredApkOrder(supportedAbis);
   for (const arch of priority) {
-    const found = apkAssets.find(asset =>
-      classifyApkArch(String(asset.name || '')) === arch,
+    const found = apkAssets.find(
+      asset => classifyApkArch(String(asset.name || '')) === arch,
     );
     if (found) {
       return found;
@@ -210,7 +216,9 @@ const selectBestRelease = (
   const usable = Array.isArray(releases)
     ? releases
         .filter(release => !release?.draft && !release?.prerelease)
-        .filter(release => Boolean(parseSemverParts(String(release?.tag_name || ''))))
+        .filter(release =>
+          Boolean(parseSemverParts(String(release?.tag_name || ''))),
+        )
         .sort((left, right) => {
           const leftParts = parseSemverParts(String(left?.tag_name || ''));
           const rightParts = parseSemverParts(String(right?.tag_name || ''));
@@ -350,27 +358,14 @@ export const checkForUpdate = async (
           },
         ],
       );
-      console.log(
-        'local version',
-        localVersion,
-        'remote semver',
-        remoteSemver,
-      );
+      console.log('local version', localVersion, 'remote semver', remoteSemver);
     } else {
       showToast &&
         ToastAndroid.show(i18n.t('App is up to date'), ToastAndroid.SHORT);
-      console.log(
-        'local version',
-        localVersion,
-        'remote semver',
-        remoteSemver,
-      );
+      console.log('local version', localVersion, 'remote semver', remoteSemver);
     }
   } catch (error) {
-    ToastAndroid.show(
-      i18n.t('Failed to check for update'),
-      ToastAndroid.SHORT,
-    );
+    ToastAndroid.show(i18n.t('Failed to check for update'), ToastAndroid.SHORT);
     console.log('Update error', error);
   }
   setUpdateLoading(false);
@@ -388,75 +383,99 @@ const About = () => {
   );
 
   return (
-    <View className="flex-1 bg-black mt-8">
-      <View className="px-4 py-3 border-b border-white/10">
-        <Text className="text-2xl font-bold text-white">{t('About')}</Text>
-        <Text className="text-gray-400 mt-1 text-sm">
-          {t('App information and updates')}
-        </Text>
-      </View>
-
-      <View className="p-4 space-y-4 pb-24">
-        {/* Version */}
-        <View className="bg-white/10 p-4 rounded-lg flex-row justify-between items-center">
-          <Text className="text-white text-base">{t('Version')}</Text>
-          <Text className="text-white/70">
-            v{Application.nativeApplicationVersion}
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={settingsPresentation.page}>
+      <ScrollView
+        className="flex-1 bg-black"
+        contentContainerStyle={{paddingBottom: 32}}>
+        <View className="px-4 py-3 border-b border-white/10">
+          <Text
+            style={settingsPresentation.title}
+            className="text-2xl font-bold text-white">
+            {t('About')}
+          </Text>
+          <Text
+            style={settingsPresentation.body}
+            className="text-gray-400 mt-1 text-sm">
+            {t('App information and updates')}
           </Text>
         </View>
 
-        {/* Auto Install Updates */}
-        <View className="bg-white/10 p-4 rounded-lg flex-row justify-between items-center">
-          <Text className="text-white text-base">
-            {t('Auto install updates')}
-          </Text>
-          <Switch
-            value={autoDownload}
-            onValueChange={() => {
-              setAutoDownload(!autoDownload);
-              settingsStorage.setAutoDownloadEnabled(!autoDownload);
-            }}
-            thumbColor={autoDownload ? primary : 'gray'}
-          />
-        </View>
-
-        {/* Auto Check Updates */}
-        <View className="bg-white/10 p-3 rounded-lg flex-row justify-between items-center">
-          <View className="flex-1 mr-2">
-            <Text className="text-white text-base">
-              {t('Check updates on start')}
+        <View className="p-4 gap-4">
+          {/* Version */}
+          <View className="bg-[#141519] p-4 rounded-none flex-row justify-between items-center">
+            <Text
+              style={settingsPresentation.body}
+              className="text-white text-base">
+              {t('Version')}
             </Text>
-            <Text className="text-gray-400 text-sm">
-              {t('Automatically check for updates when app starts')}
+            <Text style={settingsPresentation.body} className="text-white/70">
+              v{Application.nativeApplicationVersion}
             </Text>
           </View>
-          <Switch
-            value={autoCheckUpdate}
-            onValueChange={() => {
-              setAutoCheckUpdate(!autoCheckUpdate);
-              settingsStorage.setAutoCheckUpdateEnabled(!autoCheckUpdate);
-            }}
-            thumbColor={autoCheckUpdate ? primary : 'gray'}
-          />
-        </View>
 
-        {/* Check Updates Button */}
-        <TouchableNativeFeedback
-          onPress={() => checkForUpdate(setUpdateLoading, autoDownload, true)}
-          disabled={updateLoading}
-          background={TouchableNativeFeedback.Ripple('#ffffff20', false)}>
-          <View className="bg-white/10 p-4 rounded-lg flex-row justify-between items-center mt-4">
-            <View className="flex-row items-center space-x-3">
-              <MaterialCommunityIcons name="update" size={22} color="white" />
-              <Text className="text-white text-base">
-                {t('Check for updates')}
+          {/* Auto Install Updates */}
+          <View className="bg-[#141519] p-4 rounded-none flex-row justify-between items-center">
+            <Text
+              style={settingsPresentation.body}
+              className="text-white text-base">
+              {t('Auto install updates')}
+            </Text>
+            <Switch
+              value={autoDownload}
+              onValueChange={() => {
+                setAutoDownload(!autoDownload);
+                settingsStorage.setAutoDownloadEnabled(!autoDownload);
+              }}
+              thumbColor={autoDownload ? primary : 'gray'}
+            />
+          </View>
+
+          {/* Auto Check Updates */}
+          <View className="bg-[#141519] p-3 rounded-none flex-row justify-between items-center">
+            <View className="flex-1 mr-2">
+              <Text
+                style={settingsPresentation.body}
+                className="text-white text-base">
+                {t('Check updates on start')}
+              </Text>
+              <Text
+                style={settingsPresentation.body}
+                className="text-gray-400 text-sm">
+                {t('Automatically check for updates when app starts')}
               </Text>
             </View>
-            <Feather name="chevron-right" size={20} color="white" />
+            <Switch
+              value={autoCheckUpdate}
+              onValueChange={() => {
+                setAutoCheckUpdate(!autoCheckUpdate);
+                settingsStorage.setAutoCheckUpdateEnabled(!autoCheckUpdate);
+              }}
+              thumbColor={autoCheckUpdate ? primary : 'gray'}
+            />
           </View>
-        </TouchableNativeFeedback>
-      </View>
-    </View>
+
+          {/* Check Updates Button */}
+          <TouchableNativeFeedback
+            onPress={() => checkForUpdate(setUpdateLoading, autoDownload, true)}
+            disabled={updateLoading}
+            background={TouchableNativeFeedback.Ripple('#ffffff20', false)}>
+            <View className="bg-[#141519] p-4 rounded-none flex-row justify-between items-center mt-4">
+              <View className="flex-row items-center space-x-3">
+                <MaterialCommunityIcons name="update" size={22} color="white" />
+                <Text
+                  style={settingsPresentation.body}
+                  className="text-white text-base">
+                  {t('Check for updates')}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="white" />
+            </View>
+          </TouchableNativeFeedback>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
