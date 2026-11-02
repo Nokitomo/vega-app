@@ -1,11 +1,19 @@
-import {View, Text, Platform, Image, FlatList} from 'react-native';
+import {View, Text, Image, FlatList, ScrollView} from 'react-native';
 import React from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {WatchListStackParamList} from '../App';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {TouchableOpacity} from 'react-native';
 import useThemeStore from '../lib/zustand/themeStore';
-import useWatchListStore from '../lib/zustand/watchListStore';
+import useWatchListStore, {
+  WatchList as WatchListItem,
+} from '../lib/zustand/watchListStore';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {
+  CATALOG_CARD_TITLE_STYLE,
+  HOME_FONT,
+  getHomeCardWidth,
+} from '../components/homePresentation';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {StatusBar} from 'expo-status-bar';
 import {useTranslation} from 'react-i18next';
@@ -19,7 +27,7 @@ const WatchList = () => {
   const {watchList} = useWatchListStore(state => state);
   const [listWidth, setListWidth] = React.useState(0);
 
-  const itemSpacing = 10;
+  const itemSpacing = 12;
 
   // Use the stable viewport, excluding sidebar and outer padding. Do not
   // render columns from a provisional window width before it is measured.
@@ -28,7 +36,10 @@ const WatchList = () => {
   // Determine number of columns and adjusted item width
   const numColumns = Math.max(
     1,
-    Math.floor((availableWidth + itemSpacing) / (100 + itemSpacing)),
+    Math.ceil(
+      (availableWidth + itemSpacing) /
+        (getHomeCardWidth(availableWidth + 32) + itemSpacing),
+    ),
   );
 
   // Calculate the actual item width to fill the space exactly
@@ -36,9 +47,11 @@ const WatchList = () => {
     (availableWidth - itemSpacing * (numColumns - 1)) / numColumns;
 
   // Render each grid item
-  const renderItem = ({item, index}: {item: any; index: number}) => (
+  const renderItem = ({item, index}: {item: WatchListItem; index: number}) => (
     <TouchableOpacity
       key={item.link + index}
+      accessibilityRole="button"
+      accessibilityLabel={item.title}
       onPress={() =>
         navigation.navigate('Info', {
           link: item.link,
@@ -48,16 +61,15 @@ const WatchList = () => {
       }
       style={{
         width: itemWidth,
-        marginBottom: 16,
+        marginBottom: 20,
       }}>
       <View className="relative overflow-hidden">
         <Image
-          className="rounded-xl"
           resizeMode="cover"
           style={{
             width: itemWidth,
-            height: 155,
-            borderRadius: 10,
+            height: itemWidth * 1.5,
+            backgroundColor: '#23252b',
           }}
           source={{uri: item.poster}}
         />
@@ -71,9 +83,12 @@ const WatchList = () => {
           </View>
         ) : null}
         <Text
-          className="text-white text-xs truncate text-center mt-1"
-          style={{maxWidth: itemWidth}}
-          numberOfLines={1}>
+          style={{
+            ...CATALOG_CARD_TITLE_STYLE,
+            color: 'white',
+            maxWidth: itemWidth,
+          }}
+          numberOfLines={3}>
           {item.title}
         </Text>
       </View>
@@ -81,23 +96,25 @@ const WatchList = () => {
   );
 
   return (
-    <View className="flex-1 bg-black justify-center items-center">
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
+      style={{flex: 1, backgroundColor: 'black'}}>
       <StatusBar translucent backgroundColor="transparent" />
 
       <View
-        className="w-full bg-black"
         style={{
-          paddingTop: Platform.OS === 'android' ? 15 : 0, // Adjust for Android status bar height
-        }}
-      />
-
-      <View className="flex-1 w-full px-3">
+          paddingHorizontal: 16,
+          paddingVertical: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: '#23252b',
+        }}>
         <Text
-          className="text-2xl text-center font-bold mb-6 mt-4"
-          style={{color: primary}}>
+          accessibilityRole="header"
+          style={{fontFamily: HOME_FONT.heading, fontSize: 22, color: 'white'}}>
           {t('Watchlist')}
         </Text>
-
+      </View>
+      <View style={{flex: 1, paddingHorizontal: 16, paddingTop: 20}}>
         <View
           testID="watchlist-viewport"
           style={{flex: 1, minWidth: 0}}
@@ -121,28 +138,40 @@ const WatchList = () => {
                     : undefined
                 }
                 contentContainerStyle={{
-                  paddingBottom: 50,
+                  paddingBottom: 24,
                 }}
                 showsVerticalScrollIndicator={false}
               />
             ) : null
           ) : (
-            <View className="flex-1">
-              <View className="items-center justify-center mt-20 mb-12">
-                <MaterialCommunityIcons
-                  name="playlist-remove"
-                  size={80}
-                  color={primary}
-                />
-                <Text className="text-white/70 text-base mt-4 text-center">
-                  {t('Your watchlist is empty')}
-                </Text>
-              </View>
-            </View>
+            <ScrollView
+              contentContainerStyle={{
+                flexGrow: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 32,
+              }}>
+              <MaterialCommunityIcons
+                name="bookmark-outline"
+                size={80}
+                color={primary}
+              />
+              <Text
+                style={{
+                  fontFamily: HOME_FONT.regular,
+                  color: '#dadada',
+                  fontSize: 18,
+                  textAlign: 'center',
+                  marginTop: 24,
+                  maxWidth: 420,
+                }}>
+                {t('Your watchlist is empty')}
+              </Text>
+            </ScrollView>
           )}
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
