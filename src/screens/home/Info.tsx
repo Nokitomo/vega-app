@@ -19,7 +19,7 @@ import {
 } from '@react-navigation/native-stack';
 import {HomeStackParamList, TabStackParamList} from '../../App';
 import LinearGradient from 'react-native-linear-gradient';
-import SeasonList from '../../components/SeasonList';
+import SeasonList, {type InfoPlaybackAction} from '../../components/SeasonList';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {settingsStorage, watchHistoryStorage, watchListStorage} from '../../lib/storage';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -90,6 +90,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const {isTabletDevice} = useAdaptiveNavigation();
   const [contentWidth, setContentWidth] = useState(windowWidth);
+  const playbackActionRef = useRef<(() => void) | null>(null);
+  const [playbackAction, setPlaybackAction] = useState<InfoPlaybackAction | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const providerValue = route.params.provider || provider.value;
   const routeVariants = useMemo<PostVariant[]>(
@@ -854,6 +856,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             // )
           }
           <Animated.FlatList
+            style={{flex: 1}}
             data={[]}
             keyExtractor={(_, i) => i.toString()}
             renderItem={() => <View />}
@@ -989,21 +992,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           onPress={() => Linking.openURL(trailerUrl)}
                         />
                       ) : null}
-                      {inLibrary ? (
-                        <Ionicons
-                          name="bookmark"
-                          size={30}
-                          color={primary}
-                          onPress={() => removeLibrary()}
-                        />
-                      ) : (
-                        <Ionicons
-                          name="bookmark-outline"
-                          size={30}
-                          color={primary}
-                          onPress={() => addLibrary()}
-                        />
-                      )}
                       <TouchableOpacity
                         onPress={() => openThreeDotsMenu()}
                         ref={threeDotsRef}>
@@ -1212,8 +1200,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           </Text>
                         </TouchableOpacity>
                       </View>
-                      {infoView === 'episodes' ? (
+                      <View style={{display: infoView === 'episodes' ? 'flex' : 'none'}}>
                         <SeasonList
+                          playbackActionRef={playbackActionRef}
+                          onPlaybackActionChange={setPlaybackAction}
                           key={activeLink}
                           refreshing={refreshing}
                           refreshVersion={episodeRefreshVersion}
@@ -1245,7 +1235,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                           metaTitle={displayTitle}
                           routeParams={activeRouteParams}
                         />
-                      ) : (
+                      </View>
+                      {infoView === 'related' && (
                         <View className="gap-3">
                           {relatedItems.length === 0 ? (
                             <Text className="text-gray-400 text-xs">
@@ -1334,6 +1325,29 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               />
             }
           />
+          {!infoLoading && info ? (
+            <View style={{backgroundColor: '#141519', padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12}}>
+              <TouchableOpacity accessibilityRole="button"
+                accessibilityState={{disabled: !playbackAction?.available, busy: playbackAction?.loading}}
+                disabled={!playbackAction?.available}
+                onPress={() => playbackActionRef.current?.()}
+                style={{flex: 1, minHeight: 48, paddingHorizontal: 16, paddingVertical: 10,
+                  backgroundColor: primary, opacity: playbackAction?.available ? 1 : 0.5,
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10}}>
+                <Ionicons name="play" size={22} color="black" />
+                <View style={{flexShrink: 1}}>
+                  <Text style={{fontFamily: HOME_FONT.bold, color: 'black', fontSize: 16}}>{playbackAction?.label || t('Play')}</Text>
+                  {playbackAction?.detail ? <Text style={{fontFamily: HOME_FONT.regular, color: 'black', fontSize: 12}}>{playbackAction.detail}</Text> : null}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button"
+                accessibilityLabel={t(inLibrary ? 'Remove from watch list' : 'Add to watch list')}
+                onPress={() => inLibrary ? removeLibrary() : addLibrary()}
+                style={{minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center'}}>
+                <Ionicons name={inLibrary ? 'bookmark' : 'bookmark-outline'} size={28} color={primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
       </View>
     </QueryErrorBoundary>

@@ -71,3 +71,20 @@ e ritorno agli episodi. Evidenze locali `step2-dexter-ready.png`,
 `step2-details-final.png`, `step2-details-back.png`, `step2-episodes.png`.
 AnimeUnity indisponibile secondo conferma dell'utente: i successivi test
 remoti usano StreamingUnity. Nessuna modifica ai provider.
+
+## Passaggio 3: azioni fisse
+
+Barra Riproduci/Riprendi e Preferiti come elemento flex sotto la lista,
+che riserva spazio senza coprire gli episodi. SeasonList espone solamente
+stato visuale e riferimento al suo handleResume esistente: nessuna nuova
+query o logica di selezione. Resta montata nei correlati per mantenere
+stagione, filtro, progressi e azione; il contenuto nascosto non occupa spazio.
+La CTA e disabilitata durante caricamento/errore senza episodi disponibili.
+
+TypeScript e lint puliti; 35 test superati su continueWatchingFixes,
+episodesThroughTarget e prePlayEpisodes. Su Medium_Phone_API_35 StreamingUnity:
+avvio del primo episodio di Dexter dal pulsante fisso e riproduzione osservata
+(tempo avanzato a 00:05); ritorno dal player senza crash. Verificati anche
+film Drive, barra durante scroll e nei correlati, aggiunta e rimozione dai
+preferiti (stato originario ripristinato). Evidenze `step3-footer.png`,
+`step3-player-exit.png`, `step3-film-save.png`, `step3-related.png`.

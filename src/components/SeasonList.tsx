@@ -109,7 +109,16 @@ import {
 } from '../lib/utils/continueWatching';
 import {perfTrace} from '../lib/utils/perfTrace';
 
+export interface InfoPlaybackAction {
+  label: string;
+  detail: string;
+  available: boolean;
+  loading: boolean;
+}
+
 interface SeasonListProps {
+  playbackActionRef?: React.MutableRefObject<(() => void) | null>;
+  onPlaybackActionChange?: (action: InfoPlaybackAction | null) => void;
   LinkList: Link[];
   poster: {
     logo?: string;
@@ -399,6 +408,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   contentIds,
   refreshing: _refreshing,
   refreshVersion = 0,
+  playbackActionRef,
+  onPlaybackActionChange,
   routeParams,
 }) => {
   const {primary} = useThemeStore(state => state);
@@ -2675,6 +2686,26 @@ const SeasonList: React.FC<SeasonListProps> = ({
     isSameSeason,
   ]);
 
+  // Publish presentation only; the fixed action invokes the existing playback handler.
+  const actionLabel = playbackSelection.playFromBeginning
+    ? t('Play from beginning')
+    : canResumePlayback ? t('Resume') : t('Play');
+  const actionDetail = [resumeEpisodeLabel,
+    playbackSelection.resetPlayback ||
+    (playbackSelection.target && playbackSelection.target.link !== resumeProgress?.episodeLink)
+      ? '' : formatResumeTime(resumeProgress?.currentTime ?? 0),
+  ].filter(Boolean).join(' · ');
+  const actionAvailable = !episodeLoading && !(episodeError && episodeList.length === 0) &&
+    (resumeProgress?.currentTime != null || filteredAndSortedEpisodes.length > 0 || filteredAndSortedDirectLinks.length > 0);
+  useEffect(() => {
+    if (playbackActionRef) {playbackActionRef.current = handleResume;}
+    return () => {if (playbackActionRef) {playbackActionRef.current = null;}};
+  }, [handleResume, playbackActionRef]);
+  useEffect(() => {
+    onPlaybackActionChange?.({label: actionLabel, detail: actionDetail, available: actionAvailable, loading: episodeLoading});
+  }, [actionLabel, actionDetail, actionAvailable, episodeLoading, onPlaybackActionChange]);
+  useEffect(() => () => onPlaybackActionChange?.(null), [onPlaybackActionChange]);
+
   // Memoized episode render item
   const renderEpisodeItem = useCallback(
     ({item, index}: {item: EpisodeLink; index: number}) => {
@@ -3169,7 +3200,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         </View>
       )}
 
-      {(resumeProgress?.currentTime != null ||
+      {!onPlaybackActionChange && (resumeProgress?.currentTime != null ||
         filteredAndSortedEpisodes.length > 0 ||
         filteredAndSortedDirectLinks.length > 0) ? (
         <View className="mt-3 mb-2">
