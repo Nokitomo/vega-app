@@ -38,6 +38,11 @@ InfoSeasonPicker appartengono gia al lavoro sulla pagina Info.
 `DisableProviders` e commentata. Non sono schermate attive da presentare
 come regressioni visive. I dialoghi nativi restano gestiti dal sistema.
 
+Anche ricerca sottotitoli nel player, stato senza provider, schermate di
+errore e dettagli dei filtri catalogo sono stati successivamente aggiornati.
+Il pannello download e il report errori usano l'utilita Clipboard condivisa.
+Verifiche e limiti sono descritti in `secondary-ui-cruncy-ui.md`.
+
 ## Limiti della conclusione
 
 I tre interventi sono completati nel loro ambito UI. Questo non certifica

@@ -1,13 +1,11 @@
 import React, {act} from 'react';
 import renderer from 'react-test-renderer';
-import {
-  Modal,
-  Text,
-  TouchableOpacity,
-  Clipboard,
-  ToastAndroid,
-} from 'react-native';
+import {Modal, Text, TouchableOpacity, ToastAndroid} from 'react-native';
 import {describe, it, expect, jest, beforeEach} from '@jest/globals';
+import {setClipboardString} from '../src/lib/utils/clipboard';
+jest.mock('../src/lib/utils/clipboard', () => ({
+  setClipboardString: jest.fn(() => true),
+}));
 import DownloadBottomSheet from '../src/components/DownloadBottomSheet';
 import {TextTrackType} from 'react-native-video';
 const mockClose = jest.fn();
@@ -70,9 +68,7 @@ describe('Download sheet actions', () => {
     const video = jest.fn(),
       subs = jest.fn(),
       setModal = jest.fn();
-    const copy = jest
-      .spyOn(Clipboard, 'setString')
-      .mockImplementation(() => {});
+    const copy = setClipboardString;
     jest.spyOn(ToastAndroid, 'show').mockImplementation(() => {});
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {

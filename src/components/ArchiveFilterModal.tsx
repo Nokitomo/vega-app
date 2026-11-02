@@ -100,7 +100,11 @@ const ArchiveFilterModal = ({
     }
     return (
       <View className="mb-4">
-        <Text className="text-gray-300 text-sm mb-2">{t(labelKey)}</Text>
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-gray-300 text-sm mb-2">
+          {t(labelKey)}
+        </Text>
         <Dropdown
           data={[{label: t('Any'), value: ''}, ...data]}
           labelField="label"
@@ -112,14 +116,26 @@ const ArchiveFilterModal = ({
           }
           style={{
             backgroundColor: '#262626',
-            borderRadius: 8,
+            borderRadius: 0,
             paddingHorizontal: 12,
             minHeight: 44,
           }}
-          containerStyle={{backgroundColor: '#262626', borderRadius: 8}}
-          selectedTextStyle={{color: 'white', fontSize: 14}}
-          placeholderStyle={{color: '#a3a3a3', fontSize: 14}}
-          itemTextStyle={{color: 'white', fontSize: 14}}
+          containerStyle={{backgroundColor: '#262626', borderRadius: 0}}
+          selectedTextStyle={{
+            color: 'white',
+            fontFamily: HOME_FONT.regular,
+            fontSize: 14,
+          }}
+          placeholderStyle={{
+            color: '#a3a3a3',
+            fontFamily: HOME_FONT.regular,
+            fontSize: 14,
+          }}
+          itemTextStyle={{
+            color: 'white',
+            fontFamily: HOME_FONT.regular,
+            fontSize: 14,
+          }}
           itemContainerStyle={{backgroundColor: '#262626'}}
           activeColor="#3A3A3A"
           iconStyle={{tintColor: 'white'}}
@@ -166,11 +182,18 @@ const ArchiveFilterModal = ({
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             {filters.title ? (
               <View className="mb-4">
-                <Text className="text-gray-300 text-sm mb-2">{t('Title')}</Text>
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-gray-300 text-sm mb-2">
+                  {t('Title')}
+                </Text>
                 <TextInput
+                  style={{fontFamily: HOME_FONT.regular}}
                   value={draft.title || ''}
                   onChangeText={title =>
                     setDraft(current => ({
@@ -180,13 +203,17 @@ const ArchiveFilterModal = ({
                   }
                   placeholder={t('Search by title')}
                   placeholderTextColor="#737373"
-                  className="bg-[#262626] text-white rounded-lg px-3 py-3"
+                  className="bg-[#262626] text-white px-3 py-3"
                 />
               </View>
             ) : null}
             {Array.isArray(filters.year) || yearItems.length === 0 ? null : (
               <View className="mb-4">
-                <Text className="text-gray-300 text-sm mb-2">{t('Year')}</Text>
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-gray-300 text-sm mb-2">
+                  {t('Year')}
+                </Text>
                 <Dropdown
                   data={[{label: t('Any'), value: ''}, ...yearItems]}
                   labelField="label"
@@ -201,14 +228,26 @@ const ArchiveFilterModal = ({
                   }
                   style={{
                     backgroundColor: '#262626',
-                    borderRadius: 8,
+                    borderRadius: 0,
                     paddingHorizontal: 12,
                     minHeight: 44,
                   }}
-                  containerStyle={{backgroundColor: '#262626', borderRadius: 8}}
-                  selectedTextStyle={{color: 'white', fontSize: 14}}
-                  placeholderStyle={{color: '#a3a3a3', fontSize: 14}}
-                  itemTextStyle={{color: 'white', fontSize: 14}}
+                  containerStyle={{backgroundColor: '#262626', borderRadius: 0}}
+                  selectedTextStyle={{
+                    color: 'white',
+                    fontFamily: HOME_FONT.regular,
+                    fontSize: 14,
+                  }}
+                  placeholderStyle={{
+                    color: '#a3a3a3',
+                    fontFamily: HOME_FONT.regular,
+                    fontSize: 14,
+                  }}
+                  itemTextStyle={{
+                    color: 'white',
+                    fontFamily: HOME_FONT.regular,
+                    fontSize: 14,
+                  }}
                   itemContainerStyle={{backgroundColor: '#262626'}}
                   activeColor="#3A3A3A"
                   iconStyle={{tintColor: 'white'}}
@@ -221,7 +260,11 @@ const ArchiveFilterModal = ({
             {renderDropdown('season', 'Season')}
             {genres.length > 0 ? (
               <View className="mb-4">
-                <Text className="text-gray-300 text-sm mb-2">{t('Genre')}</Text>
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-gray-300 text-sm mb-2">
+                  {t('Genre')}
+                </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {genres.map(option => {
                     const genre = getOptionValue(option);
@@ -230,12 +273,13 @@ const ArchiveFilterModal = ({
                       <TouchableOpacity
                         key={genre}
                         onPress={() => toggleGenre(genre)}
-                        className="rounded-full px-3 py-1.5 border"
+                        className="px-3 py-1.5 border"
                         style={{
                           backgroundColor: selected ? primary : '#262626',
                           borderColor: selected ? primary : '#404040',
                         }}>
                         <Text
+                          style={{fontFamily: HOME_FONT.medium}}
                           className={`text-xs ${
                             selected ? 'text-black' : 'text-white'
                           }`}>
@@ -254,7 +298,11 @@ const ArchiveFilterModal = ({
             ) : null}
             {filters.dubbed ? (
               <View className="flex-row items-center justify-between py-3 border-t border-white/10">
-                <Text className="text-white text-sm">{t('Dubbed')}</Text>
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-white text-sm">
+                  {t('Dubbed')}
+                </Text>
                 <Switch
                   value={!!draft.dubbed}
                   onValueChange={dubbed =>
@@ -267,7 +315,11 @@ const ArchiveFilterModal = ({
             ) : null}
             {filters.random ? (
               <View className="flex-row items-center justify-between py-3 border-t border-white/10">
-                <Text className="text-white text-sm">{t('Random')}</Text>
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-white text-sm">
+                  {t('Random')}
+                </Text>
                 <Switch
                   value={!!draft.random}
                   onValueChange={random =>
@@ -282,14 +334,22 @@ const ArchiveFilterModal = ({
           <View className="flex-row gap-3 mt-5">
             <TouchableOpacity
               onPress={() => setDraft(createEmptyArchiveFilterSelection())}
-              className="flex-1 bg-[#262626] rounded-lg py-3 items-center">
-              <Text className="text-white font-semibold">{t('Reset')}</Text>
+              className="flex-1 bg-[#262626] py-3 items-center">
+              <Text
+                style={{fontFamily: HOME_FONT.regular}}
+                className="text-white font-semibold">
+                {t('Reset')}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => onApply({...draft, genres: [...draft.genres]})}
-              className="flex-1 rounded-lg py-3 items-center"
+              className="flex-1 py-3 items-center"
               style={{backgroundColor: primary}}>
-              <Text className="text-black font-semibold">{t('Apply')}</Text>
+              <Text
+                style={{fontFamily: HOME_FONT.regular}}
+                className="text-black font-semibold">
+                {t('Apply')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

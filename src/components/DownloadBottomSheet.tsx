@@ -14,7 +14,7 @@ import BottomSheet, {BottomSheetScrollView} from '@gorhom/bottom-sheet';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import SkeletonLoader from './Skeleton';
 import RNReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import {Clipboard} from 'react-native';
+import {setClipboardString} from '../lib/utils/clipboard';
 import useThemeStore from '../lib/zustand/themeStore';
 import {TextTrackType} from 'react-native-video';
 import {settingsStorage} from '../lib/storage';
@@ -158,7 +158,7 @@ const DownloadBottomSheet = ({
                                 },
                               );
                             }
-                            Clipboard.setString(item.link);
+                            setClipboardString(item.link);
                             ToastAndroid.show(
                               t('Link copied'),
                               ToastAndroid.SHORT,
@@ -194,7 +194,7 @@ const DownloadBottomSheet = ({
                                     },
                                   );
                                 }
-                                Clipboard.setString(item.uri);
+                                setClipboardString(item.uri);
                                 ToastAndroid.show(
                                   t('Link copied'),
                                   ToastAndroid.SHORT,

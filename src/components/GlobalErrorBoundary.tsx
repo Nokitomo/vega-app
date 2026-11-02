@@ -1,3 +1,5 @@
+import {setClipboardString} from '../lib/utils/clipboard';
+import {HOME_FONT} from './homePresentation';
 import React from 'react';
 import {
   View,
@@ -5,8 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Dimensions,
-  Clipboard,
+  useWindowDimensions,
 } from 'react-native';
 import useThemeStore from '../lib/zustand/themeStore';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -149,7 +150,7 @@ ${errorInfo?.componentStack || i18n.t('Not available')}
       [
         {
           text: i18n.t('Copy to Clipboard'),
-          onPress: () => Clipboard.setString(errorReport),
+          onPress: () => setClipboardString(errorReport),
         },
         {text: i18n.t('OK')},
       ],
@@ -202,7 +203,7 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
 }) => {
   const {primary} = useThemeStore();
   const {t} = useTranslation();
-  const {width} = Dimensions.get('window');
+  const {width} = useWindowDimensions();
   const isTablet = width > 768;
 
   return (
@@ -221,27 +222,37 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
             <Ionicons name="warning" size={40} color="#ef4444" />
           </View>
 
-          <Text className="text-white text-2xl font-bold text-center mb-2">
+          <Text
+            style={{fontFamily: HOME_FONT.heading}}
+            className="text-white text-2xl font-bold text-center mb-2">
             {t('Oops! Something went wrong')}
           </Text>
 
-          <Text className="text-gray-400 text-base text-center leading-6">
+          <Text
+            style={{fontFamily: HOME_FONT.regular}}
+            className="text-gray-400 text-base text-center leading-6">
             {t('The app encountered an unexpected error and needs to restart.')}
           </Text>
         </View>
 
-        <View className="bg-gray-900 rounded-lg p-4 mb-6">
-          <Text className="text-red-400 text-sm font-medium mb-2">
+        <View className="bg-[#141519] p-4 mb-6">
+          <Text
+            style={{fontFamily: HOME_FONT.regular}}
+            className="text-red-400 text-sm font-medium mb-2">
             {t('Error Details:')}
           </Text>
-          <Text className="text-gray-300 text-sm">
+          <Text
+            style={{fontFamily: HOME_FONT.regular}}
+            className="text-gray-300 text-sm">
             {error.message || t('Unknown error occurred')}
           </Text>
         </View>
 
         {showDetails && (
-          <View className="bg-gray-900 rounded-lg p-4 mb-6">
-            <Text className="text-orange-400 text-sm font-medium mb-2">
+          <View className="bg-[#141519] p-4 mb-6">
+            <Text
+              style={{fontFamily: HOME_FONT.regular}}
+              className="text-orange-400 text-sm font-medium mb-2">
               {t('Technical Details:')}
             </Text>
             <ScrollView className="max-h-32">
@@ -262,11 +273,13 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
         <View className="space-y-3">
           <TouchableOpacity
             onPress={onRestart}
-            className="bg-red-600 rounded-lg py-4 px-6 items-center"
+            className="bg-red-600 py-4 px-6 items-center"
             activeOpacity={0.8}>
             <View className="flex-row items-center">
               <Ionicons name="refresh" size={20} color="white" />
-              <Text className="text-white font-semibold text-base ml-2">
+              <Text
+                style={{fontFamily: HOME_FONT.regular}}
+                className="text-white font-semibold text-base ml-2">
                 {t('Restart App')}
               </Text>
             </View>
@@ -274,14 +287,14 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
 
           <TouchableOpacity
             onPress={onReset}
-            className="rounded-lg py-4 px-6 items-center border border-gray-600"
+            className="py-4 px-6 items-center border border-gray-600"
             style={{backgroundColor: `${primary}20`}}
             activeOpacity={0.8}>
             <View className="flex-row items-center">
               <Ionicons name="arrow-back" size={20} color={primary} />
               <Text
                 className="font-semibold text-base ml-2"
-                style={{color: primary}}>
+                style={{color: primary, fontFamily: HOME_FONT.medium}}>
                 {t('Try Again')}
               </Text>
             </View>
@@ -290,7 +303,7 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
           <View className="flex-row space-x-3">
             <TouchableOpacity
               onPress={onToggleDetails}
-              className="flex-1 bg-gray-800 rounded-lg py-3 px-4 items-center"
+              className="flex-1 bg-[#23252b] py-3 px-4 items-center"
               activeOpacity={0.8}>
               <View className="flex-row items-center">
                 <Ionicons
@@ -298,7 +311,9 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
                   size={16}
                   color="#9ca3af"
                 />
-                <Text className="text-gray-400 text-sm ml-2">
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-gray-400 text-sm ml-2">
                   {showDetails ? t('Hide Details') : t('Show Details')}
                 </Text>
               </View>
@@ -306,11 +321,13 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
 
             <TouchableOpacity
               onPress={onShowReport}
-              className="flex-1 bg-gray-800 rounded-lg py-3 px-4 items-center"
+              className="flex-1 bg-[#23252b] py-3 px-4 items-center"
               activeOpacity={0.8}>
               <View className="flex-row items-center">
                 <Ionicons name="bug" size={16} color="#9ca3af" />
-                <Text className="text-gray-400 text-sm ml-2">
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-gray-400 text-sm ml-2">
                   {t('Report')}
                 </Text>
               </View>
@@ -319,13 +336,17 @@ const ErrorFallbackUI: React.FC<ErrorFallbackUIProps> = ({
         </View>
 
         <View className="mt-8 pt-6 border-t border-gray-800">
-          <Text className="text-gray-500 text-xs text-center">
+          <Text
+            style={{fontFamily: HOME_FONT.regular}}
+            className="text-gray-500 text-xs text-center">
             {t('App Version: {{version}} ({{build}})', {
               version: Application.nativeApplicationVersion,
               build: Application.nativeBuildVersion,
             })}
           </Text>
-          <Text className="text-gray-600 text-xs text-center mt-1">
+          <Text
+            style={{fontFamily: HOME_FONT.regular}}
+            className="text-gray-600 text-xs text-center mt-1">
             {t('If this keeps happening, report on github or discord')}
           </Text>
         </View>

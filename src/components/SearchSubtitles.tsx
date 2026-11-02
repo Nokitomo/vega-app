@@ -6,8 +6,11 @@ import {
   TextInput,
   ActivityIndicator,
   ToastAndroid,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {HOME_FONT} from './homePresentation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React, {useMemo, useState} from 'react';
 import useThemeStore from '../lib/zustand/themeStore';
@@ -125,7 +128,9 @@ const SearchSubtitles = ({
         className="flex-row gap-3 items-center rounded-md my-1 overflow-hidden ml-2"
         onPress={() => setSearchModalVisible(true)}>
         <MaterialIcons name="add" size={20} color="white" />
-        <Text className="text-base font-semibold text-white">
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-base font-semibold text-white">
           {t('Search subtitles online')}
         </Text>
       </TouchableOpacity>
@@ -137,122 +142,184 @@ const SearchSubtitles = ({
         onRequestClose={() => {
           setSearchModalVisible(!searchModalVisible);
         }}>
-        <SafeAreaView className="h-full w-full bg-black bg-opacity-80">
-          <View className="flex-row justify-start items-center gap-x-4 px-4 py-2">
-            <MaterialIcons
-              name="arrow-back-ios-new"
-              size={24}
-              color="white"
-              onPress={() => setSearchModalVisible(false)}
-            />
-            <Text className="text-white text-xl font-semibold">
-              {t('Search Subtitles')}
-            </Text>
-          </View>
-          <View className="flex-row justify-between items-center px-4 py-2">
-            <TextInput
-              placeholder={t('Name or IMDB ID')}
-              className="bg-quaternary w-[60%] rounded-md p-2 text-white"
-              onChangeText={text => setSearchQuery(text)}
-              value={searchQuery}
-            />
-            <View className="bg-quaternary w-[10%] h-11 rounded-md p-2">
-              <Dropdown
-                selectedTextStyle={{
-                  color: 'white',
-                  overflow: 'hidden',
-                  fontWeight: 'bold',
-                }}
-                containerStyle={{
-                  borderColor: '#363636',
-                  width: 115,
-                  paddingLeft: 5,
-                  borderRadius: 5,
-                  overflow: 'hidden',
-                  padding: 2,
-                  backgroundColor: 'black',
-                  maxHeight: 450,
-                }}
-                labelField={'id'}
-                valueField={'id'}
-                placeholder={t('Select')}
-                value={subId}
-                data={subLanguageIds}
-                onChange={async item => {
-                  setSubId(item.id);
-                }}
-                renderItem={({name}) => (
-                  <Text className={'text-lg p-1 text-white/60 bg-black'}>
-                    {name}
-                  </Text>
-                )}
-              />
-            </View>
-            <TextInput
-              placeholder={t('Season')}
-              keyboardType="numeric"
-              className="bg-quaternary text-white w-[10%] rounded-md p-2"
-              onChangeText={text => setSeason(text)}
-              value={season}
-            />
-            <TextInput
-              placeholder={t('Episode')}
-              keyboardType="numeric"
-              className="bg-quaternary text-white w-[10%] rounded-md p-2"
-              onChangeText={text => setEpisode(text)}
-              value={episode}
-            />
-            <TouchableOpacity>
-              <MaterialIcons
-                name="search"
-                size={34}
-                color={primary}
-                onPress={() => searchSubtitles()}
-              />
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            className=" px-7 py-2"
-            contentContainerStyle={{flexGrow: 1}}>
-            {loading ? (
-              <View className="w-full h-full justify-center items-center">
-                <ActivityIndicator size="large" color={primary} />
-              </View>
-            ) : (
-              searchResults.map(result => (
-                <TouchableOpacity
-                  key={`${result.id}:${result.fileId}`}
-                  className="flex-row justify- items-center gap-x-4 p-2 my-1 border border-b border-white/10 rounded-md"
-                  disabled={loading}
-                  onPress={() => selectSubtitle(result)}>
-                  <Text className="text-white text-lg font-semibold capitalize">
-                    {result.language}
-                  </Text>
-                  <Text className="text-white text-base">
-                    {result.title.trim()}
-                  </Text>
-                  <Text className="text-white text-lg">
-                    {Number(result.season) > 0 ? `S${result.season}` : ''}
-                  </Text>
-                  <Text className="text-white text-lg">
-                    {Number(result.episode) > 0 ? `E${result.episode}` : ''}
-                  </Text>
-                  <Text className="text-white text-xs italic">
-                    {[result.release, result.uploader]
-                      .filter(Boolean)
-                      .join(' ')}
-                  </Text>
-                </TouchableOpacity>
-              ))
-            )}
-            {searchResults.length === 0 && !loading && (
-              <View className="w-full h-full justify-center items-center">
-                <Text className="text-red-700 text-lg font-semibold">
-                  {error}
+        <SafeAreaView className="flex-1 bg-black">
+          <KeyboardAvoidingView
+            style={{flex: 1}}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                flexGrow: 1,
+                width: '100%',
+                maxWidth: 800,
+                alignSelf: 'center',
+                paddingBottom: 24,
+              }}>
+              <View className="flex-row justify-start items-center gap-x-4 px-4 py-2">
+                <MaterialIcons
+                  name="arrow-back-ios-new"
+                  size={24}
+                  color="white"
+                  onPress={() => setSearchModalVisible(false)}
+                />
+                <Text
+                  style={{fontFamily: HOME_FONT.heading}}
+                  className="text-white text-xl font-semibold">
+                  {t('Search Subtitles')}
                 </Text>
               </View>
-            )}
-          </ScrollView>
+              <View className="px-4 py-2">
+                <TextInput
+                  placeholder={t('Name or IMDB ID')}
+                  accessibilityLabel={t('Name or IMDB ID')}
+                  style={{fontFamily: HOME_FONT.regular, minHeight: 48}}
+                  placeholderTextColor="#a0a0a0"
+                  className="bg-[#23252b] p-3 text-white mb-3"
+                  onChangeText={text => setSearchQuery(text)}
+                  value={searchQuery}
+                />
+                <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
+                  <View
+                    style={{flexGrow: 1, flexBasis: 120, minWidth: 100}}
+                    className="bg-[#23252b] p-3">
+                    <Dropdown
+                      selectedTextStyle={{
+                        color: 'white',
+                        overflow: 'hidden',
+                        fontFamily: HOME_FONT.medium,
+                      }}
+                      containerStyle={{
+                        borderColor: '#363636',
+                        width: 115,
+                        paddingLeft: 5,
+                        borderRadius: 0,
+                        overflow: 'hidden',
+                        padding: 2,
+                        backgroundColor: 'black',
+                        maxHeight: 300,
+                      }}
+                      labelField={'id'}
+                      valueField={'id'}
+                      placeholder={t('Select')}
+                      value={subId}
+                      data={subLanguageIds}
+                      onChange={async item => {
+                        setSubId(item.id);
+                      }}
+                      renderItem={({name}) => (
+                        <Text
+                          style={{fontFamily: HOME_FONT.regular}}
+                          className={'text-base p-3 text-white bg-[#23252b]'}>
+                          {name}
+                        </Text>
+                      )}
+                    />
+                  </View>
+                  <TextInput
+                    placeholder={t('Season')}
+                    accessibilityLabel={t('Season')}
+                    keyboardType="numeric"
+                    style={{
+                      fontFamily: HOME_FONT.regular,
+                      flexGrow: 1,
+                      flexBasis: 100,
+                      minHeight: 48,
+                    }}
+                    placeholderTextColor="#a0a0a0"
+                    className="bg-[#23252b] text-white p-3"
+                    onChangeText={text => setSeason(text)}
+                    value={season}
+                  />
+                  <TextInput
+                    placeholder={t('Episode')}
+                    accessibilityLabel={t('Episode')}
+                    keyboardType="numeric"
+                    style={{
+                      fontFamily: HOME_FONT.regular,
+                      flexGrow: 1,
+                      flexBasis: 100,
+                      minHeight: 48,
+                    }}
+                    placeholderTextColor="#a0a0a0"
+                    className="bg-[#23252b] text-white p-3"
+                    onChangeText={text => setEpisode(text)}
+                    value={episode}
+                  />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={t('Search')}
+                    onPress={() => searchSubtitles()}
+                    style={{
+                      flexBasis: '100%',
+                      flexDirection: 'row',
+                      gap: 8,
+                      backgroundColor: primary,
+                      minWidth: 48,
+                      minHeight: 48,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <MaterialIcons name="search" size={24} color="black" />
+                    <Text style={{fontFamily: HOME_FONT.bold, color: 'black'}}>
+                      {t('Search')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View className=" px-7 py-2" style={{flexGrow: 1}}>
+                {loading ? (
+                  <View className="w-full h-full justify-center items-center">
+                    <ActivityIndicator size="large" color={primary} />
+                  </View>
+                ) : (
+                  searchResults.map(result => (
+                    <TouchableOpacity
+                      key={`${result.id}:${result.fileId}`}
+                      className="gap-2 p-4 my-1 bg-[#141519] border border-white/10"
+                      disabled={loading}
+                      onPress={() => selectSubtitle(result)}>
+                      <Text
+                        style={{fontFamily: HOME_FONT.regular}}
+                        className="text-white text-lg font-semibold capitalize">
+                        {result.language}
+                      </Text>
+                      <Text
+                        style={{fontFamily: HOME_FONT.regular}}
+                        className="text-white text-base">
+                        {result.title.trim()}
+                      </Text>
+                      <Text
+                        style={{fontFamily: HOME_FONT.regular}}
+                        className="text-white text-lg">
+                        {Number(result.season) > 0 ? `S${result.season}` : ''}
+                      </Text>
+                      <Text
+                        style={{fontFamily: HOME_FONT.regular}}
+                        className="text-white text-lg">
+                        {Number(result.episode) > 0 ? `E${result.episode}` : ''}
+                      </Text>
+                      <Text
+                        style={{fontFamily: HOME_FONT.regular}}
+                        className="text-white text-xs italic">
+                        {[result.release, result.uploader]
+                          .filter(Boolean)
+                          .join(' ')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+                {searchResults.length === 0 && !loading && (
+                  <View className="w-full h-full justify-center items-center">
+                    <Text
+                      style={{fontFamily: HOME_FONT.regular}}
+                      className="text-red-700 text-lg font-semibold">
+                      {error}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </View>

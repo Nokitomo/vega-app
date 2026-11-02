@@ -1,5 +1,6 @@
+import {HOME_FONT} from './homePresentation';
 import React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native';
+import {Text, TouchableOpacity, ScrollView} from 'react-native';
 import useThemeStore from '../lib/zustand/themeStore';
 import {useTranslation} from 'react-i18next';
 
@@ -15,20 +16,35 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   const {primary} = useThemeStore();
   const {t} = useTranslation();
   return (
-    <View className="flex-1 justify-center items-center p-4 bg-black">
-      <Text className="text-red-400 text-lg font-bold mb-4 text-center">
+    <ScrollView
+      className="flex-1 bg-black"
+      contentContainerStyle={{
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+      }}>
+      <Text
+        style={{fontFamily: HOME_FONT.heading}}
+        className="text-red-400 text-lg font-bold mb-4 text-center">
         {t('Something went wrong')}
       </Text>
-      <Text className="text-gray-400 text-sm mb-6 text-center">
+      <Text
+        style={{fontFamily: HOME_FONT.regular}}
+        className="text-gray-400 text-sm mb-6 text-center">
         {error.message || t('An unexpected error occurred')}
       </Text>
       <TouchableOpacity
         onPress={resetError}
-        className="px-6 py-3 rounded-lg"
+        className="px-6 py-3"
         style={{backgroundColor: primary}}>
-        <Text className="text-white font-semibold">{t('Try Again')}</Text>
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-white font-semibold">
+          {t('Try Again')}
+        </Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
