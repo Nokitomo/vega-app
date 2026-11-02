@@ -4,12 +4,12 @@ import {
   View,
   StatusBar,
   RefreshControl,
-  FlatList,
   Linking,
   TouchableOpacity,
   Modal,
   Pressable,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
@@ -51,6 +51,9 @@ import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
 import RemoteLogo from '../../components/RemoteLogo';
 import {useLogoFallback} from '../../lib/hooks/useLogoFallback';
 import {markPerfNavigationStage, perfTrace} from '../../lib/utils/perfTrace';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import useAdaptiveNavigation from '../../lib/hooks/useAdaptiveNavigation';
+import {HOME_FONT} from '../../components/homePresentation';
 // import {BlurView} from 'expo-blur';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Info'>;
@@ -83,6 +86,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
   const {width: windowWidth} = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const {isTabletDevice} = useAdaptiveNavigation();
+  const [contentWidth, setContentWidth] = useState(windowWidth);
+  const scrollY = useRef(new Animated.Value(0)).current;
   const providerValue = route.params.provider || provider.value;
   const routeVariants = useMemo<PostVariant[]>(
     () =>
@@ -123,9 +130,14 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   );
   const infoHeaderHeight = useMemo(() => {
     const width =
-      Number.isFinite(windowWidth) && windowWidth > 0 ? windowWidth : 390;
-    return Math.round(Math.min(Math.max(width * (9 / 16), 256), 480));
-  }, [windowWidth]);
+      Number.isFinite(contentWidth) && contentWidth > 0 ? contentWidth : 390;
+    return Math.round(width * (isTabletDevice ? 9 / 16 : 3 / 2));
+  }, [contentWidth, isTabletDevice]);
+  const toolbarOpacity = scrollY.interpolate({
+    inputRange: [Math.max(0, infoHeaderHeight - 160), Math.max(1, infoHeaderHeight - 64)],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     setSelectedVariantLink(route.params.link);
@@ -157,7 +169,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   const [threeDotsMenuOpen, setThreeDotsMenuOpen] = useState(false);
   const [readMore, setReadMore] = useState(false);
   const [menuPosition, setMenuPosition] = useState({top: -1000, right: 0});
-  const [backgroundColor, setBackgroundColor] = useState('transparent');
   const [backgroundCandidateIndex, setBackgroundCandidateIndex] = useState(0);
   const [infoView, setInfoView] = useState<'episodes' | 'related'>('episodes');
   const [refreshing, setRefreshing] = useState(false);
@@ -205,11 +216,6 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     }
   }, []);
 
-  const handleScroll = useCallback((event: any) => {
-    setBackgroundColor(
-      event.nativeEvent.contentOffset.y > 150 ? 'black' : 'transparent',
-    );
-  }, []);
   const providerTitle = useMemo(() => {
     if (info?.titleKey) {
       return t(info.titleKey, info.titleParams);
@@ -775,29 +781,43 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     <QueryErrorBoundary>
       <View
         className="h-full w-full"
-        onLayout={() => markPerfNavigationStage('first_layout')}>
+        onLayout={event => {
+          setContentWidth(event.nativeEvent.layout.width);
+          markPerfNavigationStage('first_layout');
+        }}>
         <StatusBar
           showHideTransition={'slide'}
           animated={true}
           translucent={true}
-          backgroundColor={backgroundColor}
+          backgroundColor="transparent"
         />
-        <View>
-          <View className="absolute top-0 left-0 right-0 z-40 flex-row justify-between items-center px-3 pt-10">
+        <View style={{flex: 1}}>
+          <View style={{position: 'absolute', top: 0, left: 0, right: 0, zIndex: 40,
+            paddingTop: insets.top, paddingHorizontal: 12}}>
+            <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.65)', 'transparent']}
+              style={{position: 'absolute', top: 0, bottom: 0, left: 0, right: 0}} />
+            <Animated.View pointerEvents="none" style={{position: 'absolute', top: 0,
+              bottom: 0, left: 0, right: 0, backgroundColor: 'black', opacity: toolbarOpacity}} />
+            <View style={{minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8}}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
+              onPress={handleClose} style={{width: 44, height: 48, alignItems: 'center', justifyContent: 'center'}}>
+              <Ionicons name="close" size={28} color="white" />
+            </TouchableOpacity>
+            <Animated.View style={{flex: 1, opacity: toolbarOpacity}} pointerEvents="none">
+              <Text numberOfLines={1} style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 20}}>
+                {displayTitle}
+              </Text>
+            </Animated.View>
             {showInfoBack ? (
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('Go Back')}
                 onPress={handleInfoBack}
-                className="p-2 rounded-full bg-black/50">
+                style={{width: 44, height: 48, alignItems: 'center', justifyContent: 'center'}}>
                 <Ionicons name="chevron-back" size={24} color="white" />
               </TouchableOpacity>
-            ) : (
-              <View className="w-10 h-10" />
-            )}
-            <TouchableOpacity
-              onPress={handleClose}
-              className="p-2 rounded-full bg-black/50">
-              <Ionicons name="close" size={22} color="white" />
-            </TouchableOpacity>
+            ) : null}
+            </View>
           </View>
           <View className="absolute w-full" style={{height: infoHeaderHeight}}>
             <SkeletonLoader
@@ -832,7 +852,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             //   />
             // )
           }
-          <FlatList
+          <Animated.FlatList
             data={[]}
             keyExtractor={(_, i) => i.toString()}
             renderItem={() => <View />}
@@ -840,16 +860,17 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               <>
                 <View
                   className="relative w-full"
-                  style={{height: infoHeaderHeight}}>
+                  style={{minHeight: infoHeaderHeight, justifyContent: 'flex-end'}}>
                   <LinearGradient
-                    colors={['transparent', 'black']}
-                    className="absolute h-full w-full"
+                    colors={['transparent', 'rgba(0,0,0,0.15)', 'black']}
+                    locations={[0, 0.45, 1]}
+                    style={{position: 'absolute', top: 0, bottom: 0, left: 0, right: 0}}
                   />
-                  <View className="absolute bottom-0 right-0 w-screen flex-row justify-between items-baseline px-2">
+                  <View style={{alignItems: 'center', paddingHorizontal: 24, paddingTop: insets.top + 72, paddingBottom: 16, gap: 12}}>
                     {logoImage ? (
                       <RemoteLogo
                         uri={logoImage}
-                        width={200}
+                        width={Math.min(320, Math.max(1, contentWidth - 48))}
                         height={100}
                         onError={handleLogoError}
                         onLoad={handleLogoLoad}
@@ -857,12 +878,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                     ) : infoLoading ? (
                       <View style={{width: 200, height: 100}} />
                     ) : (
-                      <View className="w-3/4">
-                        <Text className="text-white text-2xl mt-3 capitalize font-semibold truncate">
+                      <View style={{width: '100%'}}>
+                        <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 28, textAlign: 'center'}}>
                           {displayTitle}
                         </Text>
                         {isDubbedItalian ? (
-                          <Text className="text-gray-300 text-xs mt-1">
+                          <Text className="text-gray-300 text-xs mt-1 text-center">
                             {t('Dubbed in Italian')}
                           </Text>
                         ) : null}
@@ -1300,7 +1321,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
             ListFooterComponent={<View className="h-16" />}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
+            onScroll={Animated.event([{nativeEvent: {contentOffset: {y: scrollY}}}], {useNativeDriver: true})}
             scrollEventThrottle={16} // Optimize scroll performance
             refreshControl={
               <RefreshControl
