@@ -19,6 +19,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import {HOME_FONT} from './homePresentation';
+import {
+  getPlayerEpisodeNumber,
+  playerEpisodeTitle,
+} from '../lib/utils/playerEpisodePresentation';
 import {EpisodeLink, Link} from '../lib/providers/types';
 
 type Props = {
@@ -121,17 +126,22 @@ const EpisodeRow = React.memo<EpisodeRowProps>(
         </View>
 
         <View style={styles.episodeInfo}>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.episodeTitle,
-              {
-                color: isActive ? primaryColor : '#fff',
-                fontWeight: isActive ? '700' : '600',
-              },
-            ]}>
-            {title || fallbackTitle}
-          </Text>
+          <Text style={styles.episodeNumber}>{fallbackTitle}</Text>
+          {Boolean(
+            title && playerEpisodeTitle(title, fallbackTitle) !== fallbackTitle,
+          ) && (
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.episodeTitle,
+                {
+                  color: isActive ? primaryColor : '#fff',
+                  fontFamily: isActive ? HOME_FONT.bold : HOME_FONT.medium,
+                },
+              ]}>
+              {title}
+            </Text>
+          )}
           {Boolean(episode.synopsis?.trim()) && (
             <Text numberOfLines={2} style={styles.episodeSynopsis}>
               {episode.synopsis?.trim()}
@@ -159,7 +169,11 @@ const PlayerEpisodeSidebar = ({
   onSelectEpisode,
 }: Props): React.JSX.Element => {
   const {width: screenWidth} = useWindowDimensions();
-  const drawerWidth = Math.min(380, Math.max(300, screenWidth * 0.8));
+  const drawerWidth = Math.min(
+    screenWidth,
+    420,
+    Math.max(280, screenWidth * 0.8),
+  );
   const translateX = useSharedValue(drawerWidth + 24);
   const backdropOpacity = useSharedValue(0);
   const listRef = useRef<FlatList<EpisodeLink>>(null);
@@ -200,9 +214,7 @@ const PlayerEpisodeSidebar = ({
   }));
 
   return (
-    <View
-      pointerEvents={visible ? 'box-none' : 'none'}
-      style={styles.root}>
+    <View pointerEvents={visible ? 'box-none' : 'none'} style={styles.root}>
       <Animated.View style={[styles.backdrop, backdropStyle]}>
         <Pressable
           accessibilityRole="button"
@@ -309,8 +321,12 @@ const PlayerEpisodeSidebar = ({
               <EpisodeRow
                 episode={item}
                 title={resolveTitle(item)}
-                fallbackTitle={labels.episode(index + 1)}
-                thumbnailLabel={labels.shortEpisode(index + 1)}
+                fallbackTitle={labels.episode(
+                  getPlayerEpisodeNumber(item, index),
+                )}
+                thumbnailLabel={labels.shortEpisode(
+                  getPlayerEpisodeNumber(item, index),
+                )}
                 isActive={item.link === activeEpisodeLink}
                 primaryColor={primaryColor}
                 onSelect={() => onSelectEpisode(item, index)}
@@ -341,7 +357,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
     elevation: 24,
-    backgroundColor: 'rgba(14,14,14,0.97)',
+    backgroundColor: '#141519',
     borderLeftWidth: 1,
     borderLeftColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000',
@@ -364,9 +380,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
+    fontFamily: HOME_FONT.heading,
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 22,
   },
   countBadge: {
     paddingHorizontal: 8,
@@ -377,7 +393,7 @@ const styles = StyleSheet.create({
   countText: {
     color: 'rgba(255,255,255,0.72)',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: HOME_FONT.medium,
   },
   closeButton: {
     padding: 5,
@@ -393,7 +409,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: 'rgba(255,255,255,0.55)',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: HOME_FONT.bold,
     textTransform: 'uppercase',
   },
   groupList: {
@@ -406,12 +422,12 @@ const styles = StyleSheet.create({
     maxWidth: 150,
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 0,
     borderWidth: 1,
   },
   groupButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: HOME_FONT.medium,
   },
   episodeList: {
     paddingHorizontal: 12,
@@ -421,7 +437,7 @@ const styles = StyleSheet.create({
     minHeight: 68,
     marginVertical: 4,
     padding: 8,
-    borderRadius: 8,
+    borderRadius: 0,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,7 +450,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
+    borderRadius: 0,
     backgroundColor: '#1c1c1e',
   },
   thumbnail: {
@@ -449,7 +465,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: HOME_FONT.medium,
   },
   activeThumbnailOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -461,10 +477,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  episodeNumber: {
+    fontFamily: HOME_FONT.regular,
+    fontSize: 12,
+    color: '#a0a0a0',
+    marginBottom: 4,
+  },
   episodeTitle: {
+    fontFamily: HOME_FONT.medium,
     fontSize: 13,
   },
   episodeSynopsis: {
+    fontFamily: HOME_FONT.regular,
     marginTop: 3,
     color: 'rgba(255,255,255,0.55)',
     fontSize: 11,
@@ -478,6 +502,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   stateText: {
+    fontFamily: HOME_FONT.regular,
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
     textAlign: 'center',

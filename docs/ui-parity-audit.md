@@ -21,9 +21,10 @@ InfoSeasonPicker appartengono gia al lavoro sulla pagina Info.
 
 ## Presentazioni ancora distinte
 
-1. `Player.tsx`, `PlayerMenuRow`, `PlayerEpisodeSidebar`: controlli di
-   riproduzione e pannelli meritano un progetto UI separato, con test dei
-   gesti, tracce, sottotitoli e navigazione. Nessuna modifica in questo ciclo.
+1. `Player.tsx`, `PlayerMenuRow`, `PlayerEpisodeSidebar`: successivamente
+   aggiornati con font e pannelli coerenti con la Home e numero episodio
+   visibile nella lista e nel titolo delle serie. Verifiche e limiti in
+   `player-cruncy-ui.md`; motore e callback di riproduzione invariati.
 2. `DownloadBottomSheet`, usato da `Downloader`: successivamente aggiornato
    con font, superfici e accenti coerenti. Verifiche e limiti documentati in
    `download-panel-cruncy-ui.md`; vale anche per la variante apertura server.

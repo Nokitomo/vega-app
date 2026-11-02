@@ -1,3 +1,8 @@
+import {HOME_FONT} from '../../components/homePresentation';
+import {
+  getPlayerEpisodeNumber,
+  playerEpisodeTitle,
+} from '../../lib/utils/playerEpisodePresentation';
 import React, {useEffect, useState, useRef, useCallback, useMemo} from 'react';
 import {
   ScrollView,
@@ -9,7 +14,7 @@ import {
   TouchableNativeFeedback,
   Alert,
   AppState,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -63,7 +68,10 @@ import PlayerEpisodeSidebar from '../../components/PlayerEpisodeSidebar';
 import PlayerMenuRow from '../../components/PlayerMenuRow';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import {recordEpisodePlaybackProgress} from '../../lib/storage/SeriesCompletionStorage';
-import {sameWatchContent, watchProgressKey} from '../../lib/storage/SharedAnimeWatchIdentity';
+import {
+  sameWatchContent,
+  watchProgressKey,
+} from '../../lib/storage/SharedAnimeWatchIdentity';
 import {useStream, useVideoSettings} from '../../lib/hooks/useStream';
 import {useContentInfo} from '../../lib/hooks/useContentInfo';
 import {
@@ -137,6 +145,7 @@ const SUBTITLE_GATE_TIMEOUT_MS = 1500;
 const SKIP_INTRO_LEAD_SECONDS = 1.5;
 const PLAYER_CONTROL_COLOR = 'rgba(255,255,255,0.68)';
 const PLAYER_CONTROL_LABEL_STYLE = {
+  fontFamily: HOME_FONT.regular,
   color: PLAYER_CONTROL_COLOR,
   fontWeight: '300' as const,
 };
@@ -155,6 +164,7 @@ const parseEpisodeNumberFromTitle = (title?: string): number | undefined => {
 
 const Player = ({route}: Props): React.JSX.Element => {
   const {primary} = useThemeStore(state => state);
+  const playerWindow = useWindowDimensions();
   const {t} = useTranslation();
   const {provider} = useContentStore();
   const navigation =
@@ -641,10 +651,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     () =>
       skipInfo?.extra?.ids?.tmdbShowIds?.[0] ||
       skipInfo?.extra?.ids?.tmdbMovieIds?.[0],
-    [
-      skipInfo?.extra?.ids?.tmdbMovieIds,
-      skipInfo?.extra?.ids?.tmdbShowIds,
-    ],
+    [skipInfo?.extra?.ids?.tmdbMovieIds, skipInfo?.extra?.ids?.tmdbShowIds],
   );
 
   // Memoized watched duration
@@ -1216,7 +1223,9 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   const canAdvanceFromSkip = useMemo(() => {
     const episodes = route.params?.episodeList || [];
-    const index = episodes.findIndex(item => item?.link === activeEpisode?.link);
+    const index = episodes.findIndex(
+      item => item?.link === activeEpisode?.link,
+    );
     return (
       (index >= 0 && index < episodes.length - 1) || !!nextSeasonInfo?.season
     );
@@ -1311,8 +1320,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         title: skipInfo.title || resolvedPrimaryTitle,
         type: skipInfo.type || route.params?.type || 'series',
         episodeNumber: currentEpisodeNumber,
-        seasonNumber:
-          activeEpisode?.seasonNumber ?? route.params?.seasonNumber,
+        seasonNumber: activeEpisode?.seasonNumber ?? route.params?.seasonNumber,
         duration: Math.round(episodeDuration),
         malId: skipMalId,
         imdbId: skipImdbId,
@@ -1866,7 +1874,12 @@ const Player = ({route}: Props): React.JSX.Element => {
         }),
       );
       if (route.params?.type !== 'movie') {
-        recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
+        recordEpisodePlaybackProgress(
+          historyKey,
+          episodeLink,
+          currentTime,
+          duration,
+        );
       }
 
       const progressData = {
@@ -1958,7 +1971,12 @@ const Player = ({route}: Props): React.JSX.Element => {
           }),
         );
         if (route.params?.type !== 'movie') {
-          recordEpisodePlaybackProgress(historyKey, episodeLink, currentTime, duration);
+          recordEpisodePlaybackProgress(
+            historyKey,
+            episodeLink,
+            currentTime,
+            duration,
+          );
         }
         watchHistoryStorage.addEpisodeKey(historyKey, episodeLink);
 
@@ -2868,6 +2886,29 @@ const Player = ({route}: Props): React.JSX.Element => {
     };
   }, [clearImmersiveReapplyTimer]);
 
+  const localizedEpisodeTitle = resolveLocalizedItemTitle(activeEpisode);
+  const showEpisodeNumberInTitle =
+    route.params?.type === 'series' ||
+    (route.params?.type !== 'movie' &&
+      (route.params?.episodeList?.length || 0) > 1);
+  const displayEpisodeTitle =
+    showEpisodeNumberInTitle && activeEpisode
+      ? playerEpisodeTitle(
+          localizedEpisodeTitle,
+          t('Episode {{number}}', {
+            number: getPlayerEpisodeNumber(
+              activeEpisode,
+              Math.max(
+                0,
+                route.params?.episodeList?.findIndex(
+                  item => item.link === activeEpisode.link,
+                ) ?? 0,
+              ),
+            ),
+          }),
+        )
+      : localizedEpisodeTitle;
+
   // Memoized video player props
   const videoPlayerProps = useMemo(
     () => ({
@@ -2930,7 +2971,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           resolvedPrimaryTitle && resolvedPrimaryTitle.length > 70
             ? resolvedPrimaryTitle.slice(0, 70) + '...'
             : resolvedPrimaryTitle,
-        secondary: activeEpisode?.title,
+        secondary: displayEpisodeTitle,
       },
       navigator: navigation,
       seekColor: primary,
@@ -2985,6 +3026,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     }),
     [
       isPlayerLocked,
+      displayEpisodeTitle,
       enableSwipeGesture,
       enable2xGesture,
       hideSeekButtons,
@@ -3068,11 +3110,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     castProvider === 'native' && castState === CastState.CONNECTED
       ? primary
       : 'hsl(0, 0%, 70%)';
-  const settingsPanelWidth = Math.max(
-    320,
-    Math.min(Dimensions.get('window').width - 24, 620),
-  );
-  const settingsPanelHeight = 320;
+  const settingsPanelWidth = Math.min(playerWindow.width - 24, 620);
+  const settingsPanelHeight = Math.min(320, playerWindow.height - 24);
 
   // Show loading state
   if (isPreparingPlayer) {
@@ -3094,7 +3133,9 @@ const Player = ({route}: Props): React.JSX.Element => {
               <Animated.View style={[loadingIconStyle]} className="mb-2">
                 <MaterialIcons name="hourglass-empty" size={60} color="white" />
               </Animated.View>
-              <Text className="text-white text-lg mt-4">
+              <Text
+                style={{fontFamily: HOME_FONT.regular}}
+                className="text-white text-lg mt-4">
                 {t('Loading stream...')}
               </Text>
             </Animated.View>
@@ -3109,13 +3150,17 @@ const Player = ({route}: Props): React.JSX.Element => {
     return (
       <SafeAreaView className="bg-black flex-1 justify-center items-center">
         <StatusBar translucent={true} hidden={true} />
-        <Text className="text-red-500 text-lg text-center mb-4">
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-red-500 text-lg text-center mb-4">
           {t('Failed to load stream. Please try again.')}
         </Text>
         <TouchableOpacity
           className="bg-red-600 px-4 py-2 rounded-md"
           onPress={() => navigation.goBack()}>
-          <Text className="text-white">{t('Go Back')}</Text>
+          <Text style={{fontFamily: HOME_FONT.regular}} className="text-white">
+            {t('Go Back')}
+          </Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -3152,7 +3197,9 @@ const Player = ({route}: Props): React.JSX.Element => {
         torrentState !== 'seeding' &&
         torrentState !== 'finished' && (
           <View className="absolute top-4 self-center px-3 py-2 rounded-full bg-black/70 z-50">
-            <Text className="text-white text-xs text-center">
+            <Text
+              style={{fontFamily: HOME_FONT.regular}}
+              className="text-white text-xs text-center">
               {torrentState}
               {torrentDownloaded > 0
                 ? ` · ${torrentDownloaded.toFixed(1)} MB`
@@ -3410,7 +3457,10 @@ const Player = ({route}: Props): React.JSX.Element => {
                 }}
                 className="flex-row items-center gap-2 px-4 py-2">
                 <Text
-                  style={{opacity: overlayTextOpacity}}
+                  style={{
+                    opacity: overlayTextOpacity,
+                    fontFamily: HOME_FONT.regular,
+                  }}
                   className="text-white text-sm font-semibold uppercase">
                   {activeSkipAdvancesEpisode
                     ? t('Next Episode')
@@ -3424,7 +3474,9 @@ const Player = ({route}: Props): React.JSX.Element => {
                   name="skip-next"
                   size={22}
                   color="white"
-                  style={{opacity: overlayTextOpacity}}
+                  style={{
+                    opacity: overlayTextOpacity,
+                  }}
                 />
               </BlurView>
             </View>
@@ -3437,7 +3489,9 @@ const Player = ({route}: Props): React.JSX.Element => {
         style={[toastStyle]}
         pointerEvents="none"
         className="absolute w-full top-12 justify-center items-center px-2">
-        <Text className="text-white bg-black/50 p-2 rounded-full text-base">
+        <Text
+          style={{fontFamily: HOME_FONT.regular}}
+          className="text-white bg-black/50 p-2 rounded-full text-base">
           {toastMessage}
         </Text>
       </Animated.View>
@@ -3449,11 +3503,11 @@ const Player = ({route}: Props): React.JSX.Element => {
           className="absolute opacity-0 top-0 left-0 w-full h-full justify-end items-center"
           onTouchEnd={() => setShowSettings(false)}>
           <View
-            className="p-3 rounded-t-3xl flex-row justify-start items-center"
+            className="p-3 flex-row justify-start items-center"
             style={{
               width: settingsPanelWidth,
               height: settingsPanelHeight,
-              backgroundColor: 'rgba(13,13,13,0.94)',
+              backgroundColor: '#141519',
               borderColor: 'rgba(255,255,255,0.12)',
               borderWidth: 1,
               shadowColor: '#000',
@@ -3465,12 +3519,16 @@ const Player = ({route}: Props): React.JSX.Element => {
             {/* Audio Tab */}
             {activeTab === 'audio' && (
               <ScrollView className="w-full h-full p-1 px-4">
-                <Text className="text-lg font-bold text-center text-white">
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-lg font-bold text-center text-white">
                   {t('Audio')}
                 </Text>
                 {audioTracks.length === 0 && (
                   <View className="flex justify-center items-center">
-                    <Text className="text-white text-xs">
+                    <Text
+                      style={{fontFamily: HOME_FONT.regular}}
+                      className="text-white text-xs">
                       {t('Loading audio tracks...')}
                     </Text>
                   </View>
@@ -3509,7 +3567,9 @@ const Player = ({route}: Props): React.JSX.Element => {
                 data={mergedTextTracks}
                 ListHeaderComponent={
                   <View>
-                    <Text className="text-lg font-bold text-center text-white">
+                    <Text
+                      style={{fontFamily: HOME_FONT.regular}}
+                      className="text-lg font-bold text-center text-white">
                       {t('Subtitle')}
                     </Text>
                     <PlayerMenuRow
@@ -3611,7 +3671,9 @@ const Player = ({route}: Props): React.JSX.Element => {
             {activeTab === 'server' && (
               <View className="flex flex-row w-full h-full p-1 px-4">
                 <ScrollView className="border-r border-white/50">
-                  <Text className="w-full text-center text-white text-lg font-extrabold">
+                  <Text
+                    style={{fontFamily: HOME_FONT.regular}}
+                    className="w-full text-center text-white text-lg font-extrabold">
                     {t('Server')}
                   </Text>
                   {streamData?.length > 0 &&
@@ -3634,7 +3696,9 @@ const Player = ({route}: Props): React.JSX.Element => {
                 </ScrollView>
 
                 <ScrollView>
-                  <Text className="w-full text-center text-white text-lg font-extrabold">
+                  <Text
+                    style={{fontFamily: HOME_FONT.regular}}
+                    className="w-full text-center text-white text-lg font-extrabold">
                     {t('Quality')}
                   </Text>
                   {videoTracks &&
@@ -3669,7 +3733,9 @@ const Player = ({route}: Props): React.JSX.Element => {
             {/* Speed Tab */}
             {activeTab === 'speed' && (
               <ScrollView className="w-full h-full p-1 px-4">
-                <Text className="text-lg font-bold text-center text-white">
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-lg font-bold text-center text-white">
                   {t('Playback Speed')}
                 </Text>
                 {playbacks.map((rate, i) => (

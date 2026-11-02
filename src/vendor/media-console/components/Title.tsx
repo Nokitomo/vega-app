@@ -1,5 +1,6 @@
 import React from 'react';
 import {Text, View} from 'react-native';
+import {HOME_FONT} from '../../../components/homePresentation';
 import {styles} from './styles';
 
 interface TitleProps {
@@ -38,12 +39,14 @@ const _styles = StyleSheet.create({
     padding: 0,
     marginRight: 16,
     marginTop: 15,
-    height: 37,
+    minHeight: 37,
   },
   titleText: {
+    fontFamily: HOME_FONT.bold,
     textAlign: 'center',
   },
   secondaryText: {
+    fontFamily: HOME_FONT.regular,
     fontSize: 12,
   },
 });
