@@ -16,11 +16,27 @@ Intervento del 2 novembre 2026 sul branch `cruncy-ui`.
   cronologia, sorgenti o logica di cambio episodio.
 - Un titolo composto soltanto dalla dicitura episodio non viene duplicato.
 
+## Gesti, volume e luminosita
+
+- Il trascinamento verticale si attiva dopo 16 dp e non parte se il movimento
+  orizzontale prevale. Il lato scelto al primo tocco resta fisso per tutta la
+  durata del gesto: sinistra per la luminosita, destra per il volume.
+- Su Android gli swipe che iniziano presso i bordi riservati alle barre di
+  sistema vengono ignorati. Questo permette di aprire la tendina dall'alto
+  senza modificare luminosita o volume; tap, pinch e pressione per 2x restano
+  indipendenti dal riconoscimento dello swipe verticale.
+- Il volume modifica lo stream multimediale del dispositivo. L'indicatore del
+  player segue anche i tasti fisici e il valore viene aggiornato quando l'app
+  torna in primo piano.
+- La luminosita modificata con lo swipe vale solo nella finestra del player.
+  Mandare l'app in background mostra la luminosita di sistema; tornando allo
+  stesso player resta la scelta precedente. Uscendo dal player viene rimossa
+  la modifica temporanea e un nuovo ingresso parte dal valore di sistema.
+
 ## Verifiche
 
 - `npx tsc --noEmit` e `npm run lint`: superati senza problemi.
-- Suite completa: 68 suite, 319 test superati. Rimane il messaggio di
-  deprecazione Clipboard gia presente nel test del pannello download.
+- Suite completa: 70 suite, 326 test superati.
 - Test dedicati: metadati prima della posizione, speciali e decimali,
   fallback, deduplicazione del titolo e callback di selezione/chiusura.
 - Medium_Phone_API_35, dev client Android: video locale H.264/AAC di due
@@ -30,11 +46,19 @@ Intervento del 2 novembre 2026 sul branch `cruncy-ui`.
 - Evidenze locali non versionate in `D:/codex-temp/final-ui-20261102/`:
   `player-drawer.png`, `player-next-episode.png`, `player-speed-panel.png`,
   `player-pause-confirmed.png`.
+- Il 5 novembre 2026, build dev client Android completata e installata su
+  `Medium_phone_API_35`. Con un MP4 locale H.264/AAC da dieci minuti sono
+  stati verificati swipe interni sui due lati, esclusione del bordo superiore,
+  sincronizzazione del volume multimediale e ciclo della luminosita:
+  selezione nel player, Home Android e ritorno, uscita dal player e nuovo
+  ingresso. Il valore di sistema e rimasto invariato durante gli swipe.
+- Evidenze locali non versionate in
+  `D:/codex-temp/vega-player-gestures-20261105/`.
 
 ## Limiti
 
-Intervento UI: motore, gesti, callback di riproduzione e preferenze non
-modificati. La prova locale non certifica tutti i codec o i server dei
+Motore, callback di riproduzione e preferenze non modificati. La prova locale
+dei gesti non certifica tutti i codec o i server dei
 provider. Cast, PiP, tracce remote multiple, tablet e iOS non verificati
 in questo ciclo. Non si dichiara una parita pixel per pixel con Crunchyroll
 o la risoluzione dei precedenti problemi di riproduzione dei provider.

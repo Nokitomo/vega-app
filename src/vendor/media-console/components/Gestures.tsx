@@ -1,4 +1,11 @@
-import {View, Text, Dimensions} from 'react-native';
+import {
+  View,
+  Text,
+  Dimensions,
+  Platform,
+  StatusBar,
+  AppState,
+} from 'react-native';
 import type {LayoutChangeEvent} from 'react-native';
 import React, {useState, useRef, useEffect, useCallback, useMemo} from 'react';
 import Animated, {
@@ -49,6 +56,10 @@ type GesturesProps = {
 };
 
 const SWIPE_RANGE = 370;
+const SYSTEM_EDGE_PADDING = 8;
+const BOTTOM_SYSTEM_EDGE = 32;
+const SIDE_SYSTEM_EDGE = 24;
+const VOLUME_INDICATOR_DURATION = 1500;
 
 const RIPPLE_FADE_DURATION = 400;
 
@@ -348,10 +359,9 @@ const Gestures = ({
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rippleHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapTimeRef = useRef(0);
-  const originalSettings = useRef({
-    volume: 0,
-    brightness: 0,
-  });
+  const volumeIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{x: number; y: number} | null>(null);
   const is2xActiveRef = useRef(false);
@@ -361,6 +371,8 @@ const Gestures = ({
   // the view can be narrower than the screen, and the memoized window width
   // below never updates on rotation. Falls back to the window until first layout.
   const gestureWidth = useSharedValue(0);
+  const screenWidth = useSharedValue(Dimensions.get('screen').width);
+  const screenHeight = useSharedValue(Dimensions.get('screen').height);
   const volumeValue = useSharedValue(0);
   const brightnessValue = useSharedValue(0);
   const startVolume = useSharedValue(0);
@@ -368,6 +380,19 @@ const Gestures = ({
   const toastOpacity = useSharedValue(0);
   const is2xActiveShared = useSharedValue(false);
   const isPanActive = useSharedValue(false);
+  const isPanTouchValid = useSharedValue(false);
+  const panStartsOnLeft = useSharedValue(false);
+  const isAndroid = Platform.OS === 'android';
+  const topSystemEdge =
+    (StatusBar.currentHeight || 24) + SYSTEM_EDGE_PADDING;
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({screen}) => {
+      screenWidth.value = screen.width;
+      screenHeight.value = screen.height;
+    });
+    return () => subscription.remove();
+  }, [screenHeight, screenWidth]);
 
   // Toast styles (inline, no Tailwind)
   const toastAnimatedStyle = useAnimatedStyle(
@@ -635,6 +660,46 @@ const Gestures = ({
     setDisplayVolume(clampedVolume);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const syncVolume = () => {
+      VolumeManager.getVolume()
+        .then(({volume}) => {
+          if (mounted) {
+            volumeValue.value = volume;
+            setDisplayVolume(volume);
+          }
+        })
+        .catch(error => console.error('Error reading current volume:', error));
+    };
+    const subscription = VolumeManager.addVolumeListener(({volume, type}) => {
+      if (type && type !== 'music') return;
+      volumeValue.value = volume;
+      setDisplayVolume(volume);
+      if (!isPanActive.value) {
+        setIsVolumeVisible(true);
+        if (volumeIndicatorTimerRef.current) {
+          clearTimeout(volumeIndicatorTimerRef.current);
+        }
+        volumeIndicatorTimerRef.current = setTimeout(() => {
+          setIsVolumeVisible(false);
+          volumeIndicatorTimerRef.current = null;
+        }, VOLUME_INDICATOR_DURATION);
+      }
+    });
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') syncVolume();
+    });
+    return () => {
+      mounted = false;
+      subscription.remove();
+      appStateSubscription.remove();
+      if (volumeIndicatorTimerRef.current) {
+        clearTimeout(volumeIndicatorTimerRef.current);
+      }
+    };
+  }, [isPanActive, volumeValue]);
+
   const updateSystemBrightness = useCallback((newBrightness: number) => {
     const clampedBrightness = Math.max(0, Math.min(1, newBrightness));
     Brightness.setBrightnessAsync(clampedBrightness);
@@ -648,14 +713,30 @@ const Gestures = ({
         // gestures, so keep observing raw touches when only 2x is enabled.
         .enabled(!disableGesture || (enable2xGesture && !showControls))
         .maxPointers(1)
-        .minDistance(10) // Minimum distance before gesture starts
-        .onTouchesDown(event => {
+        .activeOffsetY([-16, 16])
+        .failOffsetX([-16, 16])
+        .onTouchesDown((event, manager) => {
           'worklet';
           isPanActive.value = false;
+          isPanTouchValid.value = true;
           if (event.allTouches?.length) {
+            const touch = event.allTouches[0];
+            if (
+              isAndroid &&
+              (touch.absoluteY <= topSystemEdge ||
+                touch.absoluteY >= screenHeight.value - BOTTOM_SYSTEM_EDGE ||
+                touch.absoluteX <= SIDE_SYSTEM_EDGE ||
+                touch.absoluteX >= screenWidth.value - SIDE_SYSTEM_EDGE)
+            ) {
+              isPanTouchValid.value = false;
+              manager.fail();
+              return;
+            }
+            panStartsOnLeft.value =
+              touch.x < (gestureWidth.value || SCREEN_WIDTH) / 2;
             runOnJS(handleTouchDown)(
-              event.allTouches[0].x,
-              event.allTouches[0].y,
+              touch.x,
+              touch.y,
             );
           }
         })
@@ -676,16 +757,19 @@ const Gestures = ({
           'worklet';
           runOnJS(handleTouchUp)();
         })
-        .onStart(event => {
+        .onStart(() => {
           'worklet';
-          if (is2xActiveShared.value || disableGesture) {
+          if (
+            is2xActiveShared.value ||
+            disableGesture ||
+            !isPanTouchValid.value
+          ) {
             return;
           }
           isPanActive.value = true;
           runOnJS(cancel2x)();
-          const isLeftSide = event.x < (gestureWidth.value || SCREEN_WIDTH) / 2;
 
-          if (isLeftSide) {
+          if (panStartsOnLeft.value) {
             startBrightness.value = brightnessValue.value;
             runOnJS(setIsBrightnessVisible)(true);
           } else {
@@ -702,10 +786,9 @@ const Gestures = ({
           ) {
             return;
           }
-          const isLeftSide = event.x < (gestureWidth.value || SCREEN_WIDTH) / 2;
           const change = -event.translationY / SWIPE_RANGE;
 
-          if (isLeftSide) {
+          if (panStartsOnLeft.value) {
             // Brightness control
             const newBrightness = Math.max(
               0,
@@ -725,19 +808,29 @@ const Gestures = ({
         })
         .onFinalize(() => {
           'worklet';
+          const wasPanActive = isPanActive.value;
           isPanActive.value = false;
+          isPanTouchValid.value = false;
           runOnJS(handleTouchUp)();
-          runOnJS(setIsVolumeVisible)(false);
-          runOnJS(setIsBrightnessVisible)(false);
+          if (wasPanActive) {
+            runOnJS(setIsVolumeVisible)(false);
+            runOnJS(setIsBrightnessVisible)(false);
+          }
         }),
     [
       SCREEN_WIDTH,
       gestureWidth,
+      screenWidth,
+      screenHeight,
+      isAndroid,
+      topSystemEdge,
       disableGesture,
       enable2xGesture,
       showControls,
       is2xActiveShared,
       isPanActive,
+      isPanTouchValid,
+      panStartsOnLeft,
       handleTouchDown,
       handleTouchMove,
       handleTouchUp,
@@ -747,7 +840,7 @@ const Gestures = ({
     ],
   );
 
-  // Initialize and store original settings
+  // Read device values when this player instance opens.
   useEffect(() => {
     let mounted = true;
 
@@ -759,22 +852,11 @@ const Gestures = ({
         ]);
 
         if (mounted) {
-          // Store original values
-          originalSettings.current = {
-            volume: currentVolume.volume,
-            brightness: currentBrightness,
-          };
-
           // Set initial values
           volumeValue.value = currentVolume.volume;
           brightnessValue.value = currentBrightness;
           setDisplayVolume(currentVolume.volume);
           setDisplayBrightness(currentBrightness);
-
-          console.log('Original settings stored:🔥', {
-            volume: currentVolume,
-            brightness: currentBrightness,
-          });
         }
       } catch (error) {
         console.error('Error initializing settings:', error);
@@ -841,9 +923,15 @@ const Gestures = ({
   // entering/leaving fullscreen, which is what keeps the midpoint honest.
   const handleGestureLayout = useCallback(
     (event: LayoutChangeEvent) => {
-      gestureWidth.value = event.nativeEvent.layout.width;
+      const {width, height} = event.nativeEvent.layout;
+      gestureWidth.value = width;
+      const screen = Dimensions.get('screen');
+      // Rotation can lay out this surface before Dimensions publishes the new
+      // screen size. In fullscreen the surface itself is the current screen.
+      screenWidth.value = width > screen.width ? width : screen.width;
+      screenHeight.value = width > screen.width ? height : screen.height;
     },
-    [gestureWidth],
+    [gestureWidth, screenHeight, screenWidth],
   );
 
   const pinchGesture = useMemo(
