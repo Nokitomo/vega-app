@@ -18,6 +18,8 @@ jest.mock('../src/lib/zustand/contentStore', () => ({
 jest.mock('../src/lib/storage', () => ({
   settingsStorage: {isHapticFeedbackEnabled: () => false},
 }));
+jest.mock('../src/lib/services/stremioAddons', () => ({getSubtitleLanguage: () => 'en', setSubtitleLanguage: jest.fn()}));
+jest.mock('../src/lib/services/addonSubtitleFile', () => ({downloadAddonSubtitle: jest.fn()}));
 import SearchSubtitles from '../src/components/SearchSubtitles';
 import ArchiveFilterModal from '../src/components/ArchiveFilterModal';
 import {ErrorFallback} from '../src/components/ErrorBoundary';
@@ -98,6 +100,7 @@ describe('Secondary UI actions', () => {
     await act(async () =>
       buttonWithText(tree, 'Search subtitles online').props.onPress(),
     );
+    await act(async () => buttonWithText(tree, 'addon.direct').props.onPress());
     await act(async () => {
       tree.root
         .findAllByType(TextInput)

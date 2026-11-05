@@ -125,6 +125,7 @@ import {
 import {resolveAnimeExternalIds} from '../../lib/providers/externalIds';
 import {
   pickInitialAudioTrack,
+  mergeSubtitleTracks,
   pickItalianForcedSubtitle,
 } from '../../lib/services/playerTrackSelection';
 
@@ -637,23 +638,15 @@ const Player = ({route}: Props): React.JSX.Element => {
   const isSubtitleGatePending = hasExpectedExternalSubs && !subtitleGatePassed;
   const isPreparingPlayer =
     streamLoading || isSubtitleGatePending || isResolvingStream;
-  const mergedTextTracks = useMemo(() => {
-    const normalizedInternal = (textTracks || []).map((track, idx) => ({
-      ...track,
-      index: typeof track.index === 'number' ? track.index : idx,
-      source: 'internal' as const,
-    }));
-    const maxIndex = normalizedInternal.reduce(
-      (max, track) => Math.max(max, track.index),
-      -1,
-    );
-    const normalizedExternal = (externalSubs || []).map((track, idx) => ({
-      ...track,
-      index: maxIndex + 1 + idx,
-      source: 'external' as const,
-    }));
-    return [...normalizedInternal, ...normalizedExternal];
-  }, [textTracks, externalSubs]);
+  const mergedTextTracks = useMemo(
+    () =>
+      mergeSubtitleTracks(
+        textTracks || [],
+        externalSubs || [],
+        Platform.OS === 'ios',
+      ),
+    [textTracks, externalSubs],
+  );
   const buildSelectedTextTrack = useCallback((track: any): SelectedTrack => {
     if (!track) {
       return {type: SelectedTrackType.DISABLED};
@@ -3804,6 +3797,15 @@ const Player = ({route}: Props): React.JSX.Element => {
                       }}
                     />
                     <SearchSubtitles
+                      contentKey={activeEpisode?.link}
+                      imdbId={skipImdbId}
+                      contentType={
+                        route.params?.type === 'movie' ? 'movie' : 'series'
+                      }
+                      seasonNumber={
+                        activeEpisode?.seasonNumber ?? route.params?.seasonNumber
+                      }
+                      episodeNumber={currentEpisodeNumber}
                       searchQuery={searchQuery}
                       setSearchQuery={setSearchQuery}
                       setExternalSubs={setExternalSubs}
@@ -3814,7 +3816,9 @@ const Player = ({route}: Props): React.JSX.Element => {
                   <PlayerMenuRow
                     title={track.language || track.title || t('Subtitle')}
                     detail={track.title}
-                    tags={[track.type, track.source].filter(Boolean)}
+                    tags={[track.type, track.source].filter(
+                      (value): value is string => Boolean(value),
+                    )}
                     selected={selectedTextTrackIndex === track.index}
                     accentColor={primary}
                     icon="subtitles"

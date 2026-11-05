@@ -9,6 +9,7 @@ Le sezioni includono note su localizzazione (i18n) e supporto lingua inglese/ita
 - navigation.md: stack di navigazione e rotte.
 - state-and-storage.md: stato globale (Zustand) e persistenza (MMKV).
 - providers-and-extensions.md: sistema provider dinamici e moduli esterni.
+- stremio-addons.md: gestione addon Stremio e ricerca sottotitoli nel player.
 - services.md: servizi applicativi (download, notifiche, aggiornamenti).
 - build-and-run.md: setup, build e avvio in locale.
 - testing-and-quality.md: linting e test.

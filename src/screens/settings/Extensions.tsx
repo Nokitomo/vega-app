@@ -584,6 +584,29 @@ const Extensions = ({navigation}: Props) => {
             <Feather name="refresh-cw" size={24} color={primary} />
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={t('addon.title')}
+          onPress={() => navigation.navigate('StremioAddons')}
+          style={{
+            minHeight: 56,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            paddingHorizontal: 20,
+            borderBottomWidth: 1,
+            borderColor: '#252525',
+          }}>
+          <MaterialIcons name="extension" color={primary} size={24} />
+          <Text
+            style={[
+              settingsPresentation.medium,
+              {color: 'white', flex: 1, fontSize: 16},
+            ]}>
+            {t('addon.title')}
+          </Text>
+          <MaterialIcons name="chevron-right" color={primary} size={24} />
+        </TouchableOpacity>
         {/* Tabs */}
         <View className="flex-row bg-quaternary mx-4 mt-4 rounded-none">
           <TouchableOpacity

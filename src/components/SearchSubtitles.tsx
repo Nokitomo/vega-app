@@ -5,14 +5,19 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  ToastAndroid,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {HOME_FONT} from './homePresentation';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {
+  getSubtitleLanguage,
+  searchStremioSubtitles,
+  setSubtitleLanguage,
+} from '../lib/services/stremioAddons';
+import {downloadAddonSubtitle} from '../lib/services/addonSubtitleFile';
 import useThemeStore from '../lib/zustand/themeStore';
 import {ScrollView} from 'react-native';
 import {Dropdown} from 'react-native-element-dropdown';
@@ -29,7 +34,17 @@ const SearchSubtitles = ({
   searchQuery,
   setSearchQuery,
   setExternalSubs,
+  imdbId,
+  contentType = 'series',
+  seasonNumber,
+  episodeNumber,
+  contentKey,
 }: {
+  imdbId?: string;
+  contentType?: 'movie' | 'series';
+  seasonNumber?: number;
+  episodeNumber?: number;
+  contentKey?: string;
   searchQuery: string;
   setSearchQuery: (text: string) => void;
   setExternalSubs: React.Dispatch<React.SetStateAction<TextTracks>>;
@@ -37,12 +52,42 @@ const SearchSubtitles = ({
   const {primary} = useThemeStore(state => state);
   const {t} = useTranslation();
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [season, setSeason] = useState('');
-  const [episode, setEpisode] = useState('');
-  const [searchResults, setSearchResults] = useState<OpenSubtitlesResult[]>([]);
+  const [season, setSeason] = useState(
+    seasonNumber == null ? '' : String(seasonNumber),
+  );
+  const [episode, setEpisode] = useState(
+    episodeNumber == null ? '' : String(episodeNumber),
+  );
+  const [searchResults, setSearchResults] = useState<
+    (OpenSubtitlesResult & {addonUrl?: string; addonSource?: string})[]
+  >([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [subId, setSubId] = useState('en');
+  const [subId, setSubId] = useState(getSubtitleLanguage);
+  const [source, setSource] = useState<'stremio' | 'direct'>('stremio');
+  const [imdb, setImdb] = useState(imdbId || '');
+  const request = useRef<AbortController | null>(null);
+  const generation = useRef(0);
+  const close = () => {
+    generation.current += 1;
+    request.current?.abort();
+    setLoading(false);
+    setSearchModalVisible(false);
+  };
+  useEffect(() => {
+    generation.current += 1;
+    request.current?.abort();
+    setLoading(false);
+    setSearchResults([]);
+    setError('');
+    setImdb(imdbId || '');
+    setSeason(seasonNumber == null ? '' : String(seasonNumber));
+    setEpisode(episodeNumber == null ? '' : String(episodeNumber));
+    return () => {
+      generation.current += 1;
+      request.current?.abort();
+    };
+  }, [contentKey, imdbId, seasonNumber, episodeNumber]);
 
   const subLanguageIds = useMemo(
     () => [
@@ -72,54 +117,120 @@ const SearchSubtitles = ({
   );
 
   const searchSubtitles = async () => {
+    request.current?.abort();
+    request.current = new AbortController();
+    const current = ++generation.current;
+    setLoading(true);
+    setError('');
+    setSearchResults([]);
     try {
-      if (!getOpenSubtitlesApiKey()) {
-        setError(
-          t('Configure your OpenSubtitles API key in Subtitle Preferences.'),
+      setSubtitleLanguage(subId);
+      if (source === 'stremio') {
+        const response = await searchStremioSubtitles({
+          imdb,
+          type: contentType,
+          season,
+          episode,
+          language: subId,
+          signal: request.current.signal,
+        });
+        if (current !== generation.current) {
+          return;
+        }
+        setSearchResults(
+          response.results.map(item => ({
+            id: item.id,
+            fileId: 0,
+            language: item.language as OpenSubtitlesResult['language'],
+            release: item.label,
+            title: item.label || searchQuery,
+            addonUrl: item.url,
+            addonSource: item.source,
+          })),
         );
-        return;
+        if (response.failed.length) {
+          setError(
+            t('addon.failedSources', {sources: response.failed.join(', ')}),
+          );
+        } else if (!response.results.length) {
+          setError(t('No Results Found'));
+        }
+      } else {
+        if (!getOpenSubtitlesApiKey()) {
+          setError(
+            t('Configure your OpenSubtitles API key in Subtitle Preferences.'),
+          );
+          return;
+        }
+        const data = await searchOpenSubtitles({
+          query: searchQuery,
+          language: subId,
+          season,
+          episode,
+        });
+        if (current !== generation.current) {
+          return;
+        }
+        setSearchResults(data);
+        if (!data.length) {
+          setError(t('No Results Found'));
+        }
       }
-      setLoading(true);
-      setError('');
-      const data = await searchOpenSubtitles({
-        query: searchQuery,
-        language: subId,
-        season,
-        episode,
-      });
-      if (data?.length === 0) {
-        setError(t('No Results Found'));
-        setSearchResults([]);
-        return;
+    } catch (e) {
+      if (current === generation.current) {
+        setError(
+          e instanceof Error ? e.message : t('Error fetching subtitles'),
+        );
       }
-      setSearchResults(data);
-    } catch (e: any) {
-      setError(e?.message || t('Error fetching subtitles'));
-      ToastAndroid.show(t('Error fetching subtitles'), ToastAndroid.SHORT);
     } finally {
-      setLoading(false);
+      if (current === generation.current) {
+        setLoading(false);
+      }
     }
   };
 
-  const selectSubtitle = async (result: OpenSubtitlesResult) => {
+  const selectSubtitle = async (
+    result: OpenSubtitlesResult & {addonUrl?: string; addonSource?: string},
+  ) => {
+    const current = ++generation.current;
+    request.current?.abort();
+    request.current = new AbortController();
     try {
       setLoading(true);
-      const uri = await getOpenSubtitlesDownloadUrl(result.fileId);
+      setError('');
+      const file = result.addonUrl
+        ? await downloadAddonSubtitle(result.addonUrl, request.current.signal)
+        : {
+            uri: await getOpenSubtitlesDownloadUrl(result.fileId),
+            type: TextTrackType.SUBRIP,
+          };
+      if (current !== generation.current) {
+        return;
+      }
       setExternalSubs(prev => [
         {
-          type: TextTrackType.SUBRIP,
+          ...file,
           language: result.language,
-          title: [result.release, result.uploader].filter(Boolean).join(' '),
-          uri,
+          title: [
+            result.release || result.title,
+            result.addonSource || result.uploader,
+          ]
+            .filter(Boolean)
+            .join(' · '),
         },
         ...prev,
       ]);
-      setSearchModalVisible(false);
-    } catch (e: any) {
-      setError(e?.message || t('Unable to download subtitle.'));
-      ToastAndroid.show(t('Unable to download subtitle.'), ToastAndroid.SHORT);
+      close();
+    } catch (e) {
+      if (current === generation.current) {
+        setError(
+          e instanceof Error ? e.message : t('Unable to download subtitle.'),
+        );
+      }
     } finally {
-      setLoading(false);
+      if (current === generation.current) {
+        setLoading(false);
+      }
     }
   };
   return (
@@ -139,9 +250,7 @@ const SearchSubtitles = ({
         transparent={false}
         statusBarTranslucent={true}
         visible={searchModalVisible}
-        onRequestClose={() => {
-          setSearchModalVisible(!searchModalVisible);
-        }}>
+        onRequestClose={close}>
         <SafeAreaView className="flex-1 bg-black">
           <KeyboardAvoidingView
             style={{flex: 1}}
@@ -160,7 +269,7 @@ const SearchSubtitles = ({
                   name="arrow-back-ios-new"
                   size={24}
                   color="white"
-                  onPress={() => setSearchModalVisible(false)}
+                  onPress={close}
                 />
                 <Text
                   style={{fontFamily: HOME_FONT.heading}}
@@ -169,15 +278,83 @@ const SearchSubtitles = ({
                 </Text>
               </View>
               <View className="px-4 py-2">
-                <TextInput
-                  placeholder={t('Name or IMDB ID')}
-                  accessibilityLabel={t('Name or IMDB ID')}
-                  style={{fontFamily: HOME_FONT.regular, minHeight: 48}}
-                  placeholderTextColor="#a0a0a0"
-                  className="bg-[#23252b] p-3 text-white mb-3"
-                  onChangeText={text => setSearchQuery(text)}
-                  value={searchQuery}
-                />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    marginBottom: 12,
+                  }}>
+                  {(['stremio', 'direct'] as const).map(value => (
+                    <TouchableOpacity
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityState={{selected: source === value}}
+                      disabled={loading}
+                      onPress={() => {
+                        setSource(value);
+                        setSearchResults([]);
+                        setError('');
+                      }}
+                      style={{
+                        padding: 12,
+                        minHeight: 48,
+                        borderRadius: 10,
+                        backgroundColor: source === value ? primary : '#252525',
+                      }}>
+                      <Text
+                        style={{
+                          fontFamily: HOME_FONT.medium,
+                          color: source === value ? 'black' : 'white',
+                        }}>
+                        {t(
+                          value === 'stremio' ? 'addon.title' : 'addon.direct',
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {source === 'stremio' && (
+                  <>
+                    <Text
+                      style={{
+                        color: '#bbb',
+                        fontFamily: HOME_FONT.regular,
+                        marginBottom: 10,
+                      }}>
+                      {t('addon.searchHint')}
+                    </Text>
+                    <TextInput
+                      accessibilityLabel={t('addon.imdbLabel')}
+                      placeholder="tt1475582"
+                      placeholderTextColor="#999"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={!loading}
+                      value={imdb}
+                      onChangeText={setImdb}
+                      style={{
+                        fontFamily: HOME_FONT.regular,
+                        backgroundColor: '#23252b',
+                        padding: 12,
+                        color: 'white',
+                        minHeight: 48,
+                        marginBottom: 12,
+                      }}
+                    />
+                  </>
+                )}
+                {source === 'direct' && (
+                  <TextInput
+                    placeholder={t('Name or IMDB ID')}
+                    accessibilityLabel={t('Name or IMDB ID')}
+                    style={{fontFamily: HOME_FONT.regular, minHeight: 48}}
+                    placeholderTextColor="#a0a0a0"
+                    className="bg-[#23252b] p-3 text-white mb-3"
+                    onChangeText={text => setSearchQuery(text)}
+                    value={searchQuery}
+                  />
+                )}
                 <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 12}}>
                   <View
                     style={{flexGrow: 1, flexBasis: 120, minWidth: 100}}
@@ -215,42 +392,63 @@ const SearchSubtitles = ({
                       )}
                     />
                   </View>
-                  <TextInput
-                    placeholder={t('Season')}
-                    accessibilityLabel={t('Season')}
-                    keyboardType="numeric"
-                    style={{
-                      fontFamily: HOME_FONT.regular,
-                      flexGrow: 1,
-                      flexBasis: 100,
-                      minHeight: 48,
-                    }}
-                    placeholderTextColor="#a0a0a0"
-                    className="bg-[#23252b] text-white p-3"
-                    onChangeText={text => setSeason(text)}
-                    value={season}
-                  />
-                  <TextInput
-                    placeholder={t('Episode')}
-                    accessibilityLabel={t('Episode')}
-                    keyboardType="numeric"
-                    style={{
-                      fontFamily: HOME_FONT.regular,
-                      flexGrow: 1,
-                      flexBasis: 100,
-                      minHeight: 48,
-                    }}
-                    placeholderTextColor="#a0a0a0"
-                    className="bg-[#23252b] text-white p-3"
-                    onChangeText={text => setEpisode(text)}
-                    value={episode}
-                  />
+                  {contentType === 'series' && (
+                    <View style={{flexGrow: 1, flexBasis: 100}}>
+                      <Text
+                        style={{
+                          color: '#bbb',
+                          marginBottom: 4,
+                          fontFamily: HOME_FONT.regular,
+                        }}>
+                        {t('Season')}
+                      </Text>
+                      <TextInput
+                        placeholder={t('Season')}
+                        accessibilityLabel={t('Season')}
+                        keyboardType="numeric"
+                        style={{
+                          fontFamily: HOME_FONT.regular,
+                          minHeight: 48,
+                        }}
+                        placeholderTextColor="#a0a0a0"
+                        className="bg-[#23252b] text-white p-3"
+                        onChangeText={text => setSeason(text)}
+                        value={season}
+                      />
+                    </View>
+                  )}
+                  {contentType === 'series' && (
+                    <View style={{flexGrow: 1, flexBasis: 100}}>
+                      <Text
+                        style={{
+                          color: '#bbb',
+                          marginBottom: 4,
+                          fontFamily: HOME_FONT.regular,
+                        }}>
+                        {t('Episode')}
+                      </Text>
+                      <TextInput
+                        placeholder={t('Episode')}
+                        accessibilityLabel={t('Episode')}
+                        keyboardType="numeric"
+                        style={{
+                          fontFamily: HOME_FONT.regular,
+                          minHeight: 48,
+                        }}
+                        placeholderTextColor="#a0a0a0"
+                        className="bg-[#23252b] text-white p-3"
+                        onChangeText={text => setEpisode(text)}
+                        value={episode}
+                      />
+                    </View>
+                  )}
                   <TouchableOpacity
                     accessibilityRole="button"
                     accessibilityLabel={t('Search')}
+                    disabled={loading}
                     onPress={() => searchSubtitles()}
                     style={{
-                      flexBasis: '100%',
+                      width: '100%',
                       flexDirection: 'row',
                       gap: 8,
                       backgroundColor: primary,
@@ -274,7 +472,7 @@ const SearchSubtitles = ({
                 ) : (
                   searchResults.map(result => (
                     <TouchableOpacity
-                      key={`${result.id}:${result.fileId}`}
+                      key={result.addonUrl || `${result.id}:${result.fileId}`}
                       className="gap-2 p-4 my-1 bg-[#141519] border border-white/10"
                       disabled={loading}
                       onPress={() => selectSubtitle(result)}>
@@ -288,27 +486,35 @@ const SearchSubtitles = ({
                         className="text-white text-base">
                         {result.title.trim()}
                       </Text>
-                      <Text
-                        style={{fontFamily: HOME_FONT.regular}}
-                        className="text-white text-lg">
-                        {Number(result.season) > 0 ? `S${result.season}` : ''}
-                      </Text>
-                      <Text
-                        style={{fontFamily: HOME_FONT.regular}}
-                        className="text-white text-lg">
-                        {Number(result.episode) > 0 ? `E${result.episode}` : ''}
-                      </Text>
+                      {Number(result.season) > 0 && (
+                        <Text
+                          style={{fontFamily: HOME_FONT.regular}}
+                          className="text-white text-lg">
+                          {`S${result.season}`}
+                        </Text>
+                      )}
+                      {Number(result.episode) > 0 && (
+                        <Text
+                          style={{fontFamily: HOME_FONT.regular}}
+                          className="text-white text-lg">
+                          {`E${result.episode}`}
+                        </Text>
+                      )}
                       <Text
                         style={{fontFamily: HOME_FONT.regular}}
                         className="text-white text-xs italic">
-                        {[result.release, result.uploader]
+                        {[
+                          result.addonSource,
+                          result.release !== result.title ? result.release : '',
+                          result.uploader,
+                        ]
                           .filter(Boolean)
                           .join(' ')}
                       </Text>
                     </TouchableOpacity>
                   ))
                 )}
-                {searchResults.length === 0 && !loading && (
+                {!!error && !loading && (
                   <View className="w-full h-full justify-center items-center">
                     <Text
                       style={{fontFamily: HOME_FONT.regular}}

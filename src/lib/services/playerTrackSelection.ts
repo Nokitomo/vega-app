@@ -1,4 +1,6 @@
 export type PlayerTrackLike = {
+  sourceId?: string | null;
+  uri?: string;
   index?: number;
   language?: string;
   title?: string;
@@ -6,6 +8,51 @@ export type PlayerTrackLike = {
   type?: string;
   selected?: boolean;
 };
+
+/** Native Android events include side-loaded tracks; preserve their real indices. */
+export function mergeSubtitleTracks(
+  nativeTracks: PlayerTrackLike[],
+  externalTracks: PlayerTrackLike[],
+  matchByLabel = false,
+) {
+  const used = new Set<number>();
+  const native = nativeTracks.map((track, index) => {
+    const match = /^(?:\d+:)*external-subtitle-(\d+)$/.exec(track.sourceId || '');
+    let externalIndex = match ? Number(match[1]) : -1;
+    // AVPlayer does not expose Android's source ID. Consume each label only once.
+    if (externalIndex < 0 && matchByLabel && track.title) {
+      externalIndex = externalTracks.findIndex(
+        (item, i) =>
+          !used.has(i) &&
+          item.title === track.title &&
+          item.language === track.language,
+      );
+    }
+    const external = externalTracks[externalIndex];
+    if (external && !used.has(externalIndex)) {
+      used.add(externalIndex);
+      return {
+        ...external,
+        ...track,
+        uri: external.uri,
+        type: external.type || track.type,
+        index: track.index ?? index,
+        source: 'external' as const,
+      };
+    }
+    return {...track, index: track.index ?? index, source: 'internal' as const};
+  });
+  let nextIndex =
+    native.reduce((max, track) => Math.max(max, track.index), -1) + 1;
+  return [
+    ...native,
+    ...externalTracks.flatMap((track, i) =>
+      used.has(i)
+        ? []
+        : [{...track, index: nextIndex++, source: 'external' as const}],
+    ),
+  ];
+}
 
 export type InitialTrackSelection = {
   listIndex: number;

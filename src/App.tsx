@@ -48,6 +48,7 @@ import WatchHistory from './screens/WatchHistory';
 import ContinueWatchingAll from './screens/ContinueWatchingAll';
 import SubtitlePreference from './screens/settings/SubtitleSettings';
 import Extensions from './screens/settings/Extensions';
+import StremioAddons from './screens/settings/StremioAddons';
 import Account from './screens/settings/Account';
 import Constants from 'expo-constants';
 import {settingsStorage} from './lib/storage';
@@ -192,6 +193,7 @@ export type SettingsStackParamList = {
   WatchHistoryStack: undefined;
   SubTitlesPreferences: undefined;
   Extensions: undefined;
+  StremioAddons: undefined;
   Account: undefined;
 };
 
@@ -273,6 +275,7 @@ function SettingsStackScreen() {
       <SettingsStack.Screen name="Preferences" component={Preferences} />
       <SettingsStack.Screen name="Downloads" component={Downloads} />
       <SettingsStack.Screen name="Extensions" component={Extensions} />
+      <SettingsStack.Screen name="StremioAddons" component={StremioAddons} />
       <SettingsStack.Screen name="Account" component={Account} />
       <SettingsStack.Screen
         name="WatchHistoryStack"

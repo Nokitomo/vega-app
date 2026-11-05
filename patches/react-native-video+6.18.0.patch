@@ -1,8 +1,7 @@
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
-index 0c495e1..c76a14b 100644
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
-@@ -25,6 +25,8 @@ class DRMProps {
+@@ -25,6 +25,8 @@
       * DRM license server to be used
       */
      var drmLicenseServer: String? = null
@@ -11,7 +10,7 @@ index 0c495e1..c76a14b 100644
  
      /**
       * DRM Http Header to access to license server
-@@ -41,6 +43,8 @@ class DRMProps {
+@@ -41,6 +43,8 @@
          if (other == null || other !is DRMProps) return false
          return drmType == other.drmType &&
              drmLicenseServer == other.drmLicenseServer &&
@@ -20,7 +19,7 @@ index 0c495e1..c76a14b 100644
              multiDrm == other.multiDrm &&
              drmLicenseHeader.contentDeepEquals(other.drmLicenseHeader) // drmLicenseHeader is never null
      }
-@@ -61,9 +65,20 @@ class DRMProps {
+@@ -61,9 +65,20 @@
                  drm = DRMProps()
                  drm.drmType = safeGetString(src, PROP_DRM_TYPE)
                  drm.drmLicenseServer = safeGetString(src, PROP_DRM_LICENSE_SERVER)
@@ -43,7 +42,6 @@ index 0c495e1..c76a14b 100644
                          val drmKeyRequestPropertiesList = ArrayList<String?>()
                          for (i in 0 until drmHeadersArray.size()) {
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
-index 462f47a..4bc37e0 100644
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
 @@ -1,5 +1,8 @@
@@ -55,7 +53,7 @@ index 462f47a..4bc37e0 100644
  import androidx.media3.common.util.Util
  import androidx.media3.datasource.HttpDataSource
  import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
-@@ -23,12 +26,20 @@ class DRMManager(private val dataSourceFactory: HttpDataSource.Factory) : DRMMan
+@@ -23,12 +26,20 @@
          }
  
          try {
@@ -78,7 +76,7 @@ index 462f47a..4bc37e0 100644
              }
  
              val mediaDrm = FrameworkMediaDrm.newInstance(uuid)
-@@ -41,7 +52,8 @@ class DRMManager(private val dataSourceFactory: HttpDataSource.Factory) : DRMMan
+@@ -41,7 +52,8 @@
  
              return DefaultDrmSessionManager.Builder()
                  .setUuidAndExoMediaDrmProvider(uuid) { mediaDrm }
@@ -89,10 +87,19 @@ index 462f47a..4bc37e0 100644
                  .build(drmCallback)
          } catch (ex: UnsupportedDrmException) {
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-index 539ecfd..d92632b 100644
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-@@ -809,7 +809,10 @@ public class ReactExoplayerView extends FrameLayout implements
+@@ -86,6 +86,9 @@
+ import androidx.media3.exoplayer.source.MediaSource;
+ import androidx.media3.exoplayer.source.MergingMediaSource;
+ import androidx.media3.exoplayer.source.ProgressiveMediaSource;
++import androidx.media3.extractor.Extractor;
++import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
++import androidx.media3.extractor.text.SubtitleExtractor;
+ import androidx.media3.exoplayer.source.TrackGroupArray;
+ import androidx.media3.exoplayer.source.ads.AdsMediaSource;
+ import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection;
+@@ -809,7 +812,10 @@
              DRMManagerSpec drmManager = ReactNativeVideoManager.Companion.getInstance().getDRMManager();
              if (drmManager == null) {
                  // If no custom manager is registered, use the default implementation
@@ -104,11 +111,71 @@ index 539ecfd..d92632b 100644
              }
  
              DrmSessionManager drmSessionManager = drmManager.buildDrmSessionManager(uuid, drmProps);
+@@ -1133,6 +1139,31 @@
+                         config.buildLoadErrorHandlingPolicy(source.getMinLoadRetryCount())
+                 )
+                 .createMediaSource(mediaItem);
++
++        // Format-specific factories do not consume side-loaded subtitle configurations.
++        // Parse during extraction, as DefaultMediaSourceFactory does, so TextRenderer
++        // receives Media3 cues without enabling legacy decoding for the whole player.
++        if (subtitleConfigurations != null && !subtitleConfigurations.isEmpty()) {
++            List<MediaSource> sources = new ArrayList<>();
++            sources.add(mediaSource);
++            DefaultSubtitleParserFactory subtitleParserFactory = new DefaultSubtitleParserFactory();
++            for (MediaItem.SubtitleConfiguration subtitle : subtitleConfigurations) {
++                Format format = new Format.Builder()
++                        .setId(subtitle.id)
++                        .setSampleMimeType(subtitle.mimeType)
++                        .setLanguage(subtitle.language)
++                        .setLabel(subtitle.label)
++                        .setSelectionFlags(subtitle.selectionFlags)
++                        .setRoleFlags(subtitle.roleFlags)
++                        .build();
++                if (!subtitleParserFactory.supportsFormat(format)) continue;
++                sources.add(new ProgressiveMediaSource.Factory(
++                        buildDataSourceFactory(false),
++                        () -> new Extractor[] {new SubtitleExtractor(subtitleParserFactory.create(format), format)})
++                        .createMediaSource(MediaItem.fromUri(subtitle.uri)));
++            }
++            mediaSource = new MergingMediaSource(sources.toArray(new MediaSource[0]));
++        }
+ 
+         if (cropStartMs >= 0 && cropEndMs >= 0) {
+             return new ClippingMediaSource(mediaSource, cropStartMs * 1000, cropEndMs * 1000);
+@@ -1689,7 +1720,8 @@
+                 Format format = group.getFormat(trackIndex);
+                 Track textTrack = exoplayerTrackToGenericTrack(format, trackIndex, selection, group);
+                 
+-                boolean isExternal = format.id != null && format.id.startsWith("external-subtitle-");
++                boolean isExternal = format.id != null && format.id.matches("(?:[0-9]+:)*external-subtitle-[0-9]+");
++                textTrack.setSourceId(isExternal ? format.id : null);
+                 boolean isSelected = isTrackSelected(selection, group, trackIndex);
+                 
+                 textTrack.setIndex(textTracks.size());
+@@ -1766,7 +1798,8 @@
+                 if (format.sampleMimeType != null) textTrack.setMimeType(format.sampleMimeType);
+                 if (format.language != null) textTrack.setLanguage(format.language);
+                 
+-                boolean isExternal = format.id != null && format.id.startsWith("external-subtitle-");
++                boolean isExternal = format.id != null && format.id.matches("(?:[0-9]+:)*external-subtitle-[0-9]+");
++                textTrack.setSourceId(isExternal ? format.id : null);
+                 
+                 if (format.label != null && !format.label.isEmpty()) {
+                     textTrack.setTitle(format.label);
+@@ -1885,7 +1918,7 @@
+             for (int j = 0; j < group.length; j++) {
+                 Format format = group.getFormat(j);
+                 // If track ID doesn't start with "external-subtitle-", it's built-in
+-                if (format.id == null || !format.id.startsWith("external-subtitle-")) {
++                if (format.id == null || !format.id.matches("(?:[0-9]+:)*external-subtitle-[0-9]+")) {
+                     return true;
+                 }
+             }
 diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
-index 6d39f24..ded4a10 100644
 --- a/node_modules/react-native-video/src/Video.tsx
 +++ b/node_modules/react-native-video/src/Video.tsx
-@@ -184,6 +184,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
+@@ -184,6 +184,8 @@
            : {
                type: selectedDrm.type,
                licenseServer: selectedDrm.licenseServer,
@@ -118,10 +185,9 @@ index 6d39f24..ded4a10 100644
                contentId: selectedDrm.contentId,
                certificateUrl: selectedDrm.certificateUrl,
 diff --git a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
-index ea033f1..c0bfafc 100644
 --- a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
 +++ b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
-@@ -65,6 +65,8 @@ type DebugConfig = Readonly<{
+@@ -65,6 +65,8 @@
  type Drm = Readonly<{
    type?: DRMType;
    licenseServer?: string;
@@ -131,10 +197,9 @@ index ea033f1..c0bfafc 100644
    contentId?: string; // ios
    certificateUrl?: string; // ios
 diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/react-native-video/src/types/video.ts
-index 82861bd..672740d 100644
 --- a/node_modules/react-native-video/src/types/video.ts
 +++ b/node_modules/react-native-video/src/types/video.ts
-@@ -85,6 +85,8 @@ export type AdConfig = Readonly<{
+@@ -85,6 +85,8 @@
  export type Drm = Readonly<{
    type?: DRMType;
    licenseServer?: string;
@@ -143,3 +208,25 @@ index 82861bd..672740d 100644
    headers?: Headers;
    contentId?: string; // ios
    certificateUrl?: string; // ios
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
+@@ -4,6 +4,7 @@
+ * internal representation of audio & text tracks
+ */
+ class Track {
++    var sourceId: String? = null
+     var title: String? = null
+     var mimeType: String? = null
+     var language: String? = null
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
+@@ -365,6 +365,7 @@
+                 pushMap(
+                     Arguments.createMap().apply {
+                         putInt("index", i)
++                        putString("sourceId", format.sourceId)
+                         putString("title", format.title)
+                         putString("type", format.mimeType)
+                         putString("language", format.language)

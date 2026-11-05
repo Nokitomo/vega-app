@@ -197,7 +197,7 @@ const SubtitlePreference = () => {
                 style={settingsPresentation.body}
                 className="text-gray-400 text-sm mt-1 mb-3">
                 {t(
-                  'Required for online subtitle search. Create a key in your OpenSubtitles account.',
+                  'addon.apiOptional',
                 )}
               </Text>
               <TextInput
