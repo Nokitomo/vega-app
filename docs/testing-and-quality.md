@@ -73,6 +73,8 @@ Home, Info, episodi e poster, seguire [Profilazione Home e Info](performance-pro
 
 ## Smoke test Player Android
 
+- Con un torrent legale e condiviso e un magnet senza tracker, verificare che il player recuperi i metadati tramite i tracker di fallback, mostri il progresso del download mentre attende il primo pezzo e avvii la riproduzione senza passare alla sorgente successiva dopo 8 secondi. Verificare che un errore temporaneo HTTP 500/503 del server locale ritenti la stessa sorgente e che un torrent senza pezzi disponibili termini l'attesa con un errore gestito.
+- Cambiare sorgente o uscire dal player durante la preparazione torrent: il download precedente deve fermarsi. Riprodurre anche un MP4 diretto per verificare che il suo timeout di avvio rapido resti invariato.
 - Da player nativo app (non Webview), attivare fullscreen e verificare che status/navigation bar Android siano nascoste.
 - In fullscreen player nativo, mettere app in background e tornare in foreground: verificare che status/navigation bar restino nascoste senza dover togglare il pulsante fullscreen.
 - Uscire dal fullscreen player nativo: verificare ripristino corretto delle system bars.

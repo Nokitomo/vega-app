@@ -66,6 +66,7 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - La seekbar evidenzia gli intervalli AniSkip, supporta lo snap alla posizione iniziale del trascinamento con feedback aptico e il player supporta pinch-to-zoom.
 - Il pulsante "Next" appare quando mancano circa 90 secondi alla fine e passa al prossimo episodio; se esiste una stagione successiva apre il primo episodio.
 - Per AnimeUnity, il pulsante "Skip Intro" appare quando AniSkip fornisce un intervallo OP/mixed-op e permette di saltare l'intro. I pulsanti che saltano a un altro punto del video mantengono la visibilita corrente dei controlli del player: se erano nascosti, il salto non li mostra.
+- Su Android, gli stream torrent attendono il primo pezzo video prima di avviare il player. Durante l'attesa mostrano stato e velocita del download; il controllo di avvio tiene conto dei byte scaricati e ha un limite massimo, mentre gli errori temporanei del server torrent locale vengono ritentati prima di passare a un'altra sorgente. I magnet senza tracker ricevono tracker pubblici di fallback per recuperare i metadati.
 - Su Android e disponibile l'apertura in player esterno (es. VLC).
 - Su Android e disponibile il cast nativo Google Cast (default) dal player e dalla selezione server.
 - Il cast nativo usa una queue episodi (quando disponibile) e prova a mantenere il tracking progresso su cronologia/cache anche durante la riproduzione remota.

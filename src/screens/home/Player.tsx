@@ -141,6 +141,11 @@ const exitFullScreen = () => {
 
 const STREAM_RETRY_COOLDOWN_MS = 3000;
 const STREAM_START_TIMEOUT_MS = 8000;
+const TORRENT_START_CHECK_INTERVAL_MS = 10000;
+const TORRENT_START_STALL_TIMEOUT_MS = 60000;
+const TORRENT_START_MAX_TIMEOUT_MS = 300000;
+const TORRENT_HTTP_RETRY_DELAY_MS = 5000;
+const TORRENT_HTTP_RETRY_LIMIT = 3;
 const SUBTITLE_GATE_TIMEOUT_MS = 1500;
 const SKIP_INTRO_LEAD_SECONDS = 1.5;
 const PLAYER_CONTROL_COLOR = 'rgba(255,255,255,0.68)';
@@ -204,6 +209,11 @@ const Player = ({route}: Props): React.JSX.Element => {
   const streamStartupGuardKeyRef = useRef('');
   const streamStartupProgressSeenRef = useRef(false);
   const streamStartupHandlingRef = useRef(false);
+  const torrentStartupStartedAtRef = useRef(0);
+  const torrentHttpRetryRef = useRef<{
+    count: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({count: 0, timer: null});
 
   // Shared values for animations
   const loadingOpacity = useSharedValue(0);
@@ -295,6 +305,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   const [torrentDownloaded, setTorrentDownloaded] = useState(0);
   const [torrentDownloadSpeed, setTorrentDownloadSpeed] = useState(0);
   const activeTorrentRef = useRef<string | null>(null);
+  const torrentDownloadedBytesRef = useRef(0);
   const torrentProgressRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
@@ -356,6 +367,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     const resolveStream = async () => {
       await stopCurrentTorrent();
+      torrentDownloadedBytesRef.current = 0;
       if (!active || !selectedStream?.link) {
         setProcessedStreamUrl('');
         setIsResolvingStream(false);
@@ -387,6 +399,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           try {
             const stats = await torrentManager.getStats(added.infoHash);
             if (active) {
+              torrentDownloadedBytesRef.current = stats.totalDone || 0;
               setTorrentState(stats.state || '');
               setTorrentDownloaded((stats.totalDone || 0) / 1024 / 1024);
               setTorrentDownloadSpeed(stats.downloadRate || 0);
@@ -398,10 +411,13 @@ const Player = ({route}: Props): React.JSX.Element => {
           added.infoHash,
           selectedStream.link,
         );
-        const preparation = torrentManager.prepareVideoFile(
+        await torrentManager.prepareVideoFile(
           added.infoHash,
           fileIndex,
         );
+        if (!active) {
+          return;
+        }
         const streamUrl = await torrentManager.getStreamUrl(
           added.infoHash,
           fileIndex,
@@ -410,16 +426,16 @@ const Player = ({route}: Props): React.JSX.Element => {
           setProcessedStreamUrl(streamUrl);
           setIsResolvingStream(false);
         }
-        await preparation;
       } catch (torrentError) {
-        console.error('Failed to start torrent stream:', torrentError);
         if (active) {
+          console.error('Failed to start torrent stream:', torrentError);
           setIsResolvingStream(false);
           if (!switchToNextStream()) {
             ToastAndroid.show(
               t('Failed to load torrent stream.'),
               ToastAndroid.SHORT,
             );
+            navigation.goBack();
           }
         }
       }
@@ -435,7 +451,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       });
     };
     // switchToNextStream changes identity on each render in useStream.
-  }, [findTorrentVideoFile, selectedStream, t]);
+  }, [findTorrentVideoFile, navigation, selectedStream, t]);
 
   // Custom hooks for video settings
   const {
@@ -1379,6 +1395,17 @@ const Player = ({route}: Props): React.JSX.Element => {
     }
   }, []);
 
+  useEffect(() => {
+    torrentHttpRetryRef.current.count = 0;
+    torrentStartupStartedAtRef.current = 0;
+    return () => {
+      if (torrentHttpRetryRef.current.timer) {
+        clearTimeout(torrentHttpRetryRef.current.timer);
+        torrentHttpRetryRef.current.timer = null;
+      }
+    };
+  }, [selectedStream?.link]);
+
   const handleStartupTimeoutFallback = useCallback(() => {
     if (streamStartupHandlingRef.current) {
       return;
@@ -1414,12 +1441,42 @@ const Player = ({route}: Props): React.JSX.Element => {
       streamStartupProgressSeenRef.current = false;
       clearStreamStartupGuard();
 
-      streamStartupTimeoutRef.current = setTimeout(() => {
+      const isTorrent =
+        selectedStream.type === 'torrent' ||
+        selectedStream.link.startsWith('magnet:');
+      const startedAt = isTorrent
+        ? torrentStartupStartedAtRef.current || Date.now()
+        : Date.now();
+      if (isTorrent) {
+        torrentStartupStartedAtRef.current = startedAt;
+      }
+      let lastDownloadedBytes = torrentDownloadedBytesRef.current;
+      let lastDownloadProgressAt = Date.now();
+      const checkStartup = () => {
         if (streamStartupGuardKeyRef.current !== guardKey) {
           return;
         }
         if (streamStartupProgressSeenRef.current) {
           return;
+        }
+
+        if (isTorrent) {
+          const now = Date.now();
+          const downloadedBytes = torrentDownloadedBytesRef.current;
+          if (downloadedBytes > lastDownloadedBytes) {
+            lastDownloadedBytes = downloadedBytes;
+            lastDownloadProgressAt = now;
+          }
+          if (
+            now - startedAt < TORRENT_START_MAX_TIMEOUT_MS &&
+            now - lastDownloadProgressAt < TORRENT_START_STALL_TIMEOUT_MS
+          ) {
+            streamStartupTimeoutRef.current = setTimeout(
+              checkStartup,
+              TORRENT_START_CHECK_INTERVAL_MS,
+            );
+            return;
+          }
         }
 
         console.warn('[player] stream startup timeout', {
@@ -1428,7 +1485,11 @@ const Player = ({route}: Props): React.JSX.Element => {
           episode: activeEpisode?.link,
         });
         handleStartupTimeoutFallback();
-      }, STREAM_START_TIMEOUT_MS);
+      };
+      streamStartupTimeoutRef.current = setTimeout(
+        checkStartup,
+        isTorrent ? TORRENT_START_CHECK_INTERVAL_MS : STREAM_START_TIMEOUT_MS,
+      );
     },
     [
       activeEpisode?.link,
@@ -1448,6 +1509,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         return;
       }
       streamStartupProgressSeenRef.current = true;
+      torrentStartupStartedAtRef.current = 0;
       clearStreamStartupGuard();
     },
     [clearStreamStartupGuard],
@@ -1477,7 +1539,25 @@ const Player = ({route}: Props): React.JSX.Element => {
     async (e: any) => {
       console.log('PlayerError', e);
       clearStreamStartupGuard();
-      if (shouldRefetchStream(e) && activeEpisode?.link) {
+      const isTorrent =
+        selectedStream?.type === 'torrent' ||
+        selectedStream?.link.startsWith('magnet:');
+      const httpStatus = extractHttpStatus(e);
+      if (isTorrent && (httpStatus === 500 || httpStatus === 503)) {
+        const retry = torrentHttpRetryRef.current;
+        if (retry.timer) {
+          return;
+        }
+        if (retry.count < TORRENT_HTTP_RETRY_LIMIT) {
+          retry.count += 1;
+          retry.timer = setTimeout(() => {
+            retry.timer = null;
+            setVideoReloadNonce(value => value + 1);
+          }, TORRENT_HTTP_RETRY_DELAY_MS);
+          return;
+        }
+      }
+      if (!isTorrent && shouldRefetchStream(e) && activeEpisode?.link) {
         const now = Date.now();
         const retryKey = `${activeEpisode.link}|${selectedStream?.server || ''}`;
         const retryState = streamRetryRef.current;
@@ -1519,6 +1599,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     [
       activeEpisode?.link,
       clearStreamStartupGuard,
+      extractHttpStatus,
       navigation,
       refetch,
       selectedStream?.server,
@@ -3138,6 +3219,21 @@ const Player = ({route}: Props): React.JSX.Element => {
                 className="text-white text-lg mt-4">
                 {t('Loading stream...')}
               </Text>
+              {(selectedStream?.type === 'torrent' ||
+                selectedStream?.link.startsWith('magnet:')) &&
+                !!torrentState && (
+                <Text
+                  style={{fontFamily: HOME_FONT.regular}}
+                  className="text-white text-sm mt-2 text-center">
+                  {torrentState}
+                  {torrentDownloaded > 0
+                    ? ` · ${torrentDownloaded.toFixed(1)} MB`
+                    : ''}
+                  {torrentDownloadSpeed > 0
+                    ? ` · ${(torrentDownloadSpeed / 1024 / 1024).toFixed(1)} MB/s`
+                    : ''}
+                </Text>
+              )}
             </Animated.View>
           </View>
         </TouchableNativeFeedback>

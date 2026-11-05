@@ -5,6 +5,7 @@ import com.facebook.react.bridge.*
 import org.libtorrent4j.*
 import org.libtorrent4j.alerts.*
 import java.io.File
+import java.net.URLEncoder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -13,6 +14,11 @@ class TorrentModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     companion object {
         private const val TAG = "TorrentModule"
         private const val STREAM_STARTUP_BYTES = 8L * 1024L * 1024L
+        private val FALLBACK_TRACKERS = listOf(
+            "udp://tracker.opentrackr.org:1337/announce",
+            "http://tracker.openbittorrent.com:80/announce",
+            "udp://tracker.openbittorrent.com:6969/announce"
+        )
         private var sessionManager: SessionManager? = null
         private var streamServer: TorrentStreamServer? = null
         private val torrentHandles = mutableMapOf<String, TorrentHandle>()
@@ -21,6 +27,29 @@ class TorrentModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
     }
 
     override fun getName(): String = "TorrentModule"
+
+    private fun withFallbackTrackers(magnetOrUrl: String): String {
+        if (!magnetOrUrl.startsWith("magnet:", ignoreCase = true) ||
+            Regex("[?&]tr=", RegexOption.IGNORE_CASE).containsMatchIn(magnetOrUrl)) {
+            return magnetOrUrl
+        }
+        return magnetOrUrl + FALLBACK_TRACKERS.joinToString("") {
+            "&tr=${URLEncoder.encode(it, "UTF-8")}"
+        }
+    }
+
+    private fun removeFailedAddition(sm: SessionManager, expectedHash: String?) {
+        if (expectedHash == null) return
+        try {
+            sm.find(Sha1Hash.parseHex(expectedHash))?.let { handle ->
+                if (handle.isValid) sm.remove(handle)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to remove torrent after metadata error: ${e.message}")
+        }
+        torrentHandles.remove(expectedHash)
+        torrentSavePaths.remove(expectedHash)
+    }
 
     private fun ensureSession(): SessionManager {
         sessionManager?.let { if (it.isRunning) return it }
@@ -163,7 +192,7 @@ class TorrentModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 if (magnetOrUrl.startsWith("magnet:") ||
                     magnetOrUrl.startsWith("http://") ||
                     magnetOrUrl.startsWith("https://")) {
-                    sm.download(magnetOrUrl, File(downloadDir), TorrentFlags.AUTO_MANAGED)
+                    sm.download(withFallbackTrackers(magnetOrUrl), File(downloadDir), TorrentFlags.AUTO_MANAGED)
                 } else {
                     val ti = TorrentInfo(File(magnetOrUrl))
                     sm.download(ti, File(downloadDir))
@@ -175,11 +204,13 @@ class TorrentModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 sm.removeListener(listener)
 
                 if (addError != null) {
+                    removeFailedAddition(sm, expectedHash)
                     promise.reject("ADD_ERROR", addError)
                     return@Thread
                 }
 
                 if (!gotMetadata) {
+                    removeFailedAddition(sm, expectedHash)
                     promise.reject("TIMEOUT", "Timed out waiting for torrent metadata")
                     return@Thread
                 }
@@ -478,7 +509,7 @@ class TorrentModule(reactContext: ReactApplicationContext) : ReactContextBaseJav
                 } catch (_: Exception) {}
             }
 
-            if (th != null && sm != null) {
+            if (th != null) {
                 try { th.pause() } catch (_: Exception) {}
                 try { sm.remove(th) } catch (_: Exception) {}
             }
