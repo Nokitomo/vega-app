@@ -74,6 +74,9 @@ import {FlashList} from '@shopify/flash-list';
 import SearchSubtitles from '../../components/SearchSubtitles';
 import PlayerEpisodeSidebar from '../../components/PlayerEpisodeSidebar';
 import PlayerMenuRow from '../../components/PlayerMenuRow';
+import SubtitleTimingEditor from '../../components/SubtitleTimingEditor';
+import {subtitleTimingKey} from '../../lib/utils/subtitleTiming';
+import {useSubtitleTiming} from '../../lib/hooks/useSubtitleTiming';
 import useWatchHistoryStore from '../../lib/zustand/watchHistrory';
 import {recordEpisodePlaybackProgress} from '../../lib/storage/SeriesCompletionStorage';
 import {
@@ -646,6 +649,29 @@ const Player = ({route}: Props): React.JSX.Element => {
         Platform.OS === 'ios',
       ),
     [textTracks, externalSubs],
+  );
+  const [subtitleTimingOpen, setSubtitleTimingOpen] = useState(false);
+  const timingContentKey = activeEpisode?.link || route.params?.directUrl || '';
+  const timingTrackKey = subtitleTimingKey(
+    mergedTextTracks.find(track => track.index === selectedTextTrackIndex),
+    selectedStream?.link || '',
+  );
+  const {delayMs: subtitleDelayMs, apply: saveSubtitleTiming} =
+    useSubtitleTiming(timingContentKey, timingTrackKey);
+  useEffect(() => {
+    setSubtitleTimingOpen(false);
+  }, [timingContentKey]);
+  useEffect(() => {
+    if (!showSettings || activeTab !== 'subtitle') {
+      setSubtitleTimingOpen(false);
+    }
+  }, [showSettings, activeTab]);
+  const applySubtitleTiming = useCallback(
+    (value: number) => {
+      saveSubtitleTiming(value);
+      setSubtitleTimingOpen(false);
+    },
+    [saveSubtitleTiming],
   );
   const buildSelectedTextTrack = useCallback((track: any): SelectedTrack => {
     if (!track) {
@@ -2888,10 +2914,13 @@ const Player = ({route}: Props): React.JSX.Element => {
     provider.value,
   ]);
 
-  // Select predictable startup tracks for each stream.
+  // Reset startup selection only on a stream change, not transient empty events
+  // while rebuilding buffered subtitle cues.
   useEffect(() => {
     if (audioTracks.length === 0) {
-      hasSetInitialAudioTrackRef.current = false;
+      if (Platform.OS !== 'android') {
+        hasSetInitialAudioTrackRef.current = false;
+      }
       return;
     }
     if (hasSetInitialAudioTrackRef.current) {
@@ -2910,7 +2939,9 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   useEffect(() => {
     if (textTracks.length === 0) {
-      hasSetInitialTextTrackRef.current = false;
+      if (Platform.OS !== 'android') {
+        hasSetInitialTextTrackRef.current = false;
+      }
       return;
     }
     if (hasSetInitialTextTrackRef.current) {
@@ -3100,6 +3131,11 @@ const Player = ({route}: Props): React.JSX.Element => {
           loadedDurationRef.current = duration;
           setEpisodeDuration(prev => (prev === duration ? prev : duration));
         }
+        if (data?.subtitleTimingReload) {
+          streamStartupProgressSeenRef.current = true;
+          clearStreamStartupGuard();
+          return; // Native timing reload preserves position, pause state and playback rate.
+        }
         const seekTarget =
           subtitleReloadSeekRef.current != null
             ? subtitleReloadSeekRef.current
@@ -3148,6 +3184,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       onAudioTracks: (e: any) => processAudioTracks(e.audioTracks),
       textTracks: externalSubs,
       selectedTextTrack,
+      subtitleDelayMs: Platform.OS === 'android' ? subtitleDelayMs : undefined,
       onTextTracks: (e: any) => {
         const tracks = e?.textTracks || [];
         console.log('[subs][player] onTextTracks', {
@@ -3192,6 +3229,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params,
       activeEpisode,
       armStreamStartupGuard,
+      clearStreamStartupGuard,
       handleProgress,
       markStreamStartupProgress,
       watchedDuration,
@@ -3206,6 +3244,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       resizeMode,
       selectedAudioTrack,
       selectedTextTrack,
+      subtitleDelayMs,
       selectedVideoTrack,
       processAudioTracks,
       processVideoTracks,
@@ -3732,7 +3771,18 @@ const Player = ({route}: Props): React.JSX.Element => {
             )}
 
             {/* Subtitle Tab */}
-            {activeTab === 'subtitle' && (
+            {activeTab === 'subtitle' &&
+              subtitleTimingOpen &&
+              Platform.OS === 'android' && (
+                <SubtitleTimingEditor
+                  key={timingTrackKey}
+                  value={subtitleDelayMs}
+                  accentColor={primary}
+                  onApply={applySubtitleTiming}
+                  onCancel={() => setSubtitleTimingOpen(false)}
+                />
+              )}
+            {activeTab === 'subtitle' && !subtitleTimingOpen && (
               <FlashList
                 estimatedItemSize={70}
                 data={mergedTextTracks}
@@ -3743,6 +3793,16 @@ const Player = ({route}: Props): React.JSX.Element => {
                       className="text-lg font-bold text-center text-white">
                       {t('Subtitle')}
                     </Text>
+                    {Platform.OS === 'android' &&
+                      timingTrackKey &&
+                      selectedTextTrackIndex !== 1000 && (
+                        <PlayerMenuRow
+                          title={t('subtitleTimingTitle')}
+                          accentColor={primary}
+                          icon="sync"
+                          onPress={() => setSubtitleTimingOpen(true)}
+                        />
+                      )}
                     <PlayerMenuRow
                       title={t('Disabled')}
                       selected={selectedTextTrackIndex === 1000}

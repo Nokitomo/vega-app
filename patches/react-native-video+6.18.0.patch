@@ -89,17 +89,61 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
-@@ -86,6 +86,9 @@
+@@ -86,6 +86,11 @@
  import androidx.media3.exoplayer.source.MediaSource;
  import androidx.media3.exoplayer.source.MergingMediaSource;
  import androidx.media3.exoplayer.source.ProgressiveMediaSource;
 +import androidx.media3.extractor.Extractor;
-+import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
++import androidx.media3.extractor.ExtractorsFactory;
++import androidx.media3.extractor.DefaultExtractorsFactory;
++import androidx.media3.extractor.text.SubtitleParser;
 +import androidx.media3.extractor.text.SubtitleExtractor;
  import androidx.media3.exoplayer.source.TrackGroupArray;
  import androidx.media3.exoplayer.source.ads.AdsMediaSource;
  import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection;
-@@ -809,7 +812,10 @@
+@@ -187,6 +192,25 @@
+     private ExoPlayer player;
+     private DefaultTrackSelector trackSelector;
+     private boolean playerNeedsSource;
++    private long subtitleDelayMs;
++    private boolean hostPlaybackSuspended;
++
++    public boolean isPlaybackPaused() {
++        return player == null || hostPlaybackSuspended ? isPaused : !player.getPlayWhenReady();
++    }
++
++    public void setSubtitleDelayMs(float value) {
++        long next = Float.isNaN(value) || Float.isInfinite(value) ? 0 : Math.round(Math.max(-600000, Math.min(600000, value)));
++        if (subtitleDelayMs == next) return;
++        subtitleDelayMs = next;
++        // Cue timestamps are computed during extraction. Rebuild buffered cues too.
++        if (player != null && player.getMediaItemCount() > 0) {
++            eventEmitter.setSubtitleTimingReload(true);
++            updateResumePosition();
++            playerNeedsSource = true;
++            initializePlayer();
++        }
++    }
+     private ServiceConnection playbackServiceConnection;
+     private PlaybackServiceBinder playbackServiceBinder;
+ 
+@@ -367,6 +391,7 @@
+     // LifecycleEventListener implementation
+     @Override
+     public void onHostResume() {
++        hostPlaybackSuspended = false;
+         if (!playInBackground || !isInBackground) {
+             setPlayWhenReady(!isPaused);
+         }
+@@ -382,6 +407,7 @@
+         if (playInBackground || isInPictureInPicture || isInMultiWindowMode) {
+             return;
+         }
++        hostPlaybackSuspended = true;
+         setPlayWhenReady(false);
+     }
+ 
+@@ -809,7 +835,10 @@
              DRMManagerSpec drmManager = ReactNativeVideoManager.Companion.getInstance().getDRMManager();
              if (drmManager == null) {
                  // If no custom manager is registered, use the default implementation
@@ -111,7 +155,45 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
              }
  
              DrmSessionManager drmSessionManager = drmManager.buildDrmSessionManager(uuid, drmProps);
-@@ -1133,6 +1139,31 @@
+@@ -1024,6 +1053,9 @@
+         MediaItem.LiveConfiguration.Builder liveConfiguration = ConfigurationUtils.getLiveConfiguration(source.getBufferConfig());
+         mediaItemBuilder.setLiveConfiguration(liveConfiguration.build());
+ 
++        SubtitleParser.Factory timingParserFactory = new DelayedSubtitleParserFactory(subtitleDelayMs);
++        ExtractorsFactory timingExtractors = new SubtitlePrerollExtractorsFactory(
++                new DefaultExtractorsFactory().setSubtitleParserFactory(timingParserFactory), subtitleDelayMs);
+         MediaSource.Factory mediaSourceFactory;
+         DrmSessionManagerProvider drmProvider;
+         List<StreamKey> streamKeys = new ArrayList<>();
+@@ -1077,18 +1109,18 @@
+                 if ("asset".equals(uri.getScheme())) {
+                     try {
+                         DataSource.Factory assetDataSourceFactory = DataSourceUtil.buildAssetDataSourceFactory(themedReactContext, uri);
+-                        mediaSourceFactory = new ProgressiveMediaSource.Factory(assetDataSourceFactory);
++                        mediaSourceFactory = new ProgressiveMediaSource.Factory(assetDataSourceFactory, timingExtractors);
+                     } catch (Exception e) {
+                         throw new IllegalStateException("cannot open input file:" + uri);
+                     }
+                 } else if ("file".equals(uri.getScheme()) ||
+                         !useCache) {
+                     mediaSourceFactory = new ProgressiveMediaSource.Factory(
+-                            mediaDataSourceFactory
++                            mediaDataSourceFactory, timingExtractors
+                     );
+                 } else {
+                     mediaSourceFactory = new ProgressiveMediaSource.Factory(
+-                            RNVSimpleCache.INSTANCE.getCacheFactory(buildHttpDataSourceFactory(true))
++                            RNVSimpleCache.INSTANCE.getCacheFactory(buildHttpDataSourceFactory(true)), timingExtractors
+                     );
+ 
+                 }
+@@ -1128,11 +1160,37 @@
+                 : mediaItemBuilder.build();
+ 
+         MediaSource mediaSource = mediaSourceFactory
++                .setSubtitleParserFactory(timingParserFactory)
+                 .setDrmSessionManagerProvider(drmProvider)
+                 .setLoadErrorHandlingPolicy(
                          config.buildLoadErrorHandlingPolicy(source.getMinLoadRetryCount())
                  )
                  .createMediaSource(mediaItem);
@@ -122,7 +204,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 +        if (subtitleConfigurations != null && !subtitleConfigurations.isEmpty()) {
 +            List<MediaSource> sources = new ArrayList<>();
 +            sources.add(mediaSource);
-+            DefaultSubtitleParserFactory subtitleParserFactory = new DefaultSubtitleParserFactory();
++            SubtitleParser.Factory subtitleParserFactory = timingParserFactory;
 +            for (MediaItem.SubtitleConfiguration subtitle : subtitleConfigurations) {
 +                Format format = new Format.Builder()
 +                        .setId(subtitle.id)
@@ -143,7 +225,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
  
          if (cropStartMs >= 0 && cropEndMs >= 0) {
              return new ClippingMediaSource(mediaSource, cropStartMs * 1000, cropEndMs * 1000);
-@@ -1689,7 +1720,8 @@
+@@ -1689,7 +1747,8 @@
                  Format format = group.getFormat(trackIndex);
                  Track textTrack = exoplayerTrackToGenericTrack(format, trackIndex, selection, group);
                  
@@ -153,7 +235,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                  boolean isSelected = isTrackSelected(selection, group, trackIndex);
                  
                  textTrack.setIndex(textTracks.size());
-@@ -1766,7 +1798,8 @@
+@@ -1766,7 +1825,8 @@
                  if (format.sampleMimeType != null) textTrack.setMimeType(format.sampleMimeType);
                  if (format.language != null) textTrack.setLanguage(format.language);
                  
@@ -163,7 +245,17 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                  
                  if (format.label != null && !format.label.isEmpty()) {
                      textTrack.setTitle(format.label);
-@@ -1885,7 +1918,7 @@
+@@ -1838,6 +1898,9 @@
+ 
+     @Override
+     public void onTracksChanged(@NonNull Tracks tracks) {
++        // A timing reload briefly removes the old timeline. Keep React track
++        // identities until the replacement groups arrive.
++        if (eventEmitter.getSubtitleTimingReload() && tracks.getGroups().isEmpty()) return;
+         DebugLog.d(TAG, "onTracksChanged called - updating track information, controls=" + controls);
+         
+         if (controls) {
+@@ -1885,7 +1948,7 @@
              for (int j = 0; j < group.length; j++) {
                  Format format = group.getFormat(j);
                  // If track ID doesn't start with "external-subtitle-", it's built-in
@@ -172,7 +264,20 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      return true;
                  }
              }
-@@ -2123,10 +2156,14 @@
+@@ -2016,8 +2079,11 @@
+ 
+     public void setSrc(Source source) {
+         if (source.getUri() != null) {
+-            clearResumePosition();
+             boolean isSourceEqual = source.isEquals(this.source);
++            if (!isSourceEqual) {
++                eventEmitter.setSubtitleTimingReload(false);
++                clearResumePosition();
++            }
+             hasDrmFailed = false;
+             this.source = source;
+             final DataSource.Factory tmpMediaDataSourceFactory =
+@@ -2123,10 +2189,14 @@
                  if (textRendererIndex != C.INDEX_UNSET) {
                      TrackGroupArray groups = info.getTrackGroups(textRendererIndex);
                      boolean trackFound = false;
@@ -188,7 +293,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                              Format format = group.getFormat(trackIndex);
                              
                              boolean isMatch = false;
-@@ -2136,7 +2173,7 @@
+@@ -2136,7 +2206,7 @@
                                  isMatch = true;
                              } else if ("index".equals(type)) {
                                  int targetIndex = ReactBridgeUtils.safeParseInt(value, -1);
@@ -200,7 +305,15 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
 --- a/node_modules/react-native-video/src/Video.tsx
 +++ b/node_modules/react-native-video/src/Video.tsx
-@@ -184,6 +184,8 @@
+@@ -70,6 +70,7 @@
+       selectedVideoTrack,
+       selectedAudioTrack,
+       selectedTextTrack,
++      subtitleDelayMs,
+       useTextureView,
+       useSecureView,
+       viewType,
+@@ -184,6 +185,8 @@
            : {
                type: selectedDrm.type,
                licenseServer: selectedDrm.licenseServer,
@@ -209,6 +322,14 @@ diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-
                headers: generateHeaderForNative(selectedDrm.headers),
                contentId: selectedDrm.contentId,
                certificateUrl: selectedDrm.certificateUrl,
+@@ -838,6 +841,7 @@
+             _restoreUserInterfaceForPIPStopCompletionHandler
+           }
+           selectedTextTrack={_selectedTextTrack}
++          subtitleDelayMs={Platform.OS === 'android' ? subtitleDelayMs : undefined}
+           selectedAudioTrack={_selectedAudioTrack}
+           selectedVideoTrack={_selectedVideoTrack}
+           shutterColor={_shutterColor}
 diff --git a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
 --- a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
 +++ b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
@@ -221,6 +342,31 @@ diff --git a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts b
    headers?: Headers;
    contentId?: string; // ios
    certificateUrl?: string; // ios
+@@ -147,6 +149,7 @@
+ }>;
+ 
+ type OnLoadData = Readonly<{
++  subtitleTimingReload?: boolean;
+   currentTime: Float;
+   duration: Float;
+   naturalSize: Readonly<{
+@@ -258,6 +261,8 @@
+ }>;
+ 
+ export type OnPlaybackRateChangeData = Readonly<{
++  /** Android: distinguishes an explicit pause from buffering or a speed change. */
++  isPaused?: boolean;
+   playbackRate: Float;
+ }>;
+ 
+@@ -338,6 +343,7 @@
+   shutterColor?: Int32;
+   audioOutput?: WithDefault<string, 'speaker'>;
+   selectedTextTrack?: SelectedTextTrack;
++  subtitleDelayMs?: Float;
+   selectedAudioTrack?: SelectedAudioTrack;
+   selectedVideoTrack?: SelectedVideoTrack; // android
+   paused?: boolean;
 diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/react-native-video/src/types/video.ts
 --- a/node_modules/react-native-video/src/types/video.ts
 +++ b/node_modules/react-native-video/src/types/video.ts
@@ -233,6 +379,15 @@ diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/r
    headers?: Headers;
    contentId?: string; // ios
    certificateUrl?: string; // ios
+@@ -333,6 +335,8 @@
+   showNotificationControls?: boolean; // Android, iOS
+   selectedAudioTrack?: SelectedTrack;
+   selectedTextTrack?: SelectedTrack;
++  /** Android only. Positive milliseconds delay subtitles. */
++  subtitleDelayMs?: number;
+   selectedVideoTrack?: SelectedVideoTrack; // android
+   subtitleStyle?: SubtitleStyle; // android
+   shutterColor?: string; // Android
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/Track.kt
@@ -247,7 +402,37 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/react/VideoEventEmitter.kt
-@@ -365,6 +365,7 @@
+@@ -56,6 +56,7 @@
+ }
+ 
+ class VideoEventEmitter {
++    var subtitleTimingReload = false
+     lateinit var onVideoLoadStart: () -> Unit
+     lateinit var onVideoLoad: (
+         duration: Long,
+@@ -104,7 +105,10 @@
+                 event.dispatch(EventTypes.EVENT_LOAD_START)
+             }
+             onVideoLoad = { duration, currentPosition, videoWidth, videoHeight, audioTracks, textTracks, videoTracks, trackId ->
++                val timingReload = subtitleTimingReload
++                subtitleTimingReload = false
+                 event.dispatch(EventTypes.EVENT_LOAD) {
++                    putBoolean("subtitleTimingReload", timingReload)
+                     putDouble("duration", duration / 1000.0)
+                     putDouble("currentTime", currentPosition / 1000.0)
+ 
+@@ -260,8 +264,10 @@
+                 }
+             }
+             onPlaybackRateChange = { rate ->
++                val paused = view.isPlaybackPaused()
+                 event.dispatch(EventTypes.EVENT_PLAYBACK_RATE_CHANGE) {
+                     putDouble("playbackRate", rate.toDouble())
++                    putBoolean("isPaused", paused)
+                 }
+             }
+             onVolumeChange = { volume ->
+@@ -365,6 +371,7 @@
                  pushMap(
                      Arguments.createMap().apply {
                          putInt("index", i)
@@ -255,3 +440,183 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                          putString("title", format.title)
                          putString("type", format.mimeType)
                          putString("language", format.language)
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
+@@ -80,6 +80,11 @@
+         view.eventEmitter.addEventEmitters(reactContext, view)
+     }
+ 
++    @ReactProp(name = "subtitleDelayMs", defaultFloat = 0f)
++    fun setSubtitleDelayMs(videoView: ReactExoplayerView, delayMs: Float) {
++        videoView.setSubtitleDelayMs(delayMs)
++    }
++
+     @ReactProp(name = PROP_SRC)
+     fun setSrc(videoView: ReactExoplayerView, src: ReadableMap?) {
+         val context = videoView.context.applicationContext
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DelayedSubtitleParserFactory.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DelayedSubtitleParserFactory.java
+new file mode 100644
+--- /dev/null
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DelayedSubtitleParserFactory.java
+@@ -0,0 +1,61 @@
++package com.brentvatne.exoplayer;
++
++import androidx.media3.common.C;
++import androidx.media3.common.Format;
++import androidx.media3.common.util.Consumer;
++import androidx.media3.extractor.text.CuesWithTiming;
++import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
++import androidx.media3.extractor.text.SubtitleParser;
++
++/** Per-source timing adjustment. Never modifies text, styling, duration or media timestamps. */
++final class DelayedSubtitleParserFactory implements SubtitleParser.Factory {
++    private final SubtitleParser.Factory delegate = new DefaultSubtitleParserFactory();
++    private final long delayUs;
++
++    DelayedSubtitleParserFactory(long delayMs) {
++        delayUs = delayMs * 1000L;
++    }
++
++    @Override
++    public boolean supportsFormat(Format format) {
++        return delegate.supportsFormat(format);
++    }
++
++    @Override
++    public int getCueReplacementBehavior(Format format) {
++        return delegate.getCueReplacementBehavior(format);
++    }
++
++    @Override
++    public SubtitleParser create(Format format) {
++        SubtitleParser parser = delegate.create(format);
++        if (delayUs == 0) return parser;
++        return new SubtitleParser() {
++            @Override
++            public void parse(byte[] data, int offset, int length, OutputOptions options,
++                              Consumer<CuesWithTiming> output) {
++                // Seek cutoffs are expressed in the shifted timeline by the extractor.
++                OutputOptions unshifted = options.startTimeUs == C.TIME_UNSET
++                        ? OutputOptions.allCues()
++                        : options.outputAllCues
++                            ? OutputOptions.cuesAfterThenRemainingCuesBefore(options.startTimeUs - delayUs)
++                            : OutputOptions.onlyCuesAfter(options.startTimeUs - delayUs);
++                parser.parse(data, offset, length, unshifted, cues -> {
++                    // TIME_UNSET means sample-relative zero, not an absolute timestamp.
++                    long startUs = cues.startTimeUs == C.TIME_UNSET ? 0 : cues.startTimeUs;
++                    output.accept(new CuesWithTiming(cues.cues, startUs + delayUs, cues.durationUs));
++                });
++            }
++
++            @Override
++            public void reset() {
++                parser.reset();
++            }
++
++            @Override
++            public int getCueReplacementBehavior() {
++                return parser.getCueReplacementBehavior();
++            }
++        };
++    }
++}
+diff --git a/node_modules/react-native-video/src/types/events.ts b/node_modules/react-native-video/src/types/events.ts
+--- a/node_modules/react-native-video/src/types/events.ts
++++ b/node_modules/react-native-video/src/types/events.ts
+@@ -27,6 +27,8 @@
+ export type VideoTrack = OnVideoTracksData['videoTracks'][number];
+ 
+ export type OnLoadData = Readonly<{
++  /** Android: buffered subtitle cues were rebuilt without changing playback state. */
++  subtitleTimingReload?: boolean;
+   currentTime: number;
+   duration: number;
+   naturalSize: Readonly<{
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/SubtitlePrerollExtractorsFactory.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/SubtitlePrerollExtractorsFactory.java
+new file mode 100644
+--- /dev/null
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/SubtitlePrerollExtractorsFactory.java
+@@ -0,0 +1,82 @@
++package com.brentvatne.exoplayer;
++
++import android.net.Uri;
++import androidx.media3.extractor.Extractor;
++import androidx.media3.extractor.ExtractorInput;
++import androidx.media3.extractor.ExtractorOutput;
++import androidx.media3.extractor.ExtractorsFactory;
++import androidx.media3.extractor.PositionHolder;
++import androidx.media3.extractor.SeekMap;
++import androidx.media3.extractor.SeekPoint;
++import androidx.media3.extractor.SniffFailure;
++import androidx.media3.extractor.TrackOutput;
++import java.io.IOException;
++import java.util.List;
++import java.util.Map;
++
++/** Read the earlier subtitle samples after a seek without moving the requested playback time. */
++final class SubtitlePrerollExtractorsFactory implements ExtractorsFactory {
++    private final ExtractorsFactory delegate;
++    private final long prerollUs;
++
++    SubtitlePrerollExtractorsFactory(ExtractorsFactory delegate, long delayMs) {
++        this.delegate = delegate;
++        this.prerollUs = Math.max(0, delayMs) * 1000L;
++    }
++
++    @Override
++    public Extractor[] createExtractors() {
++        return wrap(delegate.createExtractors());
++    }
++
++    @Override
++    public Extractor[] createExtractors(Uri uri, Map<String, List<String>> headers) {
++        return wrap(delegate.createExtractors(uri, headers));
++    }
++
++    private Extractor[] wrap(Extractor[] extractors) {
++        if (prerollUs == 0) return extractors;
++        for (int i = 0; i < extractors.length; i++) {
++            final Extractor extractor = extractors[i];
++            extractors[i] = new Extractor() {
++                @Override public boolean sniff(ExtractorInput input) throws IOException {
++                    return extractor.sniff(input);
++                }
++                @Override public List<SniffFailure> getSniffFailureDetails() {
++                    return extractor.getSniffFailureDetails();
++                }
++                @Override public Extractor getUnderlyingImplementation() {
++                    return extractor.getUnderlyingImplementation();
++                }
++                @Override public void init(ExtractorOutput output) {
++                    extractor.init(new ExtractorOutput() {
++                        @Override public TrackOutput track(int id, int type) {
++                            return output.track(id, type);
++                        }
++                        @Override public void endTracks() {
++                            output.endTracks();
++                        }
++                        @Override public void seekMap(SeekMap map) {
++                            output.seekMap(new SeekMap() {
++                                @Override public boolean isSeekable() { return map.isSeekable(); }
++                                @Override public long getDurationUs() { return map.getDurationUs(); }
++                                @Override public SeekPoints getSeekPoints(long timeUs) {
++                                    SeekPoint earlier = map.getSeekPoints(Math.max(0, timeUs - prerollUs)).first;
++                                    // Sample queues still seek to timeUs. Audio/video before that
++                                    // position are decode-only; delayed text remains available.
++                                    return new SeekPoints(new SeekPoint(timeUs, earlier.position));
++                                }
++                            });
++                        }
++                    });
++                }
++                @Override public int read(ExtractorInput input, PositionHolder holder) throws IOException {
++                    return extractor.read(input, holder);
++                }
++                @Override public void seek(long position, long timeUs) { extractor.seek(position, timeUs); }
++                @Override public void release() { extractor.release(); }
++            };
++        }
++        return extractors;
++    }
++}

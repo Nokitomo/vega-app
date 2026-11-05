@@ -18,6 +18,7 @@ import Video, {
   VideoRef,
 } from 'react-native-video';
 import {useControlTimeout, useJSAnimations, usePanResponders} from './hooks';
+import {usePlaybackPauseState} from './hooks/usePlaybackPauseState';
 import {
   Error,
   Loader,
@@ -104,7 +105,11 @@ const AnimatedVideoPlayer = (
   const _videoRef = useRef<VideoRef>(null);
   const tapActionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [_resizeMode, setResizeMode] = useState<ResizeMode>(ResizeMode.CONTAIN);
-  const [_paused, setPaused] = useState<boolean>(paused);
+  const {
+    paused: _paused,
+    setPaused,
+    receiveNativePaused,
+  } = usePlaybackPauseState(paused, Platform.OS === 'android');
   const [_muted, setMuted] = useState<boolean>(muted);
   const [_volume, setVolume] = useState<number>(volume);
   const [_isFullscreen, setIsFullscreen] = useState<boolean>(
@@ -375,14 +380,18 @@ const AnimatedVideoPlayer = (
   ]);
 
   const _onPlaybackRateChange = useCallback(
-    (playBack: {playbackRate: number}) => {
+    (playBack: {playbackRate: number; isPaused?: boolean}) => {
+      if (Platform.OS === 'android' && typeof playBack.isPaused === 'boolean') {
+        receiveNativePaused(playBack.isPaused);
+        return;
+      }
       if (playBack.playbackRate === 0 && !buffering) {
         setPaused(prev => (prev ? prev : true));
       } else if (playBack.playbackRate > 0) {
         setPaused(prev => (!prev ? prev : false));
       }
     },
-    [buffering],
+    [buffering, receiveNativePaused, setPaused],
   );
 
   const events = useMemo(
@@ -747,7 +756,9 @@ const AnimatedVideoPlayer = (
   // Memoize onBuffer callback
   const onBuffer = useCallback((e: {isBuffering: boolean}) => {
     setBuffering(e.isBuffering);
-    if (!e.isBuffering && !seekingRef.current) {
+    // Android reports the requested pause state separately from buffering.
+    // Preserve the existing iOS behavior.
+    if (Platform.OS !== 'android' && !e.isBuffering && !seekingRef.current) {
       setPaused(false);
     }
   }, []);

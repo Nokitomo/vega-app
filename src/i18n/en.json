@@ -754,5 +754,17 @@
   "addon.direct": "OpenSubtitles API",
   "addon.searchHint": "Check the IMDb ID and episode before searching. Addons use these to identify your video.",
   "addon.imdbLabel": "IMDb ID",
-  "addon.apiOptional": "Optional: only needed for direct OpenSubtitles access. Manage subtitle addons in Providers → Stremio addons."
+  "addon.apiOptional": "Optional: only needed for direct OpenSubtitles access. Manage subtitle addons in Providers → Stremio addons.",
+  "subtitleTimingTitle": "Subtitle synchronization",
+  "subtitleTimingHelp": "Move subtitles earlier if they arrive late, or later if they appear before speech. The adjustment applies to this track and this content.",
+  "subtitleTimingOriginal": "Original timing",
+  "subtitleTimingDelayed": "Delay: {{seconds}} s",
+  "subtitleTimingAdvanced": "Advance: {{seconds}} s",
+  "subtitleTimingSeconds": "Seconds (+ delay, − advance)",
+  "subtitleTimingInvalid": "Enter a number between −600 and 600 seconds.",
+  "subtitleTimingEarlier": "Earlier by {{seconds}} s",
+  "subtitleTimingLater": "Later by {{seconds}} s",
+  "subtitleTimingApply": "Apply",
+  "subtitleTimingReset": "Reset",
+  "subtitleTimingCancel": "Cancel"
 }
