@@ -112,6 +112,8 @@ describe('subtitle timing', () => {
     };
     await press('subtitleTimingLater1');
     await press('subtitleTimingEarlier0,1');
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+    await press('subtitleTimingEditValue');
     expect(tree.root.findByType(TextInput).props.value).toBe('0.9');
     expect(apply).not.toHaveBeenCalled();
     await press('subtitleTimingApply');

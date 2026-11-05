@@ -2,6 +2,10 @@
 
 Nel player, selezionare una traccia e aprire **Sottotitoli → Sincronizzazione sottotitoli**. Anticipa/Ritarda modificano la bozza di 100 ms o 1 secondo. Il campo accetta secondi, punto o virgola decimale e segno: positivo ritarda, negativo anticipa. Il limite è ±600 secondi. **Applica** conferma, **Azzera** applica zero, **Annulla** scarta la bozza.
 
+Il pannello compatto mostra la traccia, il valore centrale e quattro pulsanti (−1 s, −0,1 s, +0,1 s, +1 s). Toccare il valore apre l'inserimento numerico; il pulsante di aiuto espande la spiegazione. Le azioni Annulla/Azzera/Applica restano in una barra separata dallo scorrimento del contenuto. Le regolazioni modificano solo la bozza fino alla conferma, evitando ricaricamenti a ogni pressione.
+
+Verifica UI del 2026-11-06 su Medium_phone_API_35: layout orizzontale standard, aiuto espanso, inserimento manuale −1,5 s, annullamento senza applicazione, incrementi di 100 ms/1 s, applicazione e azzeramento con conservazione di pausa/posizione. Screenshot conservato fuori dalla repo. La prova al 130% non è stata completata perché il cambio di configurazione ha ricreato il dev client; il font scale è stato ripristinato a 1.0.
+
 I valori sono conservati solo nella sessione del player, separati per traccia. Pausa, seek, background e ricreazione del componente video non devono cancellarli. Cambio episodio e uscita dal player li azzerano. Le tracce esterne sono identificate dal loro URI; quelle incorporate dall'identità dello stream e della traccia, mai dalla sola lingua. Non viene scritto alcun offset nelle impostazioni, nei file dei sottotitoli o nella cronologia.
 
 ## Implementazione nativa

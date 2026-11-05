@@ -766,5 +766,8 @@
   "subtitleTimingLater": "Later by {{seconds}} s",
   "subtitleTimingApply": "Apply",
   "subtitleTimingReset": "Reset",
-  "subtitleTimingCancel": "Cancel"
+  "subtitleTimingCancel": "Cancel",
+  "subtitleTimingHelpToggle": "Subtitle timing help",
+  "subtitleTimingEditValue": "Edit subtitle timing",
+  "subtitleTimingEditHint": "Tap to enter a value"
 }

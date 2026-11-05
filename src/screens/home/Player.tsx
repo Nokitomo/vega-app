@@ -3777,6 +3777,14 @@ const Player = ({route}: Props): React.JSX.Element => {
                 <SubtitleTimingEditor
                   key={timingTrackKey}
                   value={subtitleDelayMs}
+                  trackLabel={
+                    mergedTextTracks.find(
+                      track => track.index === selectedTextTrackIndex,
+                    )?.title ||
+                    mergedTextTracks.find(
+                      track => track.index === selectedTextTrackIndex,
+                    )?.language
+                  }
                   accentColor={primary}
                   onApply={applySubtitleTiming}
                   onCancel={() => setSubtitleTimingOpen(false)}

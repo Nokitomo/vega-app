@@ -766,5 +766,8 @@
   "subtitleTimingLater": "Ritarda {{seconds}} s",
   "subtitleTimingApply": "Applica",
   "subtitleTimingReset": "Azzera",
-  "subtitleTimingCancel": "Annulla"
+  "subtitleTimingCancel": "Annulla",
+  "subtitleTimingHelpToggle": "Aiuto sulla sincronizzazione",
+  "subtitleTimingEditValue": "Modifica il tempo dei sottotitoli",
+  "subtitleTimingEditHint": "Tocca per inserire un valore"
 }
