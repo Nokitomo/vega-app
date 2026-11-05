@@ -65,7 +65,12 @@ export const TopControls = memo(
     return (
       <AnimatedView
         pointerEvents={showControls ? 'box-none' : 'none'}
-        style={[_styles.top, controlsOpacity, topControl]}>
+        style={[
+          _styles.top,
+          controlsOpacity,
+          topControl,
+          showControls && _styles.aboveGestures,
+        ]}>
         {/* <ImageBackground
           source={require('../assets/img/top-vignette.png')}
           style={[styles.column]}
@@ -93,6 +98,12 @@ const _styles = StyleSheet.create({
     flex: 1,
     alignItems: 'stretch',
     justifyContent: 'flex-start',
+  },
+  // The gesture surface is rendered later in the player tree. Keep visible
+  // top controls above it so the back button receives touches on Android/iOS.
+  aboveGestures: {
+    zIndex: 1,
+    elevation: 1,
   },
   topControlGroup: {
     alignSelf: 'stretch',

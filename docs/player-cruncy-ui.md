@@ -32,6 +32,9 @@ Intervento del 2 novembre 2026 sul branch `cruncy-ui`.
   Mandare l'app in background mostra la luminosita di sistema; tornando allo
   stesso player resta la scelta precedente. Uscendo dal player viene rimossa
   la modifica temporanea e un nuovo ingresso parte dal valore di sistema.
+- Quando i controlli sono visibili, la fascia superiore resta sopra la
+  superficie dei gesti: il tap sulla freccia indietro raggiunge il pulsante e
+  chiude il player. Con i controlli nascosti la fascia non intercetta i gesti.
 
 ## Verifiche
 
@@ -54,6 +57,11 @@ Intervento del 2 novembre 2026 sul branch `cruncy-ui`.
   ingresso. Il valore di sistema e rimasto invariato durante gli swipe.
 - Evidenze locali non versionate in
   `D:/codex-temp/vega-player-gestures-20261105/`.
+- Il 5 novembre 2026 la freccia indietro e stata provata sullo stesso dev
+  client Android con MP4 locale: prima del fix piu tap lasciavano aperto il
+  player; dopo il fix un tap torna alla schermata precedente, anche dopo un
+  nuovo ingresso. Con i controlli nascosti restano operativi gli swipe per
+  luminosita e volume e il tap riapre i controlli.
 
 ## Limiti
 
