@@ -172,6 +172,31 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      return true;
                  }
              }
+@@ -2123,10 +2156,14 @@
+                 if (textRendererIndex != C.INDEX_UNSET) {
+                     TrackGroupArray groups = info.getTrackGroups(textRendererIndex);
+                     boolean trackFound = false;
++                    // JS indices enumerate all text tracks across all groups, as
++                    // getTextTrackInfo() does. The override still needs the index
++                    // within the matched group.
++                    int flattenedTrackIndex = 0;
+                     
+                     for (int groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+                         TrackGroup group = groups.get(groupIndex);
+-                        for (int trackIndex = 0; trackIndex < group.length; trackIndex++) {
++                        for (int trackIndex = 0; trackIndex < group.length; trackIndex++, flattenedTrackIndex++) {
+                             Format format = group.getFormat(trackIndex);
+                             
+                             boolean isMatch = false;
+@@ -2136,7 +2173,7 @@
+                                 isMatch = true;
+                             } else if ("index".equals(type)) {
+                                 int targetIndex = ReactBridgeUtils.safeParseInt(value, -1);
+-                                if (targetIndex == trackIndex) {
++                                if (targetIndex == flattenedTrackIndex) {
+                                     isMatch = true;
+                                 }
+                             }
 diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
 --- a/node_modules/react-native-video/src/Video.tsx
 +++ b/node_modules/react-native-video/src/Video.tsx
