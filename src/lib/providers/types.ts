@@ -65,6 +65,20 @@ export interface SkipInterval {
 }
 
 // getStream
+export interface StreamDrm {
+  type: 'widevine' | 'playready' | 'clearkey' | 'fairplay';
+  licenseUrl?: string;
+  licenseHeaders?: Record<string, string>;
+  keyRequestParameters?: Record<string, string>;
+  /** ClearKey KID/key pairs: 16-byte hex, UUID (KID), or base64/base64url. */
+  clearKeys?: Array<{kid: string; key: string}>;
+  multiSession?: boolean;
+  /** FairPlay on iOS. */
+  certificateUrl?: string;
+  contentId?: string;
+  base64Certificate?: boolean;
+}
+
 export interface Stream {
   server: string;
   link: string;
@@ -72,6 +86,7 @@ export interface Stream {
   quality?: '360' | '480' | '720' | '1080' | '2160';
   subtitles?: TextTracks;
   headers?: any;
+  drm?: StreamDrm;
 }
 
 // getInfo

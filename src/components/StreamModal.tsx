@@ -1,3 +1,4 @@
+import {DRM_PLAYER_ONLY} from '../lib/utils/streamDrm';
 import {View, Text, ToastAndroid, Clipboard} from 'react-native';
 import React from 'react';
 import {Modal, TouchableOpacity} from 'react-native';
@@ -17,7 +18,7 @@ const StreamModal = ({
 }: {
   downloadModal: boolean;
   setDownloadModal: (value: boolean) => void;
-  servers: Array<{server: string; link: string}>;
+  servers: Array<{server: string; link: string; drm?: unknown}>;
   serverLoading: boolean;
   downloadFile: (link: string) => void;
 }) => {
@@ -36,6 +37,10 @@ const StreamModal = ({
                   <TouchableOpacity
                     key={server.server + index}
                     onPress={() => {
+                      if (server.drm) {
+                        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+                        return;
+                      }
                       setDownloadModal(false);
                       downloadFile(server.link);
                     }}

@@ -68,6 +68,7 @@ Vega e una app Android e iOS per lo streaming di contenuti multimediali. La UI e
 - Per AnimeUnity, il pulsante "Skip Intro" appare quando AniSkip fornisce un intervallo OP/mixed-op e permette di saltare l'intro. I pulsanti che saltano a un altro punto del video mantengono la visibilita corrente dei controlli del player: se erano nascosti, il salto non li mostra.
 - Su Android, gli stream torrent attendono il primo pezzo video prima di avviare il player. Durante l'attesa mostrano stato e velocita del download; il controllo di avvio tiene conto dei byte scaricati e ha un limite massimo, mentre gli errori temporanei del server torrent locale vengono ritentati prima di passare a un'altra sorgente. I magnet senza tracker ricevono tracker pubblici di fallback per recuperare i metadati.
 - Su Android e disponibile l'apertura in player esterno (es. VLC).
+- Il player integra DRM opzionale fornito dai provider: Widevine, PlayReady e ClearKey su Android, con percorso FairPlay separato per iOS. Contratto, compatibilita e limiti sono descritti in [DRM nel player](player-drm.md).
 - Su Android e disponibile il cast nativo Google Cast (default) dal player e dalla selezione server.
 - Il cast nativo usa una queue episodi (quando disponibile) e prova a mantenere il tracking progresso su cronologia/cache anche durante la riproduzione remota.
 - E disponibile anche `Vega Cast (LAN/Web)`: l'app genera una sessione web con codice pairing (one-time) per il receiver (`vega-cast-receiver`) utilizzabile da browser TV/PC sulla stessa rete.

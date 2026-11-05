@@ -1,0 +1,145 @@
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
+index 0c495e1..c76a14b 100644
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/DRMProps.kt
+@@ -25,6 +25,8 @@ class DRMProps {
+      * DRM license server to be used
+      */
+     var drmLicenseServer: String? = null
++    var clearKeyResponse: String? = null
++    var keyRequestParameters: HashMap<String, String> = hashMapOf()
+ 
+     /**
+      * DRM Http Header to access to license server
+@@ -41,6 +43,8 @@ class DRMProps {
+         if (other == null || other !is DRMProps) return false
+         return drmType == other.drmType &&
+             drmLicenseServer == other.drmLicenseServer &&
++            clearKeyResponse == other.clearKeyResponse &&
++            keyRequestParameters == other.keyRequestParameters &&
+             multiDrm == other.multiDrm &&
+             drmLicenseHeader.contentDeepEquals(other.drmLicenseHeader) // drmLicenseHeader is never null
+     }
+@@ -61,9 +65,20 @@ class DRMProps {
+                 drm = DRMProps()
+                 drm.drmType = safeGetString(src, PROP_DRM_TYPE)
+                 drm.drmLicenseServer = safeGetString(src, PROP_DRM_LICENSE_SERVER)
++                drm.clearKeyResponse = safeGetString(src, "clearKeyResponse")
++                val parameters = safeGetArray(src, "keyRequestParameters")
++                if (parameters != null) {
++                    for (i in 0 until parameters.size()) {
++                        val entry = parameters.getMap(i)
++                        val key = safeGetString(entry, "key")
++                        val value = safeGetString(entry, "value")
++                        if (key != null && value != null) drm.keyRequestParameters[key] = value
++                    }
++                }
+                 drm.multiDrm = safeGetBool(src, PROP_DRM_MULTI_DRM, false)
+                 val drmHeadersArray = safeGetArray(src, PROP_DRM_HEADERS)
+-                if (drm.drmType != null && drm.drmLicenseServer != null) {
++                if (drm.drmType != null && (drm.drmLicenseServer != null ||
++                    (drm.drmType == "clearkey" && drm.clearKeyResponse != null))) {
+                     if (drmHeadersArray != null) {
+                         val drmKeyRequestPropertiesList = ArrayList<String?>()
+                         for (i in 0 until drmHeadersArray.size()) {
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
+index 462f47a..4bc37e0 100644
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/DRMManager.kt
+@@ -1,5 +1,8 @@
+ package com.brentvatne.exoplayer
+ 
++import androidx.media3.common.C
++import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
++import androidx.media3.exoplayer.drm.MediaDrmCallback
+ import androidx.media3.common.util.Util
+ import androidx.media3.datasource.HttpDataSource
+ import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
+@@ -23,12 +26,20 @@ class DRMManager(private val dataSourceFactory: HttpDataSource.Factory) : DRMMan
+         }
+ 
+         try {
+-            val drmCallback = HttpMediaDrmCallback(drmProps.drmLicenseServer, dataSourceFactory)
++            val localKeys = drmProps.clearKeyResponse
++            val drmCallback: MediaDrmCallback = if (localKeys != null) {
++                require(uuid == C.CLEARKEY_UUID && localKeys.length <= 32768) { "Invalid local DRM configuration" }
++                LocalMediaDrmCallback(localKeys.toByteArray(Charsets.UTF_8))
++            } else {
++                HttpMediaDrmCallback(drmProps.drmLicenseServer, dataSourceFactory)
++            }
+ 
+             // Set DRM headers
+             val keyRequestPropertiesArray = drmProps.drmLicenseHeader
+             for (i in keyRequestPropertiesArray.indices step 2) {
+-                drmCallback.setKeyRequestProperty(keyRequestPropertiesArray[i], keyRequestPropertiesArray[i + 1])
++                if (drmCallback is HttpMediaDrmCallback) {
++                    drmCallback.setKeyRequestProperty(keyRequestPropertiesArray[i], keyRequestPropertiesArray[i + 1])
++                }
+             }
+ 
+             val mediaDrm = FrameworkMediaDrm.newInstance(uuid)
+@@ -41,7 +52,8 @@ class DRMManager(private val dataSourceFactory: HttpDataSource.Factory) : DRMMan
+ 
+             return DefaultDrmSessionManager.Builder()
+                 .setUuidAndExoMediaDrmProvider(uuid) { mediaDrm }
+-                .setKeyRequestParameters(null)
++                .setKeyRequestParameters(drmProps.keyRequestParameters)
++                .setPlayClearSamplesWithoutKeys(true)
+                 .setMultiSession(drmProps.multiDrm)
+                 .build(drmCallback)
+         } catch (ex: UnsupportedDrmException) {
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
+index 539ecfd..d92632b 100644
+--- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
+@@ -809,7 +809,10 @@ public class ReactExoplayerView extends FrameLayout implements
+             DRMManagerSpec drmManager = ReactNativeVideoManager.Companion.getInstance().getDRMManager();
+             if (drmManager == null) {
+                 // If no custom manager is registered, use the default implementation
+-                drmManager = new DRMManager(buildHttpDataSourceFactory(false));
++                // License credentials must not inherit media request headers.
++                // The RN client retains the app's networking/DNS configuration.
++                drmManager = new DRMManager(new androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
++                        com.facebook.react.modules.network.OkHttpClientProvider.getOkHttpClient()));
+             }
+ 
+             DrmSessionManager drmSessionManager = drmManager.buildDrmSessionManager(uuid, drmProps);
+diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
+index 6d39f24..ded4a10 100644
+--- a/node_modules/react-native-video/src/Video.tsx
++++ b/node_modules/react-native-video/src/Video.tsx
+@@ -184,6 +184,8 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
+           : {
+               type: selectedDrm.type,
+               licenseServer: selectedDrm.licenseServer,
++              clearKeyResponse: selectedDrm.clearKeyResponse,
++              keyRequestParameters: generateHeaderForNative(selectedDrm.keyRequestParameters),
+               headers: generateHeaderForNative(selectedDrm.headers),
+               contentId: selectedDrm.contentId,
+               certificateUrl: selectedDrm.certificateUrl,
+diff --git a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
+index ea033f1..c0bfafc 100644
+--- a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
++++ b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
+@@ -65,6 +65,8 @@ type DebugConfig = Readonly<{
+ type Drm = Readonly<{
+   type?: DRMType;
+   licenseServer?: string;
++  clearKeyResponse?: string; // Android: temporary local ClearKey JWK set
++  keyRequestParameters?: Headers; // Android MediaDrm parameters, not HTTP headers
+   headers?: Headers;
+   contentId?: string; // ios
+   certificateUrl?: string; // ios
+diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/react-native-video/src/types/video.ts
+index 82861bd..672740d 100644
+--- a/node_modules/react-native-video/src/types/video.ts
++++ b/node_modules/react-native-video/src/types/video.ts
+@@ -85,6 +85,8 @@ export type AdConfig = Readonly<{
+ export type Drm = Readonly<{
+   type?: DRMType;
+   licenseServer?: string;
++  clearKeyResponse?: string; // Android: temporary local ClearKey JWK set
++  keyRequestParameters?: Headers; // Android MediaDrm parameters, not HTTP headers
+   headers?: Headers;
+   contentId?: string; // ios
+   certificateUrl?: string; // ios

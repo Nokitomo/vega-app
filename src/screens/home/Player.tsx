@@ -37,6 +37,14 @@ import {
 } from '../../lib/storage';
 import VideoPlayer from '../../vendor/media-console';
 import {
+  getPlayerDrm,
+  getStreamVideoType,
+  DRM_START_TIMEOUT_MS,
+  DRM_INVALID,
+  DRM_PLAYER_ONLY,
+  type PlayerDrm,
+} from '../../lib/utils/streamDrm';
+import {
   useFocusEffect,
   useIsFocused,
   useNavigation,
@@ -101,7 +109,7 @@ import {
   VegaCastTracking,
 } from '../../lib/cast/vegaCast';
 import {setClipboardString} from '../../lib/utils/clipboard';
-import {EpisodeLink, Link} from '../../lib/providers/types';
+import {EpisodeLink, Link, Stream} from '../../lib/providers/types';
 import {
   resolveProviderCardTitle,
   shouldResolveProviderCardTitle,
@@ -299,7 +307,16 @@ const Player = ({route}: Props): React.JSX.Element => {
     routeParams: route.params,
     provider: provider.value,
   });
-  const [processedStreamUrl, setProcessedStreamUrl] = useState('');
+  const [resolvedPlayback, setResolvedPlayback] = useState<{
+    stream: Stream;
+    url: string;
+    drm?: PlayerDrm;
+  } | null>(null);
+  // Never pair a previous URL/license with a newly selected stream's format/headers.
+  const playback =
+    resolvedPlayback?.stream === selectedStream ? resolvedPlayback : null;
+  const processedStreamUrl = playback?.url || '';
+  const processedDrm = playback?.drm;
   const [isResolvingStream, setIsResolvingStream] = useState(false);
   const [torrentState, setTorrentState] = useState('');
   const [torrentDownloaded, setTorrentDownloaded] = useState(0);
@@ -369,8 +386,31 @@ const Player = ({route}: Props): React.JSX.Element => {
       await stopCurrentTorrent();
       torrentDownloadedBytesRef.current = 0;
       if (!active || !selectedStream?.link) {
-        setProcessedStreamUrl('');
+        setResolvedPlayback(null);
         setIsResolvingStream(false);
+        return;
+      }
+
+      let drm: PlayerDrm | undefined;
+      try {
+        drm = getPlayerDrm(selectedStream.drm, Platform.OS);
+        if (
+          drm &&
+          (selectedStream.type === 'torrent' ||
+            selectedStream.link.startsWith('magnet:'))
+        ) {
+          throw new Error(DRM_INVALID);
+        }
+      } catch (error) {
+        setResolvedPlayback(null);
+        setIsResolvingStream(false);
+        ToastAndroid.show(
+          t(error instanceof Error ? error.message : DRM_INVALID),
+          ToastAndroid.SHORT,
+        );
+        if (!switchToNextStream()) {
+          navigation.goBack();
+        }
         return;
       }
 
@@ -378,12 +418,16 @@ const Player = ({route}: Props): React.JSX.Element => {
         selectedStream.type === 'torrent' ||
         selectedStream.link.startsWith('magnet:');
       if (!isTorrent) {
-        setProcessedStreamUrl(selectedStream.link);
+        setResolvedPlayback({
+          stream: selectedStream,
+          url: selectedStream.link,
+          drm,
+        });
         setIsResolvingStream(false);
         return;
       }
 
-      setProcessedStreamUrl('');
+      setResolvedPlayback(null);
       setIsResolvingStream(true);
       setTorrentState(t('Fetching torrent metadata...'));
       setTorrentDownloaded(0);
@@ -423,7 +467,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           fileIndex,
         );
         if (active) {
-          setProcessedStreamUrl(streamUrl);
+          setResolvedPlayback({stream: selectedStream, url: streamUrl});
           setIsResolvingStream(false);
         }
       } catch (torrentError) {
@@ -1488,7 +1532,11 @@ const Player = ({route}: Props): React.JSX.Element => {
       };
       streamStartupTimeoutRef.current = setTimeout(
         checkStartup,
-        isTorrent ? TORRENT_START_CHECK_INTERVAL_MS : STREAM_START_TIMEOUT_MS,
+        isTorrent
+          ? TORRENT_START_CHECK_INTERVAL_MS
+          : selectedStream.drm
+            ? DRM_START_TIMEOUT_MS
+            : STREAM_START_TIMEOUT_MS,
       );
     },
     [
@@ -1497,6 +1545,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       handleStartupTimeoutFallback,
       isPreparingPlayer,
       selectedStream?.link,
+      selectedStream?.drm,
       selectedStream?.server,
       videoReloadNonce,
     ],
@@ -1537,7 +1586,10 @@ const Player = ({route}: Props): React.JSX.Element => {
   // Memoized error handler
   const handleVideoError = useCallback(
     async (e: any) => {
-      console.log('PlayerError', e);
+      // DRM errors can contain license URLs or credentials; keep them out of logs.
+      if (!selectedStream?.drm) {
+        console.log('PlayerError', e);
+      }
       clearStreamStartupGuard();
       const isTorrent =
         selectedStream?.type === 'torrent' ||
@@ -1557,7 +1609,12 @@ const Player = ({route}: Props): React.JSX.Element => {
           return;
         }
       }
-      if (!isTorrent && shouldRefetchStream(e) && activeEpisode?.link) {
+      if (
+        !isTorrent &&
+        !selectedStream?.drm &&
+        shouldRefetchStream(e) &&
+        activeEpisode?.link
+      ) {
         const now = Date.now();
         const retryKey = `${activeEpisode.link}|${selectedStream?.server || ''}`;
         const retryState = streamRetryRef.current;
@@ -1587,6 +1644,12 @@ const Player = ({route}: Props): React.JSX.Element => {
           }
         }
       }
+      if (selectedStream?.drm) {
+        ToastAndroid.show(
+          t('Unable to play this protected stream'),
+          ToastAndroid.SHORT,
+        );
+      }
       if (!switchToNextStream()) {
         ToastAndroid.show(
           t('Video could not be played, try again later'),
@@ -1603,6 +1666,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       navigation,
       refetch,
       selectedStream?.server,
+      selectedStream?.drm,
       setSelectedStream,
       setShowControls,
       shouldRefetchStream,
@@ -1695,6 +1759,10 @@ const Player = ({route}: Props): React.JSX.Element => {
   }, [t]);
 
   const handleWebVideoCasterCast = useCallback(async () => {
+    if (selectedStream?.drm) {
+      ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+      return;
+    }
     if (!selectedStream?.link) {
       ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
       return;
@@ -1753,10 +1821,15 @@ const Player = ({route}: Props): React.JSX.Element => {
     resolvedPrimaryTitle,
     selectedStream?.headers,
     selectedStream?.link,
+    selectedStream?.drm,
     t,
   ]);
 
   const handleVegaCast = useCallback(async () => {
+    if (selectedStream?.drm) {
+      ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+      return;
+    }
     if (!selectedStream?.link) {
       ToastAndroid.show(t('No stream available for cast'), ToastAndroid.SHORT);
       return;
@@ -2335,6 +2408,10 @@ const Player = ({route}: Props): React.JSX.Element => {
   ]);
 
   const handleCastPress = useCallback(async () => {
+    if (selectedStream?.drm) {
+      ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+      return;
+    }
     if (castProvider === 'vega') {
       await handleVegaCast();
       return;
@@ -2349,6 +2426,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     handleNativeCast,
     handleVegaCast,
     handleWebVideoCasterCast,
+    selectedStream?.drm,
+    t,
   ]);
 
   useEffect(() => {
@@ -3002,9 +3081,10 @@ const Player = ({route}: Props): React.JSX.Element => {
         textTracks: externalSubs,
         uri: processedStreamUrl,
         bufferConfig: {backBufferDurationMs: 30000},
-        shouldCache: true,
-        ...(selectedStream?.type === 'm3u8' && {type: 'm3u8'}),
-        headers: selectedStream?.headers,
+        shouldCache: !processedDrm,
+        type: playback ? getStreamVideoType(playback.stream) : undefined,
+        drm: processedDrm,
+        headers: playback?.stream.headers,
         metadata: {
           title: resolvedPrimaryTitle,
           subtitle: activeEpisode?.title,
@@ -3112,6 +3192,8 @@ const Player = ({route}: Props): React.JSX.Element => {
       enable2xGesture,
       hideSeekButtons,
       externalSubs,
+      processedDrm,
+      playback,
       selectedStream,
       processedStreamUrl,
       route.params,

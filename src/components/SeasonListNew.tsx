@@ -1,3 +1,4 @@
+import {DRM_PLAYER_ONLY} from '../lib/utils/streamDrm';
 import React, {useState, useMemo, useCallback, useEffect} from 'react';
 import {
   View,
@@ -1210,7 +1211,13 @@ const SeasonList: React.FC<SeasonListProps> = ({
         key={`server-${index}-${item.server}`}
         className="bg-black/30 p-3 rounded-lg mb-2 flex-row justify-between items-center"
         style={{borderColor: primary, borderWidth: 1}}
-        onPress={() => openExternalPlayer(item.link)}>
+        onPress={() => {
+          if (item.drm) {
+            ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+            return;
+          }
+          openExternalPlayer(item.link);
+        }}>
         <View>
           <Text className="text-white text-lg capitalize font-bold">
             {item.server || t('Server {{number}}', {number: index + 1})}

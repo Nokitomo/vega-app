@@ -52,6 +52,7 @@ type GesturesProps = {
   setControlTimeout: () => void;
   zoomScale: SharedValue<number>;
   zoomStartScale: SharedValue<number>;
+  enablePinch?: boolean;
   onSkipFeedback?: (side: 'left' | 'right', totalTime: number) => void;
 };
 
@@ -333,6 +334,7 @@ const Gestures = ({
   setControlTimeout,
   zoomScale,
   zoomStartScale,
+  enablePinch = true,
   onSkipFeedback,
 }: GesturesProps) => {
   const baseRateRef = useRef(baseRate);
@@ -937,7 +939,7 @@ const Gestures = ({
   const pinchGesture = useMemo(
     () =>
       Gesture.Pinch()
-        .enabled(true)
+        .enabled(enablePinch)
         .shouldCancelWhenOutside(false)
         .onStart(() => {
           'worklet';
@@ -955,7 +957,7 @@ const Gestures = ({
           zoomStartScale.value = zoomScale.value;
           runOnJS(setControlTimeout)();
         }),
-    [clearControlTimeout, setControlTimeout, zoomScale, zoomStartScale],
+    [clearControlTimeout, enablePinch, setControlTimeout, zoomScale, zoomStartScale],
   );
 
   const tapGesture = useMemo(

@@ -140,9 +140,12 @@ const AnimatedVideoPlayer = (
   );
   const zoomScale = useSharedValue(1);
   const zoomStartScale = useSharedValue(1);
+  const protectedAndroidVideo =
+    Platform.OS === 'android' &&
+    !!(props.drm || (typeof source === 'object' && source?.drm));
 
   const zoomAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{scale: zoomScale.value}],
+    transform: [{scale: protectedAndroidVideo ? 1 : zoomScale.value}],
   }));
 
   const videoRef = props.videoRef || _videoRef;
@@ -825,8 +828,11 @@ const AnimatedVideoPlayer = (
             // not follow React Native transforms. Pinch zoom therefore needs
             // TextureView, which remains part of the normal view hierarchy.
             useTextureView={
-              Platform.OS === 'android' ? true : props.useTextureView
+              Platform.OS === 'android'
+                ? !protectedAndroidVideo
+                : props.useTextureView
             }
+            useSecureView={protectedAndroidVideo || props.useSecureView}
           />
         </Animated.View>
         {
@@ -886,6 +892,7 @@ const AnimatedVideoPlayer = (
                   setControlTimeout={setControlTimeout}
                   zoomScale={zoomScale}
                   zoomStartScale={zoomStartScale}
+                  enablePinch={!protectedAndroidVideo}
                   onSkipFeedback={handleSkipFeedback}
                 />
                 <BottomControls

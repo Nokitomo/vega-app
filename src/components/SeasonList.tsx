@@ -1,3 +1,4 @@
+import {DRM_PLAYER_ONLY} from '../lib/utils/streamDrm';
 import React, {useState, useMemo, useCallback, useEffect, useRef} from 'react';
 import {
   View,
@@ -1288,9 +1289,14 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const openWebVideoCaster = useCallback(
     async (stream: {
       link?: string;
+      drm?: unknown;
       headers?: Record<string, string>;
       subtitles?: Array<{uri?: string; title?: string}>;
     }) => {
+      if ('drm' in stream && stream.drm) {
+        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+        return;
+      }
       const streamUrl = stream?.link;
       if (!streamUrl) {
         ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
@@ -1349,6 +1355,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const openExternalPlayer = useCallback(
     async (stream: any) => {
+      if (stream?.drm) {
+        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+        return;
+      }
       if (!stream?.link) {
         ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
         return;
@@ -1382,6 +1392,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const openVegaCast = useCallback(
     async (stream: any) => {
+      if (stream?.drm) {
+        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+        return;
+      }
       if (!stream?.link) {
         ToastAndroid.show(t('No stream available'), ToastAndroid.SHORT);
         return;
@@ -1555,6 +1569,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const startNativeCastForStream = useCallback(
     async (stream: any) => {
+      if (stream?.drm) {
+        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+        return;
+      }
       if (!remoteMediaClient || !stream?.link || isStartingNativeCast) {
         return false;
       }
@@ -1658,6 +1676,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
 
   const openCastForStream = useCallback(
     async (stream: any) => {
+      if (stream?.drm) {
+        ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+        return;
+      }
       if (castProvider === 'vega') {
         await openVegaCast(stream);
         return;

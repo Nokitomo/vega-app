@@ -1,3 +1,4 @@
+import {DRM_PLAYER_ONLY} from '../lib/utils/streamDrm';
 import React, {useEffect, useLayoutEffect, useMemo, useState} from 'react';
 import {
   View,
@@ -268,6 +269,10 @@ const DownloadComponent = ({
           error={serverError}
           title={t('Select server to download')}
           onPressVideo={(server: Stream) => {
+            if (server.drm) {
+              ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+              return;
+            }
             const serverName = (server.server || '').toLowerCase();
             if (
               effectiveProviderValue === 'animeunity' &&
@@ -316,6 +321,10 @@ const DownloadComponent = ({
           error={serverError}
           title={t('Select server to open')}
           onPressVideo={(server: Stream) => {
+            if (server.drm) {
+              ToastAndroid.show(t(DRM_PLAYER_ONLY), ToastAndroid.SHORT);
+              return;
+            }
             longPressDownload(server.link);
           }}
           onPressSubs={(sub: {link: string; type: string; title: string}) => {

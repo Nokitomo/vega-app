@@ -711,5 +711,9 @@
   "Remove recent search: {{query}}": "Remove recent search: {{query}}",
   "Search all installed providers": "Search all installed providers",
   "No installed providers to search": "No installed providers to search",
-  "Back": "Back"
+  "Back": "Back",
+  "Invalid DRM configuration": "Invalid DRM configuration",
+  "This DRM is not supported on this device": "This DRM is not supported on this device",
+  "Protected streams can only be played in the app": "Protected streams can only be played in the app",
+  "Unable to play this protected stream": "Unable to play this protected stream"
 }

@@ -711,5 +711,9 @@
   "Remove recent search: {{query}}": "Rimuovi ricerca recente: {{query}}",
   "Search all installed providers": "Cerca in tutti i provider installati",
   "No installed providers to search": "Nessun provider installato in cui cercare",
-  "Back": "Indietro"
+  "Back": "Indietro",
+  "Invalid DRM configuration": "Configurazione DRM non valida",
+  "This DRM is not supported on this device": "Questo DRM non è supportato su questo dispositivo",
+  "Protected streams can only be played in the app": "Gli stream protetti possono essere riprodotti solo nell’app",
+  "Unable to play this protected stream": "Impossibile riprodurre questo stream protetto"
 }

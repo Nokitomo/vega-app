@@ -1,3 +1,4 @@
+import {assertUnprotectedStream} from '../utils/streamDrm';
 import type {
   MediaLoadRequest,
   MediaQueueItem,
@@ -257,7 +258,9 @@ const pickBestStream = (
   streams: Stream[],
   preferredServer?: string,
 ): Stream | null => {
-  const candidates = streams.filter(stream => isHttpUrl(stream?.link));
+  const candidates = streams.filter(
+    stream => !stream.drm && isHttpUrl(stream?.link),
+  );
   if (candidates.length === 0) {
     return null;
   }
@@ -344,6 +347,7 @@ export const prepareNativeCastQueue = async ({
   request: MediaLoadRequest;
   itemCount: number;
 }> => {
+  assertUnprotectedStream(selectedStream);
   if (!isHttpUrl(selectedStream?.link)) {
     throw new Error('NO_STREAM_FOR_CAST');
   }
