@@ -1247,12 +1247,10 @@ const Player = ({route}: Props): React.JSX.Element => {
       return;
     }
     playerRef?.current?.seek(stamp.endTime);
-    setShowControls(true);
   }, [
     canAdvanceFromSkip,
     episodeDuration,
     handleNextEpisode,
-    setShowControls,
     videoPositionRef,
     videoSkipStamps,
   ]);
