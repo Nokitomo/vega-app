@@ -9,6 +9,8 @@ interface EpisodeMetadataProps {
   fillerLabel?: string;
   synopsis?: string;
   thumbnail?: string;
+  fallbackThumbnail?: string;
+  reserveThumbnail?: boolean;
   accentColor: string;
 }
 
@@ -23,9 +25,11 @@ const EpisodeMetadata = ({
   fillerLabel,
   synopsis,
   thumbnail,
+  fallbackThumbnail,
+  reserveThumbnail = false,
   accentColor,
 }: EpisodeMetadataProps): React.JSX.Element => {
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const [failedThumbnails, setFailedThumbnails] = useState<string[]>([]);
   const normalizedThumbnail = useMemo(
     () => normalizeOptionalText(thumbnail),
     [thumbnail],
@@ -41,21 +45,23 @@ const EpisodeMetadata = ({
   );
 
   useEffect(() => {
-    setThumbnailFailed(false);
-  }, [normalizedThumbnail]);
+    setFailedThumbnails([]);
+  }, [normalizedThumbnail, fallbackThumbnail]);
 
-  const showThumbnail = !!normalizedThumbnail && !thumbnailFailed;
+  const displayedThumbnail = [normalizedThumbnail, normalizeOptionalText(fallbackThumbnail)]
+    .find(uri => uri && !failedThumbnails.includes(uri));
+  const showThumbnail = !!displayedThumbnail;
 
   return (
     <>
-      {showThumbnail ? (
-        <View style={{position: 'relative', width: '44%', maxWidth: 160, aspectRatio: 16 / 9, overflow: 'hidden', alignSelf: 'flex-start'}}>
-          <Image
-            source={{uri: normalizedThumbnail}}
+      {showThumbnail || reserveThumbnail ? (
+        <View style={{position: 'relative', width: '44%', maxWidth: 160, aspectRatio: 16 / 9, overflow: 'hidden', alignSelf: 'flex-start', backgroundColor: '#23252b'}}>
+          {showThumbnail && <Image
+            source={{uri: displayedThumbnail}}
             className="h-full w-full"
             resizeMode="cover"
-            onError={() => setThumbnailFailed(true)}
-          />
+            onError={() => {if (displayedThumbnail) {setFailedThumbnails(previous => [...previous, displayedThumbnail]);}}}
+          />}
           <View style={{position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)'}}>
             <Ionicons name="play-circle" size={30} color={accentColor} />
           </View>

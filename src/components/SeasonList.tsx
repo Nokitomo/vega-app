@@ -99,6 +99,7 @@ import {setClipboardString} from '../lib/utils/clipboard';
 import {buildProviderCacheKey} from '../lib/utils/providerCacheScope';
 import {hasStreamRequestHeaders} from '../lib/utils/streamHeaders';
 import EpisodeMetadata from './EpisodeMetadata';
+import {resolveInfoPlaybackIndex} from '../lib/utils/infoPlaybackTarget';
 import {infoCtaKey} from '../lib/utils/infoCta';
 import {getFillerEpisodes} from '../lib/services/fillerDatabase';
 import {readMetadata, writeMetadata} from '../lib/storage/MetadataDatabase';
@@ -122,6 +123,7 @@ export interface InfoPlaybackAction {
 
 interface SeasonListProps {
   tabletColumns?: number;
+  movieBackground?: string;
   playbackActionRef?: React.MutableRefObject<(() => void) | null>;
   onPlaybackActionChange?: (action: InfoPlaybackAction | null) => void;
   LinkList: Link[];
@@ -413,6 +415,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   contentIds,
   refreshing: _refreshing,
   refreshVersion = 0,
+  movieBackground,
   playbackActionRef,
   tabletColumns = 1,
   onPlaybackActionChange,
@@ -2423,40 +2426,8 @@ const SeasonList: React.FC<SeasonListProps> = ({
   }, [getPlayableList, stickyMenu.link, stickyMenu.type, handleExternalPlayer]);
 
   const resolveEpisodeIndex = useCallback(
-    (list: PlayableItem[], target: PendingPlay) => {
-      if (target.episodeLink) {
-        const byLink = list.findIndex(item => item.link === target.episodeLink);
-        if (byLink >= 0) {
-          return byLink;
-        }
-      }
-
-      if (target.episodeTitle) {
-        const normalizedTitle = normalizeTitle(target.episodeTitle);
-        if (normalizedTitle) {
-          const byTitle = list.findIndex(
-            item => normalizeTitle(item.title) === normalizedTitle,
-          );
-          if (byTitle >= 0) {
-            return byTitle;
-          }
-        }
-      }
-
-      if (target.episodeNumber != null) {
-        const byNumber = list.findIndex(
-          item =>
-            (normalizeNumericValue(item.episodeNumber) ??
-              getEpisodeNumber(item.title)) === target.episodeNumber,
-        );
-        if (byNumber >= 0) {
-          return byNumber;
-        }
-      }
-
-      return -1;
-    },
-    [],
+    (list: PlayableItem[], target: PendingPlay) => resolveInfoPlaybackIndex(list, target, type),
+    [type],
   );
 
   const prefetchEpisodesForLink = useCallback(
@@ -2807,8 +2778,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
                 title={episodeTitle}
                 label={metadataLabel}
                 fillerLabel={isFiller ? t('Filler') : undefined}
-                synopsis={item.synopsis}
+                synopsis={item.synopsis || (type === 'movie' ? contentInfo?.synopsis : undefined)}
                 thumbnail={item.thumbnail}
+                fallbackThumbnail={type === 'movie' ? movieBackground : undefined}
+                reserveThumbnail={type === 'movie'}
                 accentColor={primary}
               />
               {episodeProgressMap[item.link] ? (
@@ -2859,6 +2832,9 @@ const SeasonList: React.FC<SeasonListProps> = ({
       stickyMenu.link,
       playHandler,
       metaTitle,
+      type,
+      movieBackground,
+      contentInfo?.synopsis,
       activeSeason?.title,
       activeSeason?.episodesLink,
       activeSeasonNumber,
@@ -2923,6 +2899,11 @@ const SeasonList: React.FC<SeasonListProps> = ({
               onLongPress={() =>
                 onLongPressHandler(true, item.link, item?.type || 'series')
               }>
+              {type === 'movie' ? (
+                <EpisodeMetadata title={metaTitle} label={normalizedDirectLinks.length > 1 ? directDisplayTitle : undefined} synopsis={contentInfo?.synopsis}
+                  thumbnail={item.thumbnail} fallbackThumbnail={movieBackground}
+                  reserveThumbnail accentColor={primary} />
+              ) : (<>
               <View className="w-8 items-center justify-center">
                 <Ionicons name="play-circle" size={28} color={primary} />
               </View>
@@ -2942,6 +2923,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
                     : directDisplayTitle
                   : t('Play')}
               </Text>
+              </>)}
               {episodeProgressMap[item.link] ? (
                 <View
                   className="absolute bottom-0 left-0 right-0 h-1"
@@ -2990,11 +2972,15 @@ const SeasonList: React.FC<SeasonListProps> = ({
       stickyMenu.link,
       playHandler,
       metaTitle,
+      type,
+      movieBackground,
+      contentInfo?.synopsis,
       activeSeason?.title,
       activeSeason?.episodesLink,
       activeSeason?.directLinks,
       activeSeasonNumber,
       filteredAndSortedDirectLinks,
+      normalizedDirectLinks.length,
       onLongPressHandler,
       primary,
       episodeProgressMap,
@@ -3127,7 +3113,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       {/* Season Selector */}
       {LinkList.length > 1 ? (
         <InfoSeasonPicker items={linkListWithDisplayTitle} selected={activeSeasonValue} onSelect={handleSeasonChange} />
-      ) : (
+      ) : type === 'movie' ? null : (
         <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 18, paddingVertical: 16}}>
           {resolveTitle(LinkList[0]) || t('Unknown Season')}
         </Text>

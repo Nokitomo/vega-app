@@ -245,3 +245,41 @@ Info e il cambio scheda su smartphone e tablet nei due orientamenti.
 TypeScript (`npx tsc --noEmit`) e lint superati senza diagnostiche.
 Suite automatica completa: 70 suite e 326 test superati, incluso il controllo
 di conservazione dello stato e della CTA durante le rotazioni del layout Info.
+
+## Riproduzione e card dei film (6 novembre 2026)
+
+La CTA fissa risolve anche i film con un solo link diretto senza numero episodio
+(per esempio StreamingUnity). Prima cercava implicitamente l'episodio 1 e non
+trovava il link intitolato `Play`. Restano prioritarie le corrispondenze per link,
+titolo e numero; il recupero dell'unico elemento valido si applica solo ai film.
+Non viene scelto arbitrariamente un elemento tra piu parti e le serie mantengono
+il comportamento precedente.
+
+I film con link diretti mostrano una card con immagine, titolo e sinossi al posto
+della riga testuale Riproduci. Resta cliccabile, con download e menu invariati.
+Le card dei film con episodi conservano i metadati dedicati. In assenza di
+thumbnail, o se non si carica, viene usato il background effettivamente mostrato
+in Info; se anche questo fallisce rimane un riquadro 16:9 con icona Play.
+Non cambiano le preferenze dei servizi/lingue, gli identificativi dei contenuti,
+i dati inviati al player o i criteri di scelta delle immagini nella scheda Info.
+La singola sezione di un film non ripete piu il titolo generico Riproduci.
+
+Controlli automatici: TypeScript e lint senza diagnostiche; suite completa,
+77 suite e 372 test superati. Copertura dedicata per film senza numero,
+film anime numerati, precedenza della ripresa, film multipart e serie, oltre
+al fallback delle immagini e alla conservazione del layout in caso di errore.
+
+Dev client Android su Medium_phone_API_35: verificati la nuova card su
+Inception e Cunk on Life, l'apertura del player dalla CTA fissa (anche su
+Inception senza cronologia precedente), il menu della card e l'apertura del
+pannello download. Controllata anche la presentazione della serie Black Doves:
+episodi numerati, stagione e CTA Inizia a guardare E1 conservati.
+Screenshot locali fuori Git in `D:/codex-temp/final-ui-20261102`, prefisso
+`movie-fix-`, in particolare `movie-fix-inception-card.png`,
+`movie-fix-cunk-card.png` e `movie-fix-cunk-player.png`.
+
+Limiti: su Inception il player ha restituito un errore video dopo l'apertura;
+la riproduzione completa non e certificata da questa prova. Nessun download
+completo o cast eseguito. AnimeUnity coperto dai test sul contratto degli episodi
+numerati, non da una prova live del provider; iOS non verificato. Layout tablet
+e rotazioni coperti dalla suite automatica, non da un nuovo test su tablet.

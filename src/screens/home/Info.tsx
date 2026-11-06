@@ -1236,6 +1236,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
 
                       <View style={{display: infoView === 'episodes' ? 'flex' : 'none'}}>
                         <SeasonList
+                          movieBackground={resolvedBackgroundImage}
                           tabletColumns={isTabletDevice && !tabletLandscape && contentWidth >= 720 ? 2 : 1}
                           playbackActionRef={playbackActionRef}
                           onPlaybackActionChange={setPlaybackAction}

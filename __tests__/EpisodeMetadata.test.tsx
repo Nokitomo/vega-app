@@ -11,6 +11,22 @@ const renderedText = (component: renderer.ReactTestRenderer) =>
     .flatMap(node => node.props.children)
     .filter((value): value is string => typeof value === 'string');
 
+it('falls back from movie thumbnail to Info background and keeps space on image errors', async () => {
+  let component!: renderer.ReactTestRenderer;
+  await act(async () => {component = renderer.create(<EpisodeMetadata title="Film"
+    thumbnail="thumb" fallbackThumbnail="info-background" reserveThumbnail accentColor="#ff640a" />);});
+  expect(component.root.findByType(Image).props.source.uri).toBe('thumb');
+  await act(async () => component.root.findByType(Image).props.onError());
+  expect(component.root.findByType(Image).props.source.uri).toBe('info-background');
+  await act(async () => component.root.findByType(Image).props.onError());
+  expect(component.root.findAllByType(Image)).toHaveLength(0);
+  expect(component.root.findAll(node => node.props.style?.aspectRatio === 16 / 9).length).toBeGreaterThan(0);
+  await act(async () => component.update(<EpisodeMetadata title="Film" fallbackThumbnail="new-background"
+    reserveThumbnail accentColor="#ff640a" />));
+  expect(component.root.findByType(Image).props.source.uri).toBe('new-background');
+  await act(async () => component.unmount());
+});
+
 it('renders TMDB episode artwork and localized metadata', async () => {
   let component: renderer.ReactTestRenderer | undefined;
 
