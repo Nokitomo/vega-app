@@ -1,5 +1,6 @@
 import {afterEach, beforeEach, expect, it, jest} from '@jest/globals';
 import {resolveEpisodesThroughTarget} from '../src/lib/services/episodesThroughTarget';
+import * as catalogContent from '../src/lib/catalog/content';
 import {providerManager} from '../src/lib/services/ProviderManager';
 import * as metadata from '../src/lib/storage/MetadataDatabase';
 import {getEpisodeProgressPercent, getEpisodeProgressSnapshot, markEpisodesManuallyWatched} from '../src/lib/storage/ManualEpisodeCompletionStorage';
@@ -23,6 +24,25 @@ const groups = [
   {title: 'Season 2', seasonNumber: 2, episodesLink: 'season-2'},
   {title: 'Season 3', seasonNumber: 3, episodesLink: 'season-3'},
 ];
+
+it('reads canonical preceding seasons locally without reusing the active season for every group', async () => {
+  const localGroups = groups.map((group, index) => ({
+    title: group.title, seasonNumber: group.seasonNumber,
+    catalogSeasonRef: {workId: 'work', sourceId: 'source', seasonId: String(index + 1)},
+  }));
+  const load = jest.spyOn(catalogContent, 'loadCatalogSeason').mockImplementation(async ref => [{
+    title: 'Correct title', link: `s${ref.seasonId}e1`, episodeNumber: 1, seasonNumber: Number(ref.seasonId),
+  }]);
+  const request = jest.spyOn(providerManager, 'getEpisodes');
+  const selected = await resolveEpisodesThroughTarget({
+    contentLink: 'show', providerValue: 'streamingunity', groups: localGroups,
+    activeEpisodes: [{title: 'Correct title', link: 's2e1', episodeNumber: 1, seasonNumber: 2}],
+    targetLink: 's2e1',
+  });
+  expect(selected?.map(episode => episode.link)).toEqual(['s1e1', 's2e1']);
+  expect(load.mock.calls.map(([ref]) => ref.seasonId)).toEqual(['1', '2']);
+  expect(request).not.toHaveBeenCalled();
+});
 
 it('uses the complete catalog without requesting every season again', async () => {
   setSeriesCatalog('show', [

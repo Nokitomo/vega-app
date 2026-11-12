@@ -372,4 +372,14 @@ ritardi a un componente specifico. Tracce e schermate locali sono in
 
 ## Presentazione del hero
 
+Prova catalogo del 12 novembre 2026: dev client Android con
+`EXPO_PUBLIC_PERF_TRACE=1` impostato prima di Metro, senza modificare costanti.
+Catalogo pubblico completo installato su AVD temporaneo su D. Osservati eventi
+`hero_ready`, `hero_presented` e `js_lag`; non sono un benchmark confrontabile
+con il provider online, che usa richieste di rete e cache differenti. La prova
+ha incluso instabilita dell'emulatore con GPU host e un ANR durante il riavvio
+software sotto carico; dopo la riduzione a 720x1600/280 dpi sono proseguite le
+prove funzionali. Evidenze in `D:/codex-temp/vega-ui-restore/evidence`.
+Il ripristino delle schermate non consente di dichiarare un miglioramento FPS.
+
 `hero_ready` misura dal montaggio della card al completamento dei metadati e dei caricamenti nativi di sfondo/logo; `hero_presented` riporta l'attesa dalla richiesta di selezione alla pubblicazione della card. Contengono soltanto provider e durata, senza identificativi o URL. Il primo evento puo riguardare una slide preparata fuori vista; non equivale alla sua presentazione. La prima selezione include l'attesa del catalogo dal montaggio del carosello. Per i test a freddo chiudere il processo e svuotare anche il database SQLite dei metadati e le cache immagini nel solo profilo QA: Cancella cache nelle impostazioni non basta. Conservare provider e impostazioni per confronti equivalenti.

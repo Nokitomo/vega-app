@@ -30,7 +30,9 @@ import {
   getHomeCardWidth,
 } from '../components/homePresentation';
 import ArchiveFilterModal from '../components/ArchiveFilterModal';
-import {CatalogBrowse} from '../components/catalog/CatalogViews';
+import {catalogList} from '../lib/catalog/reader';
+import {loadCatalogPosts} from '../lib/catalog/presentation';
+import {useCatalogStore} from '../lib/catalog/store';
 import {
   buildArchiveFilter,
   hasActiveArchiveFilters,
@@ -99,12 +101,12 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const archiveFilters = useMemo(
     () =>
-      effectiveProviderValue
+      !route.params.catalogSection && effectiveProviderValue
         ? providerManager.getArchiveFilters({
             providerValue: effectiveProviderValue,
           })
         : {},
-    [effectiveProviderValue, provider.version],
+    [effectiveProviderValue, provider.version, route.params.catalogSection],
   );
   const isArchiveView =
     !route.params.isSearch &&
@@ -235,7 +237,9 @@ const ScrollList = ({route}: Props): React.ReactElement => {
         if (!isMounted.current || signal.aborted) {
           return;
         }
-        const getNewPosts = route.params.isSearch
+        const getNewPosts = route.params.catalogSection
+          ? catalogList(route.params.catalogSection, (page - 1) * 30, route.params.catalogSearch).then(loadCatalogPosts)
+          : route.params.isSearch
           ? providerManager.getSearchPosts({
               searchQuery: routeFilter,
               page,
@@ -302,6 +306,8 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     page,
     route.params.isSearch,
     retryAttempt,
+    route.params.catalogSection,
+    route.params.catalogSearch,
   ]);
   const applyArchiveFilters = (
     selection: ReturnType<typeof parseArchiveFilterSelection>,
@@ -559,9 +565,10 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                             style={gridItemWrapperStyle}
                             onPress={() =>
                               navigation.navigate('Info', {
+                                catalogRef: item.catalogRef,
                                 link: item.link,
                                 provider:
-                                  route.params.providerValue || provider.value,
+                                  item.catalogRef ? undefined : route.params.providerValue || provider.value,
                                 poster: item?.image,
                                 variants: item.variants,
                                 dubStatus: item.dubStatus,
@@ -571,9 +578,10 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                             <View className="relative">
                               <ProviderImage
                                 uri={item.image}
+                                candidates={item.imageCandidates}
                                 link={item.link}
                                 providerValue={
-                                  route.params.providerValue || provider.value
+                                  item.catalogRef ? undefined : route.params.providerValue || provider.value
                                 }
                                 artworkHints={item.artworkHints}
                                 style={{
@@ -661,8 +669,9 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                 style={viewType === 1 ? gridItemWrapperStyle : undefined}
                 onPress={() =>
                   navigation.navigate('Info', {
+                    catalogRef: item.catalogRef,
                     link: item.link,
-                    provider: route.params.providerValue || provider.value,
+                    provider: item.catalogRef ? undefined : route.params.providerValue || provider.value,
                     poster: item?.image,
                     variants: item.variants,
                     dubStatus: item.dubStatus,
@@ -672,8 +681,9 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                 <View className="relative">
                   <ProviderImage
                     uri={item.image}
+                    candidates={item.imageCandidates}
                     link={item.link}
-                    providerValue={route.params.providerValue || provider.value}
+                    providerValue={item.catalogRef ? undefined : route.params.providerValue || provider.value}
                     artworkHints={item.artworkHints}
                     style={
                       viewType === 1
@@ -732,5 +742,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
   );
 };
 export default function CatalogOrProviderList(props: Props) {
-  return props.route.params.catalogSection ? <CatalogBrowse section={props.route.params.catalogSection} search={props.route.params.catalogSearch} /> : <ScrollList {...props} />;
+  const generation = useCatalogStore(s => s.generation);
+  return <ScrollList key={props.route.params.catalogSection ? `catalog:${generation}:${JSON.stringify(props.route.params)}` : 'provider'} {...props} />;
 }

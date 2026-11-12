@@ -8,7 +8,7 @@ import {
   AppState,
 } from 'react-native';
 import Slider from '../../components/Slider';
-import {CatalogHome} from '../../components/catalog/CatalogViews';
+import {useCatalogHome} from '../../lib/catalog/useCatalogPresentation';
 import {useCatalogStore} from '../../lib/catalog/store';
 import HomeRowState from '../../components/HomeRowState';
 import HomeHeader from '../../components/HomeHeader';
@@ -148,6 +148,9 @@ const fetchArchiveHero = async ({
 };
 
 const Home = ({}: Props) => {
+  const catalogSelected = useCatalogStore(s => s.preferences.selected && !!s.installed);
+  const catalogGeneration = useCatalogStore(s => s.generation);
+  const catalogHome = useCatalogHome(catalogSelected);
   const homeListRef = useRef<FlatList<HomePageData>>(null);
   useScrollToTop(homeListRef);
   const {primary} = useThemeStore(state => state);
@@ -213,6 +216,11 @@ const Home = ({}: Props) => {
   );
 
   // React Query for home page data with better error handling
+  const providerHome = useHomePageData({
+    provider,
+    enabled: !catalogSelected && !!(installedProviders?.length && provider?.value),
+    isScreenActive: isHomeFocused,
+  });
   const {
     data: homeData = [],
     isLoading,
@@ -221,11 +229,7 @@ const Home = ({}: Props) => {
     isRefetching,
     activateCategories,
     // isStale,
-  } = useHomePageData({
-    provider,
-    enabled: !!(installedProviders?.length && provider?.value),
-    isScreenActive: isHomeFocused,
-  });
+  } = catalogSelected ? catalogHome : providerHome;
 
   // Only the functional top-of-feed flag crosses into React state.
   const handleScroll = useMemo(() => Animated.event(
@@ -304,11 +308,12 @@ const Home = ({}: Props) => {
 
   // Stable hero post calculation
   const heroPost = useMemo(() => {
+    if (catalogSelected) {return null;}
     if (!homeData || homeData.length === 0) {
       return null;
     }
     return getRandomHeroPost(homeData, provider?.value);
-  }, [homeData, provider?.value, heroRetryNonce]);
+  }, [homeData, provider?.value, heroRetryNonce, catalogSelected]);
 
   // Update hero only when hero post actually changes
   React.useEffect(() => {
@@ -317,6 +322,7 @@ const Home = ({}: Props) => {
 
   const handleHeroImageError = useCallback(
     (failedLink?: string) => {
+      if (catalogSelected) {return;}
       if (!provider?.value) {
         return;
       }
@@ -334,10 +340,11 @@ const Home = ({}: Props) => {
       }
       setHeroRetryNonce(value => value + 1);
     },
-    [provider?.value],
+    [provider?.value, catalogSelected],
   );
 
   React.useEffect(() => {
+    if (catalogSelected) {return;}
     let isActive = true;
     const controller = new AbortController();
 
@@ -428,6 +435,7 @@ const Home = ({}: Props) => {
     setHero,
     heroCacheTtlMs,
     heroRetryNonce,
+    catalogSelected,
   ]);
 
   // Optimized refresh handler
@@ -470,6 +478,7 @@ const Home = ({}: Props) => {
           title={resolveCatalogTitle(item)}
           posts={item.Posts}
           filter={item.filter}
+          catalogSection={item.catalogSection}
           onHorizontalDragStart={lockDrawerDuringHorizontalDrag}
           onHorizontalDragEnd={releaseDrawerAfterHorizontalDrag}
         />
@@ -485,8 +494,8 @@ const Home = ({}: Props) => {
   );
 
   const scrollKey = useMemo(() => {
-    return `${provider?.value ?? 'none'}:${homeData.length}`;
-  }, [provider?.value, homeData.length]);
+    return `${catalogSelected ? 'cinema' : provider?.value ?? 'none'}:${homeData.length}`;
+  }, [provider?.value, homeData.length, catalogSelected]);
 
   useEffect(() => {
     scrollOffset.setValue(0);
@@ -509,9 +518,9 @@ const Home = ({}: Props) => {
 
   // Early return for no providers
   if (
-    !installedProviders ||
+    !catalogSelected && (!installedProviders ||
     installedProviders.length === 0 ||
-    !provider?.value
+    !provider?.value)
   ) {
     return <Tutorial />;
   }
@@ -553,8 +562,9 @@ const Home = ({}: Props) => {
               ListHeaderComponent={
                 <>
                   <HeroOptimized
-                    key={`${providerCacheScope}:${heroRefreshNonce}`}
-                    posts={homeData
+                    key={`${catalogSelected ? `cinema:${catalogGeneration}` : providerCacheScope}:${heroRefreshNonce}`}
+                    catalogMode={catalogSelected}
+                    posts={catalogSelected ? catalogHome.heroPosts : homeData
                       .flatMap(section => section.Posts)
                       .slice(0, 20)}
                     isActive={
@@ -615,8 +625,4 @@ const Home = ({}: Props) => {
   );
 };
 
-function HomeSelection(props: Props) {
-  const selected = useCatalogStore(s => s.preferences.selected && !!s.installed);
-  return selected ? <CatalogHome /> : <Home {...props} />;
-}
-export default React.memo(HomeSelection);
+export default React.memo(Home);

@@ -161,7 +161,7 @@ export async function loadCatalogSeason(ref: {
   workId: string;
   sourceId: string;
   seasonId: string;
-}): Promise<EpisodeLink[]> {
+}, includeImages = false): Promise<EpisodeLink[]> {
   const {catalogWork} = await import('./reader');
   const work = await catalogWork(ref.workId);
   const source = (await catalogChildren<CatalogSource>('source', work.id)).find(
@@ -173,7 +173,7 @@ export async function loadCatalogSeason(ref: {
   if (!source || !season) {
     throw new Error('catalog.missingWork');
   }
-  return playbackEpisodes(work, source, season, false);
+  return playbackEpisodes(work, source, season, includeImages);
 }
 
 export async function syncCatalogSeries(

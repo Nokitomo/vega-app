@@ -5,6 +5,13 @@ import {beforeEach, describe, expect, it, jest} from '@jest/globals';
 import SearchResults from '../src/screens/SearchResults';
 import useSearchCacheStore from '../src/lib/zustand/searchCacheStore';
 import {providerManager} from '../src/lib/services/ProviderManager';
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+import {useCatalogStore} from '../src/lib/catalog/store';
+import {catalogList} from '../src/lib/catalog/reader';
+import {loadCatalogPosts} from '../src/lib/catalog/presentation';
+
+jest.mock('../src/lib/catalog/reader', () => ({catalogList: jest.fn()}));
+jest.mock('../src/lib/catalog/presentation', () => ({loadCatalogPosts: jest.fn()}));
 
 const mockProviders = [{value: 'animeunity', display_name: 'AnimeUnity'}, {value: 'streamingunity', display_name: 'StreamingUnity'}];
 jest.mock('../src/lib/zustand/contentStore', () => ({__esModule: true, default: (select: any) => select({installedProviders: mockProviders})}));
@@ -17,7 +24,28 @@ const post = {title: 'Result', link: '/result', image: '/poster'};
 const props = {route: {params: {filter: 'test'}}} as any;
 
 describe('Global search provider isolation', () => {
-  beforeEach(() => {jest.clearAllMocks(); useSearchCacheStore.getState().clearCache();});
+  beforeEach(() => {jest.clearAllMocks(); useSearchCacheStore.getState().clearCache(); useCatalogStore.setState({installed: null});});
+  it('searches both installed providers when the local catalog is selected', async () => {
+    const client = new QueryClient({defaultOptions: {queries: {retry: false, gcTime: Infinity}}});
+    useCatalogStore.setState({
+      installed: {revision: 'a'.repeat(64), file: 'catalog.sqlite', bytes: 1, installedAt: 1},
+      preferences: {...useCatalogStore.getState().preferences, selected: true},
+    });
+    const localPost = {...post, catalogRef: {catalogId: 'cinema' as const, workId: 'work'}};
+    jest.mocked(catalogList).mockResolvedValue([]);
+    jest.mocked(loadCatalogPosts).mockResolvedValue([localPost]);
+    search.mockResolvedValue([post]);
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {tree = renderer.create(<QueryClientProvider client={client}><SearchResults {...props} /></QueryClientProvider>);});
+    await act(async () => {await new Promise(resolve => setTimeout(resolve, 20));});
+    expect(search.mock.calls.map(([options]) => options.providerValue).sort()).toEqual(['animeunity', 'streamingunity']);
+    expect(catalogList).toHaveBeenCalledWith(expect.objectContaining({id: 'search'}), 0, 'test');
+    const rows = tree.root.findAllByType('Slider' as any);
+    expect(rows).toHaveLength(3);
+    expect(rows.some(row => row.props.posts[0]?.catalogRef?.workId === 'work')).toBe(true);
+    await act(async () => tree.unmount());
+    client.clear();
+  });
   it('shows a failed provider, keeps successful cards and retries only the failure before caching', async () => {
     search.mockImplementation(async ({providerValue}) => {
       if (providerValue === 'streamingunity') {throw new Error('network');}

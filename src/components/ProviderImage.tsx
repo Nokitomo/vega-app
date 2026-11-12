@@ -38,6 +38,7 @@ const getInitialSourceUri = (
 
 type ProviderImageProps = Omit<ImageProps, 'source'> & {
   uri?: string;
+  candidates?: readonly string[];
   link?: string;
   providerValue?: string;
   artworkHints?: Post['artworkHints'];
@@ -46,6 +47,7 @@ type ProviderImageProps = Omit<ImageProps, 'source'> & {
 
 const ProviderImage = ({
   uri,
+  candidates,
   link,
   providerValue,
   artworkHints,
@@ -61,6 +63,7 @@ const ProviderImage = ({
     providerValue,
     link,
     uri,
+    candidates,
   ]);
   const initialSourceUri = useMemo(
     () => getInitialSourceUri(uri, link, providerValue),
@@ -140,6 +143,11 @@ const ProviderImage = ({
   ]);
 
   const resolveFallback = useCallback(async () => {
+    const candidateIndex = candidates?.indexOf(sourceUri) ?? -1;
+    if (candidateIndex >= 0 && candidates?.[candidateIndex + 1]) {
+      updateSourceUri(candidates[candidateIndex + 1]);
+      return;
+    }
     if (hasTriedFallback) {
       return;
     }
@@ -178,6 +186,7 @@ const ProviderImage = ({
     }
   }, [
     artworkHints,
+    candidates,
     hasTriedFallback,
     link,
     providerCacheScope,

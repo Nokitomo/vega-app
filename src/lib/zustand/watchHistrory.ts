@@ -169,6 +169,7 @@ const useWatchHistoryStore = create<History>(set => ({
     try {
       // Format item for our storage service
       const storageItem: WatchHistoryItem = {
+        ...(item.catalogRef ? {catalogRef: item.catalogRef} : {}),
         id: item.link || item.title,
         title: item.title,
         displayTitle: item.displayTitle || item.title,

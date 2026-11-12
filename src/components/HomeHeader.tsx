@@ -23,6 +23,8 @@ import SearchSuggestionState from './SearchSuggestionState';
 import {HOME_FONT} from './homePresentation';
 import {useSearchSuggestions} from '../lib/hooks/useSearchSuggestions';
 import {sanitizeSearchQuery} from '../lib/utils/helpers';
+import {useCatalogStore} from '../lib/catalog/store';
+import {catalogSearchSection} from '../lib/catalog/useCatalogPresentation';
 
 export default function HomeHeader({
   isDrawerOpen,
@@ -40,6 +42,7 @@ export default function HomeHeader({
   const {t} = useTranslation();
   const primary = useThemeStore(state => state.primary);
   const {provider} = useContentStore();
+  const catalogSelected = useCatalogStore(s => s.preferences.selected && !!s.installed);
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState('');
   const [suggestionsSuppressed, setSuggestionsSuppressed] = useState(false);
@@ -82,9 +85,11 @@ export default function HomeHeader({
         navigation.navigate('Info', {link: query});
       } else {
         searchNavigation.navigate('ScrollList', {
+          catalogSection: catalogSelected ? catalogSearchSection : undefined,
+          catalogSearch: catalogSelected ? query : undefined,
           providerValue: provider.value,
           filter: query,
-          title: provider.display_name,
+          title: catalogSelected ? t('catalog.cinema') : provider.display_name,
           isSearch: true,
         });
       }
@@ -95,6 +100,8 @@ export default function HomeHeader({
       searchNavigation,
       provider.value,
       provider.display_name,
+      catalogSelected,
+      t,
     ],
   );
 
@@ -161,7 +168,7 @@ export default function HomeHeader({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('Search in {{provider}}', {
-              provider: provider.display_name,
+              provider: catalogSelected ? t('catalog.cinema') : provider.display_name,
             })}
             onPress={() => setSearchActive(true)}
             style={{
@@ -191,7 +198,7 @@ export default function HomeHeader({
             placeholder={t('Search')}
           />
           <Text style={{color: '#a0a0a0', fontFamily: HOME_FONT.regular, paddingHorizontal: 16, paddingTop: 12}}>
-            {t('Search in {{provider}}', {provider: provider.display_name})}
+            {t('Search in {{provider}}', {provider: catalogSelected ? t('catalog.cinema') : provider.display_name})}
           </Text>
           <View className="flex-1 pt-2">
             {suggestions.length > 0 ? (

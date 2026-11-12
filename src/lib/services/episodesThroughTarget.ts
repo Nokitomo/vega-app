@@ -3,6 +3,7 @@ import {readMetadata, writeMetadata} from '../storage/MetadataDatabase';
 import {getSeriesCatalog, type SeriesCatalogEpisode} from '../storage/SeriesCompletionStorage';
 import {getEpisodesThroughTarget} from '../utils/episodesThroughTarget';
 import {providerManager} from './ProviderManager';
+import {loadCatalogSeason} from '../catalog/content';
 
 type Options = {
   contentLink: string;
@@ -21,7 +22,9 @@ export const resolveEpisodesThroughTarget = async ({
     group.availabilityStatus !== 'upcoming' && group.seasonNumber !== 0);
   const targetGroup = available.find(group =>
     group.directLinks?.some(episode => episode.link === targetLink) ||
-    (group.episodesLink === activeSeasonLink &&
+    (group.catalogSeasonRef
+      ? activeEpisodes?.some(episode => episode.link === targetLink && episode.seasonNumber === group.seasonNumber)
+      : group.episodesLink === activeSeasonLink &&
       activeEpisodes?.some(episode => episode.link === targetLink)));
   if (!targetGroup) {
     return null;
@@ -33,7 +36,9 @@ export const resolveEpisodesThroughTarget = async ({
     : available;
   const cachedCatalog = getSeriesCatalog(contentLink);
   const cachedLinks = new Set(cachedCatalog?.episodes?.map(episode => episode.link));
-  const catalogCoversRequired = required.every(group => group.episodesLink
+  const catalogCoversRequired = required.every(group => group.catalogSeasonRef
+    ? cachedCatalog?.episodes?.some(episode => episode.seasonNumber === group.seasonNumber)
+    : group.episodesLink
     ? cachedCatalog?.episodes?.some(episode => episode.seasonEpisodesLink === group.episodesLink)
     : group.directLinks?.every(episode => cachedLinks.has(episode.link)));
   if (cachedCatalog?.complete && cachedLinks.has(targetLink) && catalogCoversRequired) {
@@ -45,7 +50,9 @@ export const resolveEpisodesThroughTarget = async ({
 
   const loadGroup = async (group: Link): Promise<SeriesCatalogEpisode[]> => {
     let episodes: EpisodeLink[] = [];
-    if (group.episodesLink === activeSeasonLink && activeEpisodes?.length) {
+    if (group.catalogSeasonRef) {
+      episodes = await loadCatalogSeason(group.catalogSeasonRef);
+    } else if (group.episodesLink === activeSeasonLink && activeEpisodes?.length) {
       episodes = activeEpisodes;
     } else if (group.episodesLink) {
       const cached = readMetadata<EpisodeLink[]>('episodes', providerValue, group.episodesLink);

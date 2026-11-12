@@ -128,6 +128,47 @@ cronologia usa solo ID di fonte e alias verificati nel catalogo, non titoli simi
 I contratti del player e DRM rimangono gli stessi; le stagioni locali vengono
 caricate dal catalogo anche nel passaggio all'episodio/stagione successiva.
 
+### Presentazione condivisa con i provider
+
+Il catalogo alimenta la Home, il carousel, le righe, la lista/griglia e la scheda
+Info originali di `cruncy-ui`. Le schermate alternative `CatalogHome`,
+`CatalogBrowse` e `CatalogInfo` sono state rimosse. La ricerca della Home usa il
+catalogo selezionato; la ricerca globale conserva le richieste a tutti i provider
+installati e aggiunge una riga locale con gli stessi componenti delle altre righe.
+
+I post locali portano `catalogRef` e non assumono il provider selezionato. I
+metadati e le immagini sono letti da SQLite, con ordine/qualita configurabili;
+il recupero automatico di artwork e metadati online delle schermate provider non
+sovrascrive le scelte del catalogo. La selezione della fonte di riproduzione resta
+esplicita quando sono disponibili piu fonti compatibili. Senza provider installato
+rimane possibile consultare i dettagli.
+
+La lista stagioni originale legge `catalogSeasonRef`, conservando titoli,
+sinossi, thumbnail verificate e coordinate di riproduzione canoniche. Cronologia,
+libreria e passaggio al player conservano `catalogRef`, compresa la conversione
+dello store della cronologia verso la persistenza. Un aggiornamento del provider
+senza quel riferimento non cancella quello gia salvato.
+
+Verifica del ripristino UI (12 novembre 2026): TypeScript e lint senza errori,
+83 suite Jest / 426 test passati. Su un AVD temporaneo Medium_Phone_API_35 su D,
+con partizione da 24 GiB, scaricato e installato dall'app il catalogo pubblico
+completo (1.16 GiB compressi, 4.31 GiB installati). Verificate Home originale,
+ricerca locale, ricerca globale con Cinema/AnimeUnity/StreamingUnity, scheda
+Breaking Bad (62 episodi), cambio stagione, riproduzione S2E1, ripresa e avanzamento
+agli episodi successivi, lista salvati e ritorno da Continua a guardare alla
+scheda Cinema. Verificata anche la scheda film El Camino e la sua riproduzione:
+il primo avvio ha avuto un timeout, seguito da recupero e avanzamento del video.
+Non e stata determinata la causa del ritardo dello stream. Provato il riordino dei
+poster e ripristinato l'ordine iniziale; disattivando Cinema ritorna la Home
+AnimeUnity, senza modificare la selezione del provider.
+
+L'emulatore con GPU host si e chiuso durante una prova; al riavvio con rendering
+software si e verificato un ANR in condizioni di forte carico Android. Le prove
+successive a 720x1600/280 dpi sono proseguite. Questi risultati non certificano
+prestazioni su smartphone, iOS, cast, download video o ogni combinazione di fonti
+e preferenze. Evidenze locali in `D:/codex-temp/vega-ui-restore/evidence`.
+I risultati storici sotto riguardano le prove precedenti dell'installatore.
+
 Le skill security-threat-model/security-best-practices sono state usate per i
 confini di fiducia e i controlli dell'input. Le linee guida React web non coprono
 interamente Kotlin/Objective-C++: la parte nativa richiede revisione e prove

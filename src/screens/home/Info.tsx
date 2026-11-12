@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {CatalogInfo} from '../../components/catalog/CatalogViews';
+import {useCatalogDetails} from '../../lib/catalog/useCatalogDetails';
 import {
   NativeStackNavigationProp,
   NativeStackScreenProps,
@@ -83,7 +83,7 @@ const normalizeTrailerUrl = (value?: string): string => {
 };
 
 export default function Info(props: Props): React.JSX.Element {
-  return props.route.params.catalogRef ? <CatalogInfo {...props} /> : <ProviderInfoScreen {...props} />;
+  return <ProviderInfoScreen key={props.route.params.catalogRef?.workId || 'provider'} {...props} />;
 }
 function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   const searchNavigation =
@@ -92,6 +92,8 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   const {t} = useTranslation();
   const {addItem, removeItem} = useWatchListStore(state => state);
   const {provider} = useContentStore(state => state);
+  const catalog = useCatalogDetails(route.params.catalogRef, route.params.link, !!route.params.continueWatchingTarget);
+  const isCatalog = !!route.params.catalogRef;
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const {isTabletDevice} = useAdaptiveNavigation();
@@ -102,7 +104,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   const playbackActionRef = useRef<(() => void) | null>(null);
   const [playbackAction, setPlaybackAction] = useState<InfoPlaybackAction | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const providerValue = route.params.provider || provider.value;
+  const providerValue = isCatalog ? catalog.provider : route.params.provider || provider.value;
   const routeVariants = useMemo<PostVariant[]>(
     () =>
       (route.params.variants || []).filter(
@@ -113,7 +115,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   const [selectedVariantLink, setSelectedVariantLink] = useState(
     route.params.link,
   );
-  const activeLink = useMemo(() => resolveSavedStreamCenterLink(
+  const activeLink = useMemo(() => isCatalog ? catalog.link : resolveSavedStreamCenterLink(
     providerValue,
     selectedVariantLink || route.params.link,
     providerValue === 'streamcenter'
@@ -122,7 +124,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
           ...watchListStorage.getWatchList(),
         ]
       : [],
-  ), [providerValue, route.params.link, selectedVariantLink]);
+  ), [providerValue, route.params.link, selectedVariantLink, isCatalog, catalog.link]);
   const metadataProvider = getMetadataSourceProvider(providerValue, activeLink);
   const routeSelectedVariant = useMemo(
     () => routeVariants.find(variant => variant.link === selectedVariantLink),
@@ -156,15 +158,14 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   }, [route.params.link]);
 
   // React Query for optimized data fetching
-  const {
-    info,
-    meta,
-    isLoading: infoLoading,
-    error,
-    refetch,
-    repairInfo,
-    check,
-  } = useContentDetails(activeLink, providerValue);
+  const providerDetails = useContentDetails(isCatalog ? '' : activeLink, isCatalog ? '' : providerValue);
+  const info = isCatalog ? catalog.info : providerDetails.info;
+  const meta = isCatalog ? undefined : providerDetails.meta;
+  const infoLoading = isCatalog ? catalog.isLoading : providerDetails.isLoading;
+  const error = isCatalog ? catalog.error : providerDetails.error;
+  const refetch = isCatalog ? catalog.refetch : providerDetails.refetch;
+  const repairInfo = isCatalog ? catalog.refetch : providerDetails.repairInfo;
+  const check = isCatalog ? undefined : providerDetails.check;
   useEffect(() => {
     if (error || (infoLoading && !info)) {
       // The list unmounts in these states: reset its animated toolbar as well.
@@ -251,13 +252,13 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   );
   const artworkCandidates = useMemo(
     () =>
-      selectArtworkCandidates({
+      isCatalog ? catalog.artwork || {poster: [], background: [], logo: []} : selectArtworkCandidates({
         providerValue: metadataProvider,
         info,
         enhanced: meta,
         activePoster,
       }),
-    [metadataProvider, info, meta, activePoster],
+    [metadataProvider, info, meta, activePoster, isCatalog, catalog.artwork],
   );
   const posterImage = useMemo(() => {
     return artworkCandidates.poster[0] || PLACEHOLDER_IMAGE;
@@ -269,13 +270,14 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
       ignoreAndroidSystemSettings: false,
     });
     addItem({
+      catalogRef: route.params.catalogRef,
       title: libraryTitle,
       poster: posterImage,
       link: activeLink,
       provider: providerValue,
     });
     setInLibrary(true);
-  }, [libraryTitle, posterImage, activeLink, providerValue, addItem]);
+  }, [libraryTitle, posterImage, activeLink, providerValue, addItem, route.params.catalogRef]);
 
   const removeLibrary = useCallback(() => {
     if (settingsStorage.isHapticFeedbackEnabled()) {
@@ -453,6 +455,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
 
   const repairBrokenArtwork = useCallback(
     (kind: 'background' | 'logo') => {
+      if (isCatalog) {return;}
       if (!['animeunity', 'streamingunity', 'streamcenter'].includes(providerValue)) {
         return;
       }
@@ -465,7 +468,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
         console.warn('Failed to repair broken artwork URL:', artworkError);
       });
     },
-    [activeLink, providerValue, repairInfo],
+    [activeLink, providerValue, repairInfo, isCatalog],
   );
 
   const {
@@ -473,8 +476,8 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
     onError: handleLogoError,
     onLoad: handleLogoLoad,
   } = useLogoFallback({
-    providerValue,
-    link: activeLink,
+    providerValue: isCatalog ? '' : providerValue,
+    link: isCatalog ? '' : activeLink,
     candidates: artworkCandidates.logo,
     onExhausted: () => repairBrokenArtwork('logo'),
   });
@@ -558,6 +561,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
 
   const currentInfoEntry = useMemo(
     () => ({
+      catalogRef: route.params.catalogRef,
       link: activeLink,
       provider: providerValue,
       poster: posterImage,
@@ -1012,7 +1016,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                           {t('Synopsis')}
                         </Text>
                         <Text className="text-white text-xs bg-tertiary p-1 px-2 rounded-md">
-                          {providerValue}
+                          {isCatalog ? t('catalog.cinema') : providerValue}
                         </Text>
                       </View>
                     </SkeletonLoader>
@@ -1239,6 +1243,25 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                     <>
 
                       <View style={{display: infoView === 'episodes' ? 'flex' : 'none'}}>
+                        {isCatalog && !catalog.source && (
+                          <Text style={{color: 'white', fontFamily: HOME_FONT.regular, padding: 16}}>
+                            {t(catalog.sources.length ? 'catalog.chooseSource' : 'catalog.noSource')}
+                          </Text>
+                        )}
+                        {isCatalog && catalog.sources.length > 1 && (
+                          <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16}}>
+                            {catalog.sources.map(source => (
+                              <Pressable key={source.id} accessibilityRole="button"
+                                accessibilityState={{selected: source.id === catalog.source?.id}}
+                                onPress={() => catalog.selectSource(source.id)}
+                                style={{borderRadius: 16, borderWidth: 1, borderColor: source.id === catalog.source?.id ? primary : '#555', padding: 12}}>
+                                <Text style={{color: 'white', fontFamily: HOME_FONT.regular}}>
+                                  {`${source.payload.provider} · ${String(source.payload.info.name || source.payload.id)}`}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        )}
                         <SeasonList
                           movieBackground={resolvedBackgroundImage}
                           tabletColumns={isTabletDevice && !tabletLandscape && contentWidth >= 720 ? 2 : 1}

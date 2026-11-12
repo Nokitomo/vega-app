@@ -19,6 +19,7 @@
   "catalog.downloadSize": "Download completo: {{download}} · Dati installati: {{installed}}",
   "catalog.title": "Database",
   "catalog.cinema": "Cinema",
+  "catalog.runtimeMinutes": "{{count}} min",
   "catalog.online": "Provider online",
   "catalog.details": "Informazioni",
   "catalog.more": "Carica altri",

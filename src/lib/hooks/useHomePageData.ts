@@ -30,6 +30,7 @@ import i18n from '../../i18n';
 import {hasHeroLogo, isPresentableHero, wouldDegradeHero} from '../utils/heroPolicy';
 
 export interface HomePageData {
+  catalogSection?: import('../catalog/types').CatalogSection;
   title: string;
   titleKey?: string;
   titleParams?: Record<string, string | number>;

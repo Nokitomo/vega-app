@@ -39,6 +39,9 @@ jest.mock('../src/lib/utils/providerCacheScope', () => ({
 jest.mock('../src/lib/hooks/useHomePageData', () => ({
   useHeroMetadata: jest.fn(),
 }));
+jest.mock('../src/lib/catalog/useCatalogPresentation', () => ({
+  useCatalogHero: () => ({data: undefined, isLoading: false, error: null}),
+}));
 jest.mock('../src/lib/zustand/contentStore', () => ({
   __esModule: true,
   default: jest.fn(),

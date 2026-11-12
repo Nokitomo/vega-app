@@ -41,6 +41,17 @@ beforeEach(() => {
   cacheStorage.clearAll();
 });
 
+it('retains the catalog route through history persistence and subsequent provider updates', () => {
+  const catalogRef = {catalogId: 'cinema' as const, workId: 'cinema:test'};
+  const entry = {...item('/it/titles/42-show', true), provider: 'streamingunity'};
+  useWatchHistoryStore.getState().addItem({...entry, catalogRef});
+  useWatchHistoryStore.getState().refreshHistory();
+  expect(useWatchHistoryStore.getState().history[0].catalogRef).toEqual(catalogRef);
+  useWatchHistoryStore.getState().addItem({...entry, currentTime: 31});
+  expect(new WatchHistoryStorage().getWatchHistory()[0].catalogRef).toEqual(catalogRef);
+  expect(selectContinueWatchingItems(useWatchHistoryStore.getState().history, 30)[0].catalogRef).toEqual(catalogRef);
+});
+
 it('moves a resumed title to the front without duplicating it', () => {
   const storage = new WatchHistoryStorage();
   storage.addToWatchHistory(item('first'));

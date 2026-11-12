@@ -2,6 +2,7 @@ import {AxiosStatic} from 'axios';
 import * as cheerio from 'cheerio';
 import {Content} from '../zustand/contentStore';
 import * as Crypto from 'expo-crypto';
+import type {CatalogRef} from '../catalog/types';
 
 export type I18nParams = Record<string, string | number>;
 
@@ -13,6 +14,8 @@ export interface ProvidersList {
 }
 
 export interface Post {
+  catalogRef?: CatalogRef;
+  imageCandidates?: string[];
   title: string;
   link: string;
   image: string;

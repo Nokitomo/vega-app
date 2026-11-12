@@ -32,6 +32,23 @@ beforeEach(() => {
   resolvePosterMock.mockResolvedValue(undefined);
 });
 
+it('tries ordered catalog candidates and resets after a preference change without provider requests', async () => {
+  let component!: renderer.ReactTestRenderer;
+  await act(async () => {
+    component = renderer.create(<ProviderImage uri="https://example.test/first.jpg" candidates={['https://example.test/first.jpg', 'https://example.test/second.jpg']} />);
+  });
+  await act(async () => component.root.findByType(Image).props.onError({nativeEvent: {error: '404'}}));
+  expect(component.root.findByType(Image).props.source.uri).toBe('https://example.test/second.jpg');
+  await act(async () => component.root.findByType(Image).props.onError({nativeEvent: {error: '404'}}));
+  expect(component.root.findByType(Image).props.source.uri).toContain('placehold.jp');
+  await act(async () => {
+    component.update(<ProviderImage uri="https://example.test/new.jpg" candidates={['https://example.test/new.jpg']} />);
+  });
+  expect(component.root.findByType(Image).props.source.uri).toBe('https://example.test/new.jpg');
+  expect(resolvePosterMock).not.toHaveBeenCalled();
+  await act(async () => component.unmount());
+});
+
 it('shows the cached preferred poster immediately and does not remount for the same URL', async () => {
   const preferred = 'https://image.tmdb.org/t/p/w300/poster.jpg';
   getCachedPosterMock.mockReturnValue({

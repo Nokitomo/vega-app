@@ -24,6 +24,7 @@ import useContentStore from '../lib/zustand/contentStore';
 import useHeroStore from '../lib/zustand/herostore';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
+import {useCatalogHero} from '../lib/catalog/useCatalogPresentation';
 import {useTranslation} from 'react-i18next';
 import RemoteLogo from './RemoteLogo';
 import type {ArtworkCandidates} from '../lib/services/artworkSelection';
@@ -79,15 +80,18 @@ const HeroCard = memo(
       useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
 
     // Use React Query for hero metadata
+    const providerMetadata = useHeroMetadata(hero.catalogRef ? '' : hero?.link || '', hero.catalogRef ? '' : provider.value);
+    const catalogMetadata = useCatalogHero(hero.catalogRef);
     const {
       data: heroData,
       isLoading,
       error,
-    } = useHeroMetadata(hero?.link || '', provider.value);
+    } = hero.catalogRef ? catalogMetadata : providerMetadata;
     const handlePlayPress = useCallback(() => {
       if (hero?.link) {
         startPerfNavigation(provider.value);
         navigation.navigate('Info', {
+          catalogRef: hero.catalogRef,
           link: hero.link,
           provider: provider.value,
           poster: heroData?.image || heroData?.poster || heroData?.background,
@@ -99,6 +103,7 @@ const HeroCard = memo(
     }, [
       navigation,
       hero?.link,
+      hero.catalogRef,
       hero?.variants,
       hero?.dubStatus,
       hero?.dubStatusKey,
@@ -137,7 +142,7 @@ const HeroCard = memo(
       );
     }, [backgroundCandidates, failedImages, hero?.link]);
 
-    const artworkEligible = isHeroArtworkEligible(
+    const artworkEligible = !!hero.catalogRef || isHeroArtworkEligible(
       provider.value, hero.link, heroData, currentImageUri,
     );
 
@@ -202,8 +207,8 @@ const HeroCard = memo(
       onLoad: handleLogoLoad,
       isResolving: resolvingLogo,
     } = useLogoFallback({
-      providerValue: provider.value,
-      link: hero?.link || '',
+      providerValue: hero.catalogRef ? '' : provider.value,
+      link: hero.catalogRef ? '' : hero?.link || '',
       candidates: logoCandidates,
     });
 
@@ -402,6 +407,7 @@ const HeroCard = memo(
                       removeItem(hero.link);
                     } else {
                       addItem({
+                        catalogRef: hero.catalogRef,
                         title: displayTitle || hero.title,
                         poster:
                           heroData?.poster || heroData?.image || hero.image,
@@ -436,6 +442,7 @@ const HeroCard = memo(
 HeroCard.displayName = 'HeroCard';
 
 interface HeroProps {
+  catalogMode?: boolean;
   posts?: Post[];
   isActive?: boolean;
   isDrawerOpen: boolean;
@@ -450,6 +457,7 @@ const Hero = memo(
     onImageError,
     posts = [],
     isActive = true,
+    catalogMode = false,
   }: HeroProps) => {
     const reducedMotion = useReducedMotion();
     const progress = useRef(new Animated.Value(0)).current;
@@ -466,7 +474,7 @@ const Hero = memo(
     const {provider} = useContentStore(state => state);
     const {hero: storedHero, providerScope} = useHeroStore(state => state);
     const scope = getProviderCacheScope(provider.value);
-    const initialHero = providerScope === scope ? storedHero : undefined;
+    const initialHero = !catalogMode && providerScope === scope ? storedHero : undefined;
     const {width, height, fontScale} = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const measureKey = `${scope}:${width}:${height}:${fontScale}:${insets.top}`;
@@ -697,7 +705,7 @@ const Hero = memo(
                 layout={layout}
                 onContentHeight={onContentHeight}
                 hero={post}
-                provider={provider}
+                provider={catalogMode ? {value: ''} : provider}
                 reducedMotion={reducedMotion}
                 onFailure={reportHeroFailure}
                 onReady={onReady}

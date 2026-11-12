@@ -50,6 +50,8 @@ const Slider = ({
   title,
   posts,
   filter,
+  catalogSection,
+  catalogSearch,
   providerValue,
   isSearch = false,
   onHorizontalDragStart,
@@ -63,6 +65,8 @@ const Slider = ({
   title: string;
   posts: Post[];
   filter: string;
+  catalogSection?: import('../lib/catalog/types').CatalogSection;
+  catalogSearch?: string;
   providerValue?: string;
   isSearch?: boolean;
   onHorizontalDragStart?: () => void;
@@ -117,11 +121,13 @@ const Slider = ({
   const handleMorePress = useCallback(() => {
     navigation.navigate('ScrollList', {
       title: title,
+      catalogSection,
+      catalogSearch,
       filter: filter,
       providerValue: providerValue,
       isSearch: isSearch,
     });
-  }, [navigation, title, filter, providerValue, isSearch]);
+  }, [navigation, title, filter, providerValue, isSearch, catalogSection, catalogSearch]);
 
   const handleItemPress = useCallback(
     (item: Post) => {
@@ -130,8 +136,9 @@ const Slider = ({
         item.provider || providerValue || provider?.value || '',
       );
       navigation.navigate('Info', {
+        catalogRef: item.catalogRef,
         link: item.link,
-        provider: item.provider || providerValue || provider?.value,
+        provider: item.catalogRef ? undefined : item.provider || providerValue || provider?.value,
         poster: item?.image,
         variants: item.variants,
         dubStatus: item.dubStatus,
@@ -169,10 +176,11 @@ const Slider = ({
             <ProviderImage
               className={catalogAppearance ? undefined : 'rounded-md'}
               uri={item?.image}
+              candidates={item.imageCandidates}
               link={item.link}
-              providerValue={item.provider || providerValue || provider?.value}
+              providerValue={item.catalogRef ? undefined : item.provider || providerValue || provider?.value}
               artworkHints={item.artworkHints}
-              shouldResolveArtwork={visiblePostKeys.has(
+              shouldResolveArtwork={!item.catalogRef && visiblePostKeys.has(
                 getPostKey(item, index),
               )}
               style={{width: imageWidth, height: imageHeight}}

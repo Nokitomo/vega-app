@@ -6,11 +6,11 @@ import ScrollList from '../src/screens/ScrollList';
 import {providerManager} from '../src/lib/services/ProviderManager';
 import ArchiveFilterModal from '../src/components/ArchiveFilterModal';
 import ProviderImage from '../src/components/ProviderImage';
+import {catalogList} from '../src/lib/catalog/reader';
+import {loadCatalogPosts} from '../src/lib/catalog/presentation';
 const mockNavigate = jest.fn();
-jest.mock('../src/components/catalog/CatalogViews', () => ({
-  CatalogBrowse: (props: any) =>
-    require('react').createElement('CatalogBrowse', props),
-}));
+jest.mock('../src/lib/catalog/reader', () => ({catalogList: jest.fn()}));
+jest.mock('../src/lib/catalog/presentation', () => ({loadCatalogPosts: jest.fn()}));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: require('react-native').View,
 }));
@@ -58,6 +58,9 @@ const flush = async () => {
 };
 describe('Catalog, archive and calendar presentation', () => {
   it('routes a local section without requesting provider posts', async () => {
+    const localPost = {...post, catalogRef: {catalogId: 'cinema' as const, workId: 'work'}};
+    jest.mocked(catalogList).mockResolvedValue([]);
+    jest.mocked(loadCatalogPosts).mockResolvedValue([localPost]);
     const section = {
       id: 'movies',
       title: '',
@@ -71,17 +74,17 @@ describe('Catalog, archive and calendar presentation', () => {
       tree = renderer.create(
         <ScrollList
           {...({
-            route: {params: {catalogSection: section, catalogSearch: 'test'}},
+            route: {params: {filter: 'test', isSearch: true, catalogSection: section, catalogSearch: 'test'}},
           } as any)}
         />,
       );
     });
-    expect(tree.root.findByType('CatalogBrowse' as any).props.section).toEqual(
-      section,
-    );
-    expect(tree.root.findByType('CatalogBrowse' as any).props.search).toBe(
-      'test',
-    );
+    await flush();
+    expect(catalogList).toHaveBeenCalledWith(section, 0, 'test');
+    const list = tree.root.findByType('List' as any);
+    expect(list.props.data).toEqual([localPost]);
+    list.props.renderItem({item: localPost}).props.onPress();
+    expect(mockNavigate).toHaveBeenLastCalledWith('Info', expect.objectContaining({catalogRef: localPost.catalogRef, provider: undefined}));
     expect(request).not.toHaveBeenCalled();
     await act(async () => {
       tree.unmount();

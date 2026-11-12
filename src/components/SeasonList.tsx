@@ -52,6 +52,7 @@ import {
   WATCH_COMPLETION_PERCENT,
 } from '../lib/storage/ManualEpisodeCompletionStorage';
 import {useEpisodes, useStreamData} from '../lib/hooks/useEpisodes';
+import {useCatalogEpisodes} from '../lib/catalog/useCatalogEpisodes';
 import {
   getSeriesCatalogSyncSignature,
   syncSeriesCatalog,
@@ -148,6 +149,7 @@ interface SeasonListProps {
   refreshing?: boolean;
   refreshVersion?: number;
   routeParams: Readonly<{
+    catalogRef?: import('../lib/catalog/types').CatalogRef;
     link: string;
     provider?: string;
     poster?: string;
@@ -689,10 +691,10 @@ const SeasonList: React.FC<SeasonListProps> = ({
   const shouldFetchEpisodes = useMemo(
     () =>
       Boolean(
-        activeSeason?.episodesLink &&
+        (activeSeason?.episodesLink || activeSeason?.catalogSeasonRef) &&
           activeSeason?.availabilityStatus !== 'upcoming',
       ),
-    [activeSeason?.episodesLink, activeSeason?.availabilityStatus],
+    [activeSeason?.episodesLink, activeSeason?.availabilityStatus, activeSeason?.catalogSeasonRef],
   );
   const formatAvailabilityDate = useCallback(
     (
@@ -755,18 +757,20 @@ const SeasonList: React.FC<SeasonListProps> = ({
     return t('No stream found');
   }, [activeSeasonValue?.availabilityStatus, t]);
   // React Query for episodes
+  const providerEpisodes = useEpisodes(
+    activeSeason?.episodesLink,
+    providerValue,
+    shouldFetchEpisodes && !routeParams.catalogRef,
+    contentInfo,
+  );
+  const catalogEpisodes = useCatalogEpisodes(activeSeason?.catalogSeasonRef);
   const {
     data: episodeList = EMPTY_EPISODES,
     isLoading: episodeLoading,
     isFetching: episodeFetching,
     error: episodeError,
     refetch: refetchEpisodes,
-  } = useEpisodes(
-    activeSeason?.episodesLink,
-    providerValue,
-    shouldFetchEpisodes,
-    contentInfo,
-  );
+  } = routeParams.catalogRef ? catalogEpisodes : providerEpisodes;
 
   const lastCatalogSyncRef = useRef<{
     signature: string;
@@ -775,7 +779,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
   } | undefined>(undefined);
 
   useEffect(() => {
-    if (type === 'movie' || !routeParams.link || !providerValue ||
+    if (routeParams.catalogRef || type === 'movie' || !routeParams.link || !providerValue ||
       (shouldFetchEpisodes && (episodeLoading || episodeFetching))) {
       return;
     }
@@ -1771,6 +1775,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
+          catalogRef: routeParams.catalogRef,
           id: historyKey,
           link: historyKey,
           title: metaTitle || '',
@@ -1933,6 +1938,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
         .some(item => sameWatchContent(item.link, historyKey));
       if (!hasHistoryEntry) {
         addItem({
+          catalogRef: routeParams.catalogRef,
           id: historyKey,
           link: historyKey,
           title: metaTitle || '',
@@ -2139,6 +2145,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       const resolvedSeasonNumber =
         normalizeNumericValue(seasonNumber) ?? resolveSeasonNumber(activeSeason);
       addItem({
+        catalogRef: routeParams.catalogRef,
         id: routeParams.link,
         link: routeParams.link,
         title: primaryTitle,
@@ -2162,7 +2169,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       let playableIndex = linkIndex;
       let playableSeasons = LinkList;
       const currentSeasonLink = seasonEpisodesLink || activeSeason?.episodesLink;
-      if (needsPrePlayRefresh(providerValue)) {
+      if (!routeParams.catalogRef && needsPrePlayRefresh(providerValue)) {
         const verification = Promise.allSettled([
           checkContent?.(),
           currentSeasonLink && currentSeasonLink === activeSeason?.episodesLink
@@ -2257,6 +2264,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
       }
 
       navigation.navigate('Player', {
+        catalogRef: routeParams.catalogRef,
         linkIndex: playableIndex,
         episodeList: playableEpisodes,
         type: contentType,
@@ -2311,6 +2319,7 @@ const SeasonList: React.FC<SeasonListProps> = ({
     const episode = episodeList.find(item => item.link === episodeLink) ||
       activeSeason?.directLinks?.find(item => item.link === episodeLink);
     recordManualEpisode({
+      catalogRef: routeParams.catalogRef,
       id: routeParams.link,
       link: routeParams.link,
       title: metaTitle || '',

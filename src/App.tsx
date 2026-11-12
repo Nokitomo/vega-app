@@ -101,6 +101,7 @@ export type InfoRouteParams = {
   dubStatus?: 'subbed' | 'dubbed' | 'both';
   dubStatusKey?: 'Subbed' | 'Dubbed' | 'Subbed and dubbed';
   infoStack?: Array<{
+    catalogRef?: CatalogRef;
     link: string;
     provider?: string;
     poster?: string;

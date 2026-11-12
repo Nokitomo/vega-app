@@ -187,6 +187,17 @@ export async function catalogChildren<T>(
     ).map(unpack<T>),
   );
 }
+export async function catalogEpisodeCount(work: string): Promise<number> {
+  return readCatalog(async db => {
+    const row = await db.getFirstAsync<{total: number}>(
+      `SELECT count(*) total FROM records e JOIN records s ON s.id=e.parent_id
+       WHERE e.work_id=? AND e.kind='episode' AND s.kind='season'
+       AND CAST(json_extract(s.payload,'$.number') AS REAL)>0`,
+      work,
+    );
+    return row?.total || 0;
+  });
+}
 export async function catalogImages(
   work: string,
   field: ImageField,

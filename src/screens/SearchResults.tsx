@@ -12,7 +12,7 @@ import {useTranslation} from 'react-i18next';
 import {SearchStackParamList} from '../App';
 import Slider from '../components/Slider';
 import {HOME_FONT} from '../components/homePresentation';
-import {CatalogSearchResults} from '../components/catalog/CatalogViews';
+import CatalogSearchResults from '../components/catalog/CatalogSearchRow';
 import useThemeStore from '../lib/zustand/themeStore';
 import {providerManager} from '../lib/services/ProviderManager';
 import useContentStore from '../lib/zustand/contentStore';
