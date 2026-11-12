@@ -1,7 +1,11 @@
 import {useEffect} from 'react';
 import {AppState} from 'react-native';
 import {catalogNative} from './native';
-import {configureCatalogTransfer, installPendingCatalog} from './installer';
+import {
+  configureCatalogTransfer,
+  installPendingCatalog,
+  isCatalogPreparationPaused,
+} from './installer';
 import {useCatalogStore} from './store';
 import {cleanupDormantCatalogs} from './reader';
 
@@ -26,6 +30,7 @@ export function useCatalogLifecycle() {
         const state = useCatalogStore.getState();
         if (
           state.installed &&
+          !isCatalogPreparationPaused() &&
           state.preferences.automatic &&
           Date.now() - lastCheck > 2 * 60 * 60 * 1000
         ) {

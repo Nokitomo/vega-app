@@ -15,6 +15,21 @@ export interface CatalogNative {
   status(): Promise<TransferState>;
   pending(): Promise<string | null>;
   acknowledge(): Promise<void>;
+  beginPreparation(): Promise<void>;
+  cancelPreparation(): Promise<void>;
+  preparationStatus(): Promise<{
+    active: boolean;
+    phase: TransferState['phase'];
+    bytes: number;
+    total: number;
+  }>;
+  prepareFile(
+    mode: 'hash' | 'extract' | 'copy',
+    source: string,
+    target: string,
+    limit: number,
+    phase: string,
+  ): Promise<string>;
   gunzip(source: string, target: string, limit: number): Promise<void>;
   openLines(file: string): Promise<void>;
   readLines(): Promise<string[]>;

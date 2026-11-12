@@ -7,7 +7,10 @@ import {useCatalogStore} from '../../lib/catalog/store';
 import {catalogNative} from '../../lib/catalog/native';
 import {
   configureCatalogTransfer,
-  installPendingCatalog,
+  resumeCatalogPreparation,
+  pauseCatalogPreparation,
+  discardCatalogDownload,
+  isCatalogPreparationPaused,
   removeCatalog,
   startCatalogDownload,
 } from '../../lib/catalog/installer';
@@ -37,6 +40,8 @@ export default function CatalogSettings() {
   } = useCatalogStore();
   const primary = useThemeStore(s => s.primary);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [field, setField] = useState<ImageField>('poster');
   const [edit, setEdit] = useState<CatalogSection>();
   const rules = useQuery({
@@ -60,6 +65,20 @@ export default function CatalogSettings() {
   useEffect(() => {
     let alive = true;
     const timer = setInterval(() => {
+      setNow(Date.now());
+      if (busy || useCatalogStore.getState().transfer.status === 'installing') {
+        return;
+      }
+      try {
+        catalogNative()
+          .pending()
+          .then(value => {
+            if (alive) {
+              setPending(!!value);
+            }
+          })
+          .catch(() => {});
+      } catch {}
       if (busy || useCatalogStore.getState().transfer.status === 'installing') {
         return;
       }
@@ -67,7 +86,13 @@ export default function CatalogSettings() {
         catalogNative()
           .status()
           .then(value => {
-            if (alive) {
+            const current = useCatalogStore.getState().transfer;
+            if (
+              alive &&
+              current.status !== 'installing' &&
+              !isCatalogPreparationPaused() &&
+              !(current.status === 'error' && value.status === 'downloaded')
+            ) {
               setTransfer(value);
             }
           })
@@ -139,11 +164,31 @@ export default function CatalogSettings() {
           {t('catalog.title')} · {t('catalog.cinema')}
         </Text>
         <Text style={catalogStyles.text}>
-          {t(`catalog.status.${transfer.status}`)}
+          {t(
+            transfer.status === 'paused' &&
+              transfer.error === 'catalog.preparationPaused'
+              ? 'catalog.preparationPausedTitle'
+              : `catalog.status.${transfer.status}`,
+          )}
         </Text>
+        {transfer.status === 'installing' && transfer.phase && (
+          <Text accessibilityLiveRegion="polite" style={catalogStyles.text}>
+            {t(`catalog.phase.${transfer.phase}`)}
+            {transfer.startedAt
+              ? ` · ${t('catalog.elapsed', {seconds: Math.max(0, Math.floor((now - transfer.startedAt) / 1000))})}`
+              : ''}
+          </Text>
+        )}
         {!!transfer.total && (
           <Text style={catalogStyles.text}>
-            {size(transfer.bytes)} / {size(transfer.total)}
+            {transfer.phase === 'index'
+              ? `${Math.floor((100 * transfer.bytes) / transfer.total)}%`
+              : transfer.phase === 'verifyRevision'
+                ? t('catalog.recordsVerified', {
+                    count: transfer.bytes,
+                    total: transfer.total,
+                  })
+                : `${size(transfer.bytes)} / ${size(transfer.total)}`}
           </Text>
         )}
         {!!transfer.error && (
@@ -168,42 +213,72 @@ export default function CatalogSettings() {
           {t('catalog.storageExplanation')}
         </Text>
         <View style={catalogStyles.row}>
-          <CatalogButton
-            label={t(installed ? 'catalog.check' : 'catalog.install')}
-            disabled={busy || transfer.status === 'installing'}
-            onPress={() => {
-              run(startCatalogDownload);
-            }}
-          />
-          <CatalogButton
-            label={t('catalog.pause')}
-            disabled={busy}
-            onPress={() => {
-              run(() => catalogNative().pause());
-            }}
-          />
-          <CatalogButton
-            label={t('catalog.resume')}
-            disabled={busy}
-            onPress={() => {
-              run(startCatalogDownload);
-            }}
-          />
-          <CatalogButton
-            label={t('catalog.cancel')}
-            disabled={busy}
-            onPress={() => {
-              run(() => catalogNative().cancel());
-            }}
-          />
-          {transfer.status === 'downloaded' && (
+          {transfer.status === 'installing' ? (
             <CatalogButton
-              label={t('catalog.activate')}
-              disabled={busy}
+              label={t('catalog.stopPreparation')}
+              disabled={
+                transfer.phase === 'stopping' || transfer.phase === 'activate'
+              }
               onPress={() => {
-                run(installPendingCatalog);
+                pauseCatalogPreparation().catch(() =>
+                  Alert.alert(t('catalog.title'), t('catalog.transferFailed')),
+                );
               }}
             />
+          ) : (
+            <>
+              {!pending &&
+                !['downloading', 'queued', 'paused'].includes(
+                  transfer.status,
+                ) && (
+                  <CatalogButton
+                    label={t(installed ? 'catalog.check' : 'catalog.install')}
+                    disabled={busy}
+                    onPress={() => {
+                      run(startCatalogDownload);
+                    }}
+                  />
+                )}
+              {['downloading', 'queued'].includes(transfer.status) && (
+                <CatalogButton
+                  label={t('catalog.pause')}
+                  disabled={busy}
+                  onPress={() => {
+                    run(() => catalogNative().pause());
+                  }}
+                />
+              )}
+              {transfer.status === 'paused' && !pending && (
+                <CatalogButton
+                  label={t('catalog.resume')}
+                  disabled={busy}
+                  onPress={() => {
+                    run(startCatalogDownload);
+                  }}
+                />
+              )}
+              {(pending ||
+                ['paused', 'downloading', 'queued', 'error'].includes(
+                  transfer.status,
+                )) && (
+                <CatalogButton
+                  label={t('catalog.cancel')}
+                  disabled={busy}
+                  onPress={() => {
+                    run(discardCatalogDownload);
+                  }}
+                />
+              )}
+              {pending && (
+                <CatalogButton
+                  label={t('catalog.activate')}
+                  disabled={busy}
+                  onPress={() => {
+                    run(resumeCatalogPreparation);
+                  }}
+                />
+              )}
+            </>
           )}
           {!!installed && (
             <CatalogButton

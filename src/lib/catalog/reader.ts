@@ -1,12 +1,11 @@
-import {
-  openDatabaseAsync,
-  type SQLiteDatabase,
-  type SQLiteBindValue,
-} from 'expo-sqlite';
+import {type SQLiteDatabase, type SQLiteBindValue} from 'expo-sqlite';
+import {openCatalogDatabase} from './connection';
 import {catalogNative} from './native';
 import {useCatalogStore} from './store';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import {registerCatalogIdentity} from './identity';
+import {parseManifest} from './manifest';
+import {catalogViewsFile, ensureCatalogViews} from './views';
 import type {
   Artwork,
   CatalogRecord,
@@ -15,9 +14,14 @@ import type {
   Work,
 } from './types';
 
-let connection: {file: string; db: Promise<SQLiteDatabase>} | undefined;
+type Connection = {
+  file: string;
+  viewsFile: string;
+  db: Promise<SQLiteDatabase>;
+};
+let connection: Connection | undefined;
 let readers = 0;
-let retiring: Array<{file: string; db: Promise<SQLiteDatabase>}> = [];
+let retiring: Connection[] = [];
 async function acquire(): Promise<SQLiteDatabase> {
   const installed = useCatalogStore.getState().installed;
   if (!installed) {
@@ -30,17 +34,37 @@ async function acquire(): Promise<SQLiteDatabase> {
     const db = catalogNative()
       .root()
       .then(async directory => {
-        const opened = await openDatabaseAsync(
+        const viewsFile = await ensureCatalogViews(
           installed.file,
-          {useNewConnection: true},
           directory,
+          installed.revision,
         );
-        await opened.execAsync(
-          'PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-8192;',
-        );
-        return opened;
+        const opened = await openCatalogDatabase(installed.file, directory);
+        try {
+          await opened.runAsync(
+            'ATTACH DATABASE ? AS catalog_views',
+            `${directory}/${viewsFile}`,
+          );
+          await opened.execAsync(
+            'PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-8192;',
+          );
+          return opened;
+        } catch (error) {
+          await opened.closeAsync();
+          throw error;
+        }
       });
-    connection = {file: installed.file, db};
+    connection = {
+      file: installed.file,
+      viewsFile: catalogViewsFile(installed.revision),
+      db,
+    };
+    db.catch(() => {
+      if (connection?.db === db) {
+        connection = undefined;
+      }
+      retiring = retiring.filter(item => item.db !== db);
+    });
   }
   return connection.db;
 }
@@ -62,6 +86,13 @@ export async function readCatalog<T>(
           if (await RNFS.exists(path)) {
             await RNFS.unlink(path);
           }
+          const views = `${await catalogNative().root()}/${p.viewsFile}`;
+          if (
+            p.viewsFile !== connection?.viewsFile &&
+            (await RNFS.exists(views))
+          ) {
+            await RNFS.unlink(views);
+          }
         }),
       );
     }
@@ -80,13 +111,28 @@ export async function cleanupDormantCatalogs(): Promise<void> {
   const root = await catalogNative().root();
   const keep = new Set([
     useCatalogStore.getState().installed?.file,
+    useCatalogStore.getState().installed &&
+      catalogViewsFile(useCatalogStore.getState().installed!.revision),
     connection?.file,
-    ...retiring.map(r => r.file),
+    connection?.viewsFile,
+    ...retiring.flatMap(r => [r.file, r.viewsFile]),
   ]);
+  try {
+    const pending = await catalogNative().pending();
+    if (pending) {
+      const revision = parseManifest(JSON.parse(pending)).revision;
+      keep.add(`catalog-${revision}.sqlite`);
+      keep.add(catalogViewsFile(revision));
+    }
+  } catch {
+    /* Invalid manifests never keep an untrusted candidate active. */
+  }
   for (const file of await RNFS.readDir(root)) {
-    const base = file.name.replace(/-journal$/, '');
+    const base = file.name.replace(/-journal$/, '').replace(/\.building$/, '');
     if (
-      /^catalog-[a-f0-9-]+\.sqlite(?:-journal)?$/.test(file.name) &&
+      /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|views-[a-f0-9]{64}-\d+\.sqlite(?:\.building)?(?:-journal)?)$/.test(
+        file.name,
+      ) &&
       !keep.has(base)
     ) {
       await RNFS.unlink(file.path);
@@ -182,11 +228,7 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
       scope: string;
       source: string;
       language: string | null;
-    }>(
-      `SELECT DISTINCT json_extract(payload,'$.field') field,json_extract(payload,'$.scope') scope,
-       json_extract(payload,'$.source') source,json_extract(payload,'$.language') language
-       FROM records WHERE kind='artwork_assignment' AND json_extract(payload,'$.eligible')=1`,
-    );
+    }>('SELECT field,scope,source,language FROM catalog_views.image_rules');
     const result: Record<string, string[]> = {};
     rows.forEach(r => {
       const field =
@@ -220,22 +262,22 @@ export async function catalogList(
   search?: string,
 ): Promise<CatalogRecord<Work>[]> {
   const params: SQLiteBindValue[] = [];
-  const where = ["w.kind='work'", "json_extract(w.payload,'$.active')=1"];
+  const where = ['1=1'];
   if (section.type) {
-    where.push("json_extract(w.payload,'$.info.type')=?");
+    where.push('c.type=?');
     params.push(section.type);
   }
   if (section.fromYear) {
-    where.push("CAST(json_extract(w.payload,'$.info.year') AS INTEGER)>=?");
+    where.push('c.year>=?');
     params.push(section.fromYear);
   }
   if (section.toYear) {
-    where.push("CAST(json_extract(w.payload,'$.info.year') AS INTEGER)<=?");
+    where.push('c.year<=?');
     params.push(section.toYear);
   }
   for (const genre of section.genres) {
     where.push(
-      "EXISTS(SELECT 1 FROM json_each(w.payload,'$.info.genres') g WHERE CASE WHEN g.type='object' THEN json_extract(g.value,'$.name') ELSE g.value END=?)",
+      "EXISTS(SELECT 1 FROM json_each(c.genres) g WHERE CASE WHEN g.type='object' THEN json_extract(g.value,'$.name') ELSE g.value END=?)",
     );
     params.push(genre);
   }
@@ -244,23 +286,23 @@ export async function catalogList(
     if (!tokens.length) {
       return [];
     }
-    where.push('w.id IN (SELECT id FROM search WHERE search MATCH ?)');
+    where.push('c.id IN (SELECT id FROM search WHERE search MATCH ?)');
     params.push(
       tokens.map(t => '"' + t.replace(/"/g, '""') + '"*').join(' AND '),
     );
   }
   const order = {
-    title:
-      "coalesce(json_extract(w.payload,'$.info.title'),json_extract(w.payload,'$.info.name')) COLLATE NOCASE",
-    year: "CAST(json_extract(w.payload,'$.info.year') AS INTEGER) DESC",
-    added: "json_extract(w.payload,'$.info.created_at') DESC",
-    views:
-      "CAST(coalesce(json_extract(w.payload,'$.info.views'),json_extract(w.payload,'$.info.views_count'),0) AS REAL) DESC",
+    title: 'c.title COLLATE NOCASE',
+    year: 'c.year DESC',
+    added: 'c.added DESC',
+    views: 'c.views DESC',
   }[section.sort];
   return readCatalog(async db =>
     (
       await db.getAllAsync<{id: string; payload: string}>(
-        `SELECT w.id,w.payload FROM records w WHERE ${where.join(' AND ')} ORDER BY ${order},w.id LIMIT 30 OFFSET ?`,
+        `SELECT w.id,w.payload FROM
+        (SELECT c.* FROM catalog_views.works c WHERE ${where.join(' AND ')} ORDER BY ${order},c.id LIMIT 30 OFFSET ?) c
+        JOIN records w ON w.id=c.id ORDER BY ${order},c.id`,
         ...params,
         Math.max(0, Math.floor(offset)),
       )

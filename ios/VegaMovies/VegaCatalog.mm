@@ -177,12 +177,62 @@ static NSArray *Assets(NSDictionary *m, NSString *revision) {
 @end
 
 @interface VegaCatalog : NSObject <RCTBridgeModule> { FILE *_lines; CC_SHA256_CTX _hash; }
+@property(atomic) BOOL preparationCancelled;
+@property(atomic, copy) NSDictionary *preparationProgress;
 @end
 @implementation VegaCatalog
 RCT_EXPORT_MODULE();
 + (BOOL)requiresMainQueueSetup {return NO;}
 - (dispatch_queue_t)methodQueue {static dispatch_queue_t q; static dispatch_once_t once; dispatch_once(&once, ^{q=dispatch_queue_create("com.vega.catalog.io", DISPATCH_QUEUE_SERIAL);}); return q;}
 RCT_REMAP_METHOD(root, rootResolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {resolve(Root());}
+RCT_REMAP_METHOD(beginPreparation, beginPreparationResolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  self.preparationCancelled=NO; self.preparationProgress=@{@"active":@NO}; resolve(nil);
+}
+RCT_REMAP_METHOD(cancelPreparation, cancelPreparationResolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  self.preparationCancelled=YES; resolve(nil);
+}
+RCT_REMAP_METHOD(preparationStatus, preparationStatusResolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  resolve(self.preparationProgress ?: @{@"active":@NO});
+}
+RCT_REMAP_METHOD(prepareFile, prepareFileMode:(NSString *)mode source:(NSString *)source target:(NSString *)target limit:(double)limit phase:(NSString *)phase resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+  BOOL hashing=[mode isEqualToString:@"hash"], extracting=[mode isEqualToString:@"extract"];
+  if ((!hashing && !extracting && ![mode isEqualToString:@"copy"]) ||
+      !SafeFile(source) || (!hashing && (!SafeFile(target) || [source isEqualToString:target])) ||
+      !(limit>0 && limit<=68719476736.0)) {reject(@"catalog.io",@"catalog.io",nil); return;}
+  // Keep the bridge queue available for cancellation and progress while streaming.
+  static dispatch_queue_t worker; static dispatch_once_t once;
+  dispatch_once(&once, ^{worker=dispatch_queue_create("com.vega.catalog.preparation", DISPATCH_QUEUE_SERIAL);});
+  dispatch_async(worker, ^{
+    FILE *input=extracting ? NULL : fopen(source.fileSystemRepresentation,"rb");
+    gzFile gzip=extracting ? gzopen(source.fileSystemRepresentation,"rb") : NULL;
+    FILE *output=hashing ? NULL : fopen(target.fileSystemRepresentation,"wb");
+    BOOL ok=(extracting ? gzip!=NULL : input!=NULL) && (hashing || output!=NULL);
+    BOOL badSize=NO; double count=0; CFAbsoluteTime updated=0;
+    unsigned char buffer[262144]; CC_SHA256_CTX digest; CC_SHA256_Init(&digest);
+    self.preparationProgress=@{@"active":@YES,@"phase":phase,@"bytes":@0,@"total":@(limit)};
+    while(ok && !self.preparationCancelled) {
+      int n=extracting ? gzread(gzip,buffer,sizeof(buffer)) : (int)fread(buffer,1,sizeof(buffer),input);
+      if(n<=0) {if(n<0 || (!extracting && ferror(input))) ok=NO; break;}
+      count+=n;
+      if(count>limit) {badSize=YES; ok=NO; break;}
+      if(output && fwrite(buffer,1,n,output)!=(size_t)n) {ok=NO; break;}
+      CC_SHA256_Update(&digest,buffer,(CC_LONG)n);
+      CFAbsoluteTime now=CFAbsoluteTimeGetCurrent();
+      if(now-updated>=0.2) {self.preparationProgress=@{@"active":@YES,@"phase":phase,@"bytes":@(count),@"total":@(limit)}; updated=now;}
+    }
+    if(input && fclose(input)!=0) ok=NO;
+    if(gzip && gzclose(gzip)!=Z_OK) ok=NO;
+    if(output && fclose(output)!=0) ok=NO;
+    if(!extracting && count!=limit) {badSize=YES; ok=NO;}
+    self.preparationProgress=@{@"active":@NO,@"phase":phase,@"bytes":@(count),@"total":@(limit)};
+    if(self.preparationCancelled) {reject(@"catalog.preparationPaused",@"catalog.preparationPaused",nil); return;}
+    if(!ok) {NSString *code=badSize ? @"catalog.checksum" : @"catalog.io"; reject(code,code,nil); return;}
+    unsigned char bytes[CC_SHA256_DIGEST_LENGTH]; CC_SHA256_Final(bytes,&digest);
+    NSMutableString *value=[NSMutableString new];
+    for(int i=0;i<CC_SHA256_DIGEST_LENGTH;i++) [value appendFormat:@"%02x",bytes[i]];
+    resolve(value);
+  });
+}
 RCT_REMAP_METHOD(configure, configureAutomatic:(BOOL)automatic cellular:(BOOL)cellular revision:(NSString *)revision title:(NSString *)title resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
   BOOL changed = [Prefs() boolForKey:@"cellular"] != cellular;
   [Prefs() setBool:automatic forKey:@"automatic"]; [Prefs() setBool:cellular forKey:@"cellular"]; [Prefs() setObject:revision forKey:@"revision"];

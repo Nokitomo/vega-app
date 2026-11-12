@@ -61,11 +61,58 @@ transazioni SQL parametrizzate; vengono controllati hash delle righe, revisioni,
 relazioni, conteggi e indice FTS. La revisione logica viene calcolata ordinando gli
 hash per ID BINARY: non si confrontano i byte della copia aggiornata con quelli
 dello snapshot del server. Delta non validi fanno richiedere lo snapshot completo.
+La lettura degli hash usa pagine da 2.000 righe e un cursore sull'ID con collazione
+BINARY su una proiezione temporanea di soli ID/hash, costruita con scansione
+sequenziale e ordinamento su disco. Questo evita sia una chiamata nativa per ogni
+record sia milioni di accessi casuali ai grandi payload JSON.
+
+Le liste e le opzioni immagini usano `views-<revisione>-1.sqlite`, una cache
+derivata separata: conserva colonne di filtro/ordinamento delle opere attive e
+tutte le combinazioni fonte/lingua/campo delle assegnazioni eleggibili. I payload
+completi vengono letti dal database originale solo per le opere della pagina.
+Non modifica record, URL, override, revisioni o hash della pubblicazione.
+La cache viene chiusa e rinominata atomicamente prima dell'attivazione; in caso
+di interruzione si elimina soltanto il file `.building`. Per installazioni gia
+presenti viene ricostruita una volta al primo accesso. La rimozione e la pulizia
+delle generazioni includono anche questi file e rispettano i lettori ancora attivi.
 
 La nuova generazione viene selezionata solo dopo verifica e chiusura della
 connessione di preparazione. I lettori precedenti terminano prima della rimozione
-dei relativi file. Dopo un'interruzione, i file di preparazione abbandonati sono
-rimossi alla riapertura. Rimuovere il catalogo conserva preferenze e dati personali.
+dei relativi file. Uno snapshot preparato in attesa di attivazione viene conservato
+e ricontrollato tramite SHA-256 prima del riuso; le copie incomplete degli
+aggiornamenti vengono rimosse. Rimuovere il catalogo conserva preferenze e dati personali.
+
+La preparazione distingue controllo del download, estrazione, verifica della copia,
+compatibilita, applicazione delta e attivazione. Mostra avanzamento dei file e tempo
+trascorso. Interrompi preparazione conserva il download e richiede una ripresa
+esplicita, anche dopo riavvio; il passaggio in background interrompe la preparazione.
+L'annullamento del download rimuove anche i candidati non attivi. La breve fase
+finale di attivazione non espone il comando di interruzione.
+
+Gli snapshot vengono verificati tramite SHA-256 sia compressi sia estratti, quindi
+con controlli di schema, metadati e conteggio FTS. Non si ripetono sul dispositivo
+le scansioni complete integrity_check e foreign_key_check gia eseguite dal publisher.
+Per i delta si mantengono conteggi e revisione logica completa, con foreign_keys
+abilitato sulla stessa connessione della transazione.
+
+Prima dell'attivazione viene costruita una cache derivata separata,
+`views-<revision>-1.sqlite`, per gli ordinamenti della Home e le opzioni immagini.
+Il database del publisher rimane immutato, inclusi tutti i link e gli override.
+Una scansione sequenziale a blocchi prepara solo i campi necessari: le liste
+selezionano prima gli ID e recuperano poi i metadati delle sole opere visibili.
+La fase espone avanzamento e interruzione; un file `.building` incompleto non viene
+usato dai lettori. La cache e ricostruibile e viene eliminata insieme alla
+generazione ritirata. I cataloghi gia installati la preparano al primo accesso.
+
+La verifica della revisione di un delta proietta ID e hash in una tabella TEMP
+su disco e li legge in pagine ordinate. Evita milioni di accessi casuali ai
+payload originali senza cambiare l'algoritmo di revisione del publisher.
+
+Tutte le connessioni del catalogo disabilitano finalizeUnusedStatementsBeforeClosing:
+la finalizzazione automatica di expo-sqlite 16.0.10 puo finalizzare statement interni
+FTS e causare un crash alla chiusura. Gli statement espliciti dell'app devono essere
+finalizzati nei rispettivi finally. Non aggiornare la versione Expo solo per questo
+workaround senza verificare la compatibilita del progetto nativo.
 
 ## Confini di sicurezza e compatibilita
 
@@ -94,10 +141,27 @@ fonti indisponibili, checksum errati, spazio insufficiente, preparazione interro
 attivazione dopo chiusura e serializzazione delle installazioni.
 
 Build Android dev client verificata senza prebuild. Le prove visive usano
-Medium_Phone_API_35. Questo emulatore dispone di meno di 1 GB libero: non consente
-una prova dello snapshot completo da 4,63 GB. La prova completa di installazione,
-aggiornamento reale e prestazioni su dispositivo sufficientemente capiente resta
-necessaria. Il codice iOS non e compilabile/verificabile su questa postazione
+Medium_Phone_API_35. Una successiva prova dello snapshot completo su un AVD
+temporaneo su D, con partizione dati da 24 GiB, ha riprodotto un crash nativo
+in sqlite3_close dopo circa 15 minuti di preparazione nell'APK precedente al fix.
+La prova successiva con il dev client ha completato l'installazione dello snapshot
+integrale, verificato pausa/ripresa e persistenza della pausa dopo riavvio. Con la
+cache derivata sono state aperte Home, scheda, stagioni/episodi e ricerca locale;
+la ricerca globale ha mostrato anche i risultati di StreamingUnity.
+Il costruttore finale della cache e stato interrotto durante la scansione del
+catalogo completo: il temporaneo e stato eliminato e lo snapshot conservato.
+La ripresa, comprendente un nuovo hash del file da 4.63 GB e la costruzione della
+cache, e terminata in circa cinque minuti sull'AVD. Questo tempo non e un
+benchmark per telefoni: l'emulatore ha mostrato anche rallentamenti di System UI.
+
+Un delta generato dal publisher su un campione di due opere e stato applicato
+dal vero modulo Android e dall'installatore JS. Il file risultante, estratto
+dall'AVD, ha superato tutti i controlli del publisher (inclusi hash dei record,
+integrita, relazioni e revisione); verificata anche la ricerca FTS del titolo
+aggiornato. Questo verifica il percorso nativo incrementale, non le prestazioni
+di un delta sull'intero catalogo. Il calcolo della revisione completa e stato
+verificato separatamente sul PC su tutti i 5.262.964 record, con hash identico.
+Il codice iOS non e compilabile/verificabile su questa postazione
 Windows e richiede Xcode e un dispositivo/simulatore appropriato.
 
 Non dichiarare assenza di regressioni o affidabilita dei trasferimenti su iOS
@@ -105,8 +169,10 @@ finche questi controlli non sono stati eseguiti.
 
 ### Prova locale del 12 novembre 2026
 
-Verifiche automatiche: `npx tsc --noEmit`, `npm run lint` e suite Jest completa
-(80 suite, 405 test). Compilazione Kotlin riuscita anche dopo gli ultimi controlli
+Verifiche automatiche: `npx tsc --noEmit`, lint (esclusa la directory degli output
+Android) e suite Jest completa finale (81 suite, 416 test), incluso il test
+negativo di disaccordo tra manifest e delta.
+Compilazione Kotlin riuscita anche dopo gli ultimi controlli
 sulla rete. Nessun prebuild eseguito.
 
 La schermata delle impostazioni e stata aperta nel dev client Android e sono
@@ -120,5 +186,5 @@ certifica l'installazione del catalogo completo o gli aggiornamenti incrementali
 su un dispositivo reale.
 
 Gli output di build e i log di questa sessione sono conservati fuori repository
-in `D:/codex-temp/vega-catalog`. L'APK generato precede gli ultimi controlli
-nativi sulla rete: per testare lo stato finale occorre ricompilare il dev client.
+in `D:/codex-temp/vega-catalog`. Un successivo dev client x86_64 e stato compilato
+con il modulo di preparazione interrompibile, senza prebuild.

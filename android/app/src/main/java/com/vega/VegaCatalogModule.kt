@@ -20,6 +20,7 @@ import java.io.*
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.GZIPInputStream
 
 private const val MANIFEST = "https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite/manifest.json"
@@ -193,11 +194,54 @@ private fun InputStream.readBytesLimited(limit: Int): ByteArray {
 
 class VegaCatalogModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   private val executor = Executors.newSingleThreadExecutor()
+  private val preparationCancelled = AtomicBoolean(false)
+  @Volatile private var preparationProgress = JSONObject().put("active", false)
   private var lines: BufferedReader? = null
   private var digest: MessageDigest? = null
   override fun getName() = "VegaCatalog"
   private fun task(p: Promise, action: () -> Any?) {executor.execute {try {p.resolve(action())} catch (e: Exception) {p.reject("catalog.io", "catalog.io")}}}
   @ReactMethod fun root(p: Promise) {p.resolve(CatalogFiles.root(context).absolutePath)}
+  @ReactMethod fun beginPreparation(p: Promise) {preparationCancelled.set(false); preparationProgress = JSONObject().put("active", false); p.resolve(null)}
+  @ReactMethod fun cancelPreparation(p: Promise) {preparationCancelled.set(true); p.resolve(null)}
+  @ReactMethod fun preparationStatus(p: Promise) {p.resolve(JSONArguments(preparationProgress))}
+  @ReactMethod fun prepareFile(mode: String, source: String, target: String, limit: Double, phase: String, p: Promise) {
+    executor.execute {
+      try {
+        require(limit > 0 && limit <= 64.0 * 1024 * 1024 * 1024)
+        require(mode in listOf("hash", "extract", "copy"))
+        val inputFile = CatalogFiles.file(context, source)
+        val outputFile = if (mode == "hash") null else CatalogFiles.file(context, target)
+        require(outputFile == null || outputFile != inputFile)
+        val hash = MessageDigest.getInstance("SHA-256")
+        var count = 0L
+        var lastUpdate = 0L
+        fun progress() {preparationProgress = JSONObject().put("active", true).put("phase", phase).put("bytes", count).put("total", limit)}
+        progress()
+        val raw = inputFile.inputStream().buffered()
+        val input = if (mode == "extract") try {GZIPInputStream(raw)} catch (e: Exception) {raw.close(); throw e} else raw
+        input.use { stream ->
+          val output = outputFile?.outputStream()?.buffered()
+          try {
+            val buffer = ByteArray(256 * 1024)
+            while (true) {
+              if (preparationCancelled.get()) throw InterruptedIOException("catalog.preparationPaused")
+              val n = stream.read(buffer); if (n < 0) break
+              count += n; require(count <= limit.toLong()) {"catalog.checksum"}
+              hash.update(buffer, 0, n); output?.write(buffer, 0, n)
+              val now = System.currentTimeMillis()
+              if (now - lastUpdate >= 200) {progress(); lastUpdate = now}
+            }
+          } finally {output?.close()}
+        }
+        if (preparationCancelled.get()) throw InterruptedIOException("catalog.preparationPaused")
+        if (mode != "extract") require(count == limit.toLong()) {"catalog.checksum"}
+        p.resolve(hash.digest().joinToString("") {"%02x".format(it)})
+      } catch (e: Exception) {
+        val code = if (preparationCancelled.get()) "catalog.preparationPaused" else if (e.message == "catalog.checksum") "catalog.checksum" else "catalog.io"
+        p.reject(code, code)
+      } finally {preparationProgress = JSONObject().put("active", false)}
+    }
+  }
   private fun constraints() = Constraints.Builder().setRequiredNetworkType(if (CatalogFiles.prefs(context).getBoolean("cellular", false)) NetworkType.CONNECTED else NetworkType.UNMETERED).setRequiresStorageNotLow(true).build()
   @ReactMethod fun configure(automatic: Boolean, cellular: Boolean, revision: String, title: String, p: Promise) {
     val prefs = CatalogFiles.prefs(context)
@@ -272,7 +316,7 @@ class VegaCatalogModule(private val context: ReactApplicationContext) : ReactCon
   @ReactMethod fun finishHash(p: Promise) = task(p) {digest!!.digest().joinToString("") { "%02x".format(it) }.also {digest = null}}
   private fun JSONArguments(value: JSONObject): WritableMap {
     val result = Arguments.createMap()
-    value.keys().forEach { key -> when (val v = value.get(key)) {is String -> result.putString(key, v); is Number -> result.putDouble(key, v.toDouble())} }
+    value.keys().forEach { key -> when (val v = value.get(key)) {is String -> result.putString(key, v); is Boolean -> result.putBoolean(key, v); is Number -> result.putDouble(key, v.toDouble())} }
     return result
   }
 }

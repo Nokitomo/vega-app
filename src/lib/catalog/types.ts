@@ -83,4 +83,17 @@ export type TransferState = {
   bytes: number;
   total: number;
   error?: string;
+  phase?:
+    | 'hashDownload'
+    | 'extract'
+    | 'hashPrepared'
+    | 'copyBase'
+    | 'validate'
+    | 'index'
+    | 'applyDelta'
+    | 'verifyRevision'
+    | 'activate'
+    | 'stopping';
+  startedAt?: number;
+  updatedAt?: number;
 };

@@ -1,19 +1,40 @@
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import * as Crypto from 'expo-crypto';
 import {AppState} from 'react-native';
-import {openDatabaseAsync, type SQLiteDatabase} from 'expo-sqlite';
+import {type SQLiteDatabase} from 'expo-sqlite';
+import {openCatalogDatabase} from './connection';
 import {catalogNative} from './native';
 import {parseManifest, planDownload, recordKinds} from './manifest';
 import {useCatalogStore} from './store';
-import {closeCatalog, readCatalog} from './reader';
-import type {CatalogManifest} from './types';
+import {closeCatalog, readCatalog, cleanupDormantCatalogs} from './reader';
+import type {CatalogManifest, TransferState} from './types';
+import {settingsStorage} from '../storage/SettingsStorage';
+import {ensureCatalogViews} from './views';
 import i18n from '../../i18n';
 
 let installing: Promise<void> | undefined;
+let cancellationRequested = false;
+const PAUSED_KEY = 'catalog-preparation-paused:v1';
+export const isCatalogPreparationPaused = () =>
+  settingsStorage.getBool(PAUSED_KEY);
+const phase = (value: TransferState['phase'], bytes = 0, total = 0) => {
+  const state = useCatalogStore.getState();
+  state.setTransfer({
+    ...state.transfer,
+    status: 'installing',
+    phase: value,
+    bytes,
+    total,
+    updatedAt: Date.now(),
+  });
+};
 const reserve = 256 * 1024 ** 2;
 const hash = (value: string) =>
   Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value);
 const ensureForeground = () => {
+  if (cancellationRequested) {
+    throw new Error('catalog.preparationPaused');
+  }
   if (AppState.currentState !== 'active') {
     throw new Error('catalog.foregroundRequired');
   }
@@ -79,30 +100,31 @@ async function verify(
   ) {
     throw new Error('catalog.invalidDatabase');
   }
-  const integrity = await db.getFirstAsync<Record<string, string>>(
-    'PRAGMA integrity_check',
-  );
-  if (
-    !integrity ||
-    Object.values(integrity)[0] !== 'ok' ||
-    (await db.getFirstAsync('PRAGMA foreign_key_check'))
-  ) {
-    throw new Error('catalog.invalidDatabase');
-  }
-  const counts = await db.getAllAsync<{kind: string; count: number}>(
-    'SELECT kind,count(*) count FROM records GROUP BY kind',
-  );
-  if (
-    counts.some(
-      r => !recordKinds.has(r.kind) || r.count !== expected.counts[r.kind],
-    ) ||
-    [...recordKinds].some(
-      k =>
-        (counts.find(r => r.kind === k)?.count || 0) !==
-        (expected.counts[k] || 0),
-    )
-  ) {
-    throw new Error('catalog.invalidDatabase');
+  // Snapshots are publisher-validated and byte-for-byte SHA-256 verified before
+  // opening. Repeating full B-tree/FK scans here costs minutes on mobile devices.
+  // Deltas preserve the verified base, validate each upsert hash, enforce FKs in
+  // their transaction and verify the complete target logical revision below.
+  if (logical) {
+    phase(
+      'verifyRevision',
+      0,
+      Object.values(expected.counts).reduce((n, count) => n + count, 0),
+    );
+    const counts = await db.getAllAsync<{kind: string; count: number}>(
+      'SELECT kind,count(*) count FROM records GROUP BY kind',
+    );
+    if (
+      counts.some(
+        r => !recordKinds.has(r.kind) || r.count !== expected.counts[r.kind],
+      ) ||
+      [...recordKinds].some(
+        k =>
+          (counts.find(r => r.kind === k)?.count || 0) !==
+          (expected.counts[k] || 0),
+      )
+    ) {
+      throw new Error('catalog.invalidDatabase');
+    }
   }
   const search = await db.getFirstAsync<{n: number}>(
     'SELECT count(*) n FROM search',
@@ -110,24 +132,47 @@ async function verify(
   if (search?.n !== expected.activeCount) {
     throw new Error('catalog.invalidDatabase');
   }
-  await db.execAsync("INSERT INTO search(search) VALUES('integrity-check');");
   if (logical) {
     const native = catalogNative();
     await native.beginHash('cinema-schema-1');
-    let batch: string[] = [];
-    for await (const row of db.getEachAsync<{hash: string}>(
-      'SELECT hash FROM records NOT INDEXED ORDER BY id COLLATE BINARY',
-    )) {
-      batch.push(row.hash);
-      if (batch.length === 2000) {
+    let after: string | undefined;
+    let verified = 0;
+    // Project the hashes sequentially before paging. Following the published
+    // TEXT primary-key index directly would cause millions of random lookups
+    // into large JSON rows. TEMP stays on disk and never changes active data.
+    await db.execAsync(`CREATE TEMP TABLE catalog_revision_hashes(
+      id TEXT PRIMARY KEY COLLATE BINARY,hash TEXT NOT NULL) WITHOUT ROWID;
+      INSERT INTO catalog_revision_hashes SELECT id,hash FROM records NOT INDEXED ORDER BY id COLLATE BINARY;`);
+    try {
+      for (;;) {
         ensureForeground();
-        await native.appendHash(batch);
-        batch = [];
+        const rows: Array<{id: string; hash: string}> =
+          after === undefined
+            ? await db.getAllAsync(
+                'SELECT id,hash FROM catalog_revision_hashes ORDER BY id COLLATE BINARY LIMIT 2000',
+              )
+            : await db.getAllAsync(
+                'SELECT id,hash FROM catalog_revision_hashes WHERE id COLLATE BINARY > ? ORDER BY id COLLATE BINARY LIMIT 2000',
+                after,
+              );
+        if (!rows.length) {
+          break;
+        }
+        await native.appendHash(rows.map(row => row.hash));
+        verified += rows.length;
+        after = rows[rows.length - 1].id;
+        phase(
+          'verifyRevision',
+          verified,
+          Object.values(expected.counts).reduce((n, count) => n + count, 0),
+        );
       }
-    }
-    await native.appendHash(batch);
-    if ((await native.finishHash()) !== expected.revision) {
-      throw new Error('catalog.invalidDatabase');
+      ensureForeground();
+      if ((await native.finishHash()) !== expected.revision) {
+        throw new Error('catalog.invalidDatabase');
+      }
+    } finally {
+      await db.execAsync('DROP TABLE IF EXISTS temp.catalog_revision_hashes');
     }
   }
 }
@@ -138,10 +183,14 @@ async function applyDelta(
   to: string,
 ) {
   const native = catalogNative();
+  phase('applyDelta');
   await native.openLines(file);
   let header: any;
   try {
-    await db.withExclusiveTransactionAsync(async tx => {
+    // This staging connection has one owner. Use the same connection so the
+    // foreign_keys pragma is retained (exclusive helper opens another handle).
+    await db.withTransactionAsync(async () => {
+      const tx = db;
       await tx.execAsync('PRAGMA defer_foreign_keys=ON;');
       const statement = await tx.prepareAsync(
         'INSERT INTO records VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET kind=excluded.kind,work_id=excluded.work_id,parent_id=excluded.parent_id,artwork_id=excluded.artwork_id,payload=excluded.payload,hash=excluded.hash',
@@ -220,6 +269,13 @@ async function applyDelta(
       }
     });
     await verify(db, header.target, true);
+  } catch (error) {
+    if (error instanceof Error && /^catalog\.[a-zA-Z]+$/.test(error.message)) {
+      throw error;
+    }
+    // A malformed record or an SQL constraint failure invalidates this delta.
+    // The staging copy is discarded and the caller requests a full snapshot.
+    throw new Error('catalog.invalidDelta');
   } finally {
     await native.closeLines();
   }
@@ -235,16 +291,73 @@ export async function configureCatalogTransfer() {
   );
 }
 export async function startCatalogDownload() {
+  settingsStorage.setBool(PAUSED_KEY, false);
+  useCatalogStore
+    .getState()
+    .setTransfer({status: 'queued', bytes: 0, total: 0});
   await configureCatalogTransfer();
   await catalogNative().start(false);
+}
+export async function resumeCatalogPreparation() {
+  settingsStorage.setBool(PAUSED_KEY, false);
+  return installPendingCatalog();
+}
+export async function pauseCatalogPreparation() {
+  if (!installing || useCatalogStore.getState().transfer.phase === 'activate') {
+    return;
+  }
+  cancellationRequested = true;
+  settingsStorage.setBool(PAUSED_KEY, true);
+  phase('stopping');
+  await catalogNative().cancelPreparation();
+  await installing.catch(() => {});
+}
+export async function discardCatalogDownload() {
+  await pauseCatalogPreparation();
+  await catalogNative().cancel();
+  settingsStorage.setBool(PAUSED_KEY, false);
+  await cleanupDormantCatalogs();
+  useCatalogStore.getState().setTransfer({status: 'idle', bytes: 0, total: 0});
 }
 export function installPendingCatalog(): Promise<void> {
   if (installing) {
     return installing;
   }
-  installing = install().finally(() => {
-    installing = undefined;
-  });
+  if (isCatalogPreparationPaused()) {
+    useCatalogStore.getState().setTransfer({
+      status: 'paused',
+      bytes: 0,
+      total: 0,
+      error: 'catalog.preparationPaused',
+    });
+    return Promise.resolve();
+  }
+  cancellationRequested = false;
+  installing = install()
+    .catch(error => {
+      const code =
+        error instanceof Error && /^catalog\.[a-zA-Z]+$/.test(error.message)
+          ? error.message
+          : 'catalog.transferFailed';
+      const paused =
+        code === 'catalog.preparationPaused' ||
+        code === 'catalog.foregroundRequired';
+      if (paused) {
+        settingsStorage.setBool(PAUSED_KEY, true);
+      }
+      useCatalogStore.getState().setTransfer({
+        status: paused ? 'paused' : 'error',
+        bytes: 0,
+        total: 0,
+        error: paused ? 'catalog.preparationPaused' : code,
+      });
+      if (!paused) {
+        throw error;
+      }
+    })
+    .finally(() => {
+      installing = undefined;
+    });
   return installing;
 }
 async function install() {
@@ -259,54 +372,151 @@ async function install() {
   const assets = planDownload(m, installed?.revision);
   if (!assets.length) {
     await native.acknowledge();
+    useCatalogStore
+      .getState()
+      .setTransfer({status: 'ready', bytes: 0, total: 0});
     return;
   }
-  const root = await native.root();
-  const snapshot =
-    assets[0].name === m.snapshot.name &&
-    assets[0].sha256 === m.snapshot.sha256;
-  const required = m.snapshot.uncompressedBytes * (snapshot ? 1 : 3) + reserve;
-  if ((await RNFS.getFSInfo()).freeSpace < required) {
-    throw new Error('catalog.noSpace');
+  if (!native.prepareFile) {
+    throw new Error('catalog.nativeRequired');
   }
-  const file = `catalog-${m.revision}-${Date.now().toString(16)}.sqlite`;
+  const root = await native.root();
+  const snapshot = assets[0].sha256 === m.snapshot.sha256;
+  // A deterministic staging path lets a verified snapshot survive an interrupted
+  // activation. It is never trusted on resume without a fresh raw SHA-256 check.
+  const file = snapshot
+    ? `catalog-${m.revision}.sqlite`
+    : `catalog-${m.revision}-${Date.now().toString(16)}.sqlite`;
   const path = `${root}/${file}`;
   let db: SQLiteDatabase | undefined;
   let activated = false;
-  useCatalogStore
-    .getState()
-    .setTransfer({status: 'installing', bytes: 0, total: 0});
+  let reusableSnapshot = false;
+  let retainSnapshot = false;
+  let ended = false;
+  let progressTotalKnown = true;
+  await native.beginPreparation();
+  useCatalogStore.getState().setTransfer({
+    status: 'installing',
+    phase: 'hashDownload',
+    bytes: 0,
+    total: 0,
+    startedAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+  const subscription = AppState.addEventListener('change', value => {
+    if (!activated && value !== 'active') {
+      pauseCatalogPreparation().catch(() => {});
+    }
+  });
+  const timer = setInterval(() => {
+    native
+      .preparationStatus()
+      .then(progress => {
+        const state = useCatalogStore.getState();
+        if (
+          !ended &&
+          !cancellationRequested &&
+          progress.active &&
+          state.transfer.status === 'installing' &&
+          state.transfer.phase === progress.phase
+        ) {
+          phase(
+            progress.phase,
+            progress.bytes,
+            progressTotalKnown ? progress.total : 0,
+          );
+        }
+      })
+      .catch(() => {});
+  }, 500);
+  const prepare = async (
+    mode: 'hash' | 'extract' | 'copy',
+    source: string,
+    target: string,
+    limit: number,
+    label: NonNullable<TransferState['phase']>,
+    totalKnown = true,
+  ) => {
+    ensureForeground();
+    progressTotalKnown = totalKnown;
+    phase(label, 0, totalKnown ? limit : 0);
+    const result = await native.prepareFile(mode, source, target, limit, label);
+    ensureForeground();
+    return result;
+  };
   try {
-    for (const asset of assets) {
-      const compressed = `${root}/${asset.sha256}.gz`;
+    if (snapshot && (await RNFS.exists(path))) {
       if (
-        Number((await RNFS.stat(compressed)).size) !== asset.bytes ||
-        (await RNFS.hash(compressed, 'sha256')) !== asset.sha256
+        Number((await RNFS.stat(path)).size) === m.snapshot.uncompressedBytes
       ) {
-        throw new Error('catalog.checksum');
+        reusableSnapshot =
+          (await prepare(
+            'hash',
+            path,
+            '',
+            m.snapshot.uncompressedBytes,
+            'hashPrepared',
+          )) === m.snapshot.uncompressedSha256;
+      }
+      if (!reusableSnapshot) {
+        await RNFS.unlink(path);
       }
     }
-    if (snapshot) {
-      await native.gunzip(
-        `${root}/${m.snapshot.sha256}.gz`,
-        path,
-        m.snapshot.uncompressedBytes,
-      );
-      if (
-        Number((await RNFS.stat(path)).size) !== m.snapshot.uncompressedBytes ||
-        (await RNFS.hash(path, 'sha256')) !== m.snapshot.uncompressedSha256
-      ) {
-        throw new Error('catalog.checksum');
+    const required =
+      (reusableSnapshot
+        ? 0
+        : m.snapshot.uncompressedBytes * (snapshot ? 1 : 3)) + reserve;
+    if ((await RNFS.getFSInfo()).freeSpace < required) {
+      throw new Error('catalog.noSpace');
+    }
+    if (!reusableSnapshot) {
+      for (const asset of assets) {
+        const compressed = `${root}/${asset.sha256}.gz`;
+        if (
+          Number((await RNFS.stat(compressed)).size) !== asset.bytes ||
+          (await prepare(
+            'hash',
+            compressed,
+            '',
+            asset.bytes,
+            'hashDownload',
+          )) !== asset.sha256
+        ) {
+          throw new Error('catalog.checksum');
+        }
       }
-    } else {
-      if (!installed) {
-        throw new Error('catalog.notInstalled');
+      if (snapshot) {
+        const digest = await prepare(
+          'extract',
+          `${root}/${m.snapshot.sha256}.gz`,
+          path,
+          m.snapshot.uncompressedBytes,
+          'extract',
+        );
+        if (
+          Number((await RNFS.stat(path)).size) !==
+            m.snapshot.uncompressedBytes ||
+          digest !== m.snapshot.uncompressedSha256
+        ) {
+          throw new Error('catalog.checksum');
+        }
+        reusableSnapshot = true;
+      } else {
+        if (!installed) {
+          throw new Error('catalog.notInstalled');
+        }
+        await prepare(
+          'copy',
+          `${root}/${installed.file}`,
+          path,
+          Number((await RNFS.stat(`${root}/${installed.file}`)).size),
+          'copyBase',
+        );
       }
-      // Active generations are query-only and never have a WAL writer.
-      await RNFS.copyFile(`${root}/${installed.file}`, path);
     }
     ensureForeground();
-    db = await openDatabaseAsync(file, {useNewConnection: true}, root);
+    phase('validate');
+    db = await openCatalogDatabase(file, root);
     await db.execAsync(
       'PRAGMA foreign_keys=ON; PRAGMA trusted_schema=OFF; PRAGMA journal_mode=DELETE; PRAGMA cache_size=-8192; PRAGMA temp_store=FILE;',
     );
@@ -317,10 +527,13 @@ async function install() {
         const delta = m.deltas.find(d => d.sha256 === asset.sha256)!;
         const lines = `${root}/delta.ndjson`;
         try {
-          await native.gunzip(
+          await prepare(
+            'extract',
             `${root}/${asset.sha256}.gz`,
             lines,
             m.snapshot.uncompressedBytes * 2,
+            'extract',
+            false,
           );
           if ((await metadata(db)).revision !== delta.fromRevision) {
             throw new Error('catalog.invalidDelta');
@@ -332,21 +545,36 @@ async function install() {
           }
         }
       }
+      // The last delta header must also agree with the published manifest.
+      await verify(db, m, false);
     }
+    ensureForeground();
+    phase('index');
+    let lastIndexProgress = 0;
+    await ensureCatalogViews(file, root, m.revision, progress => {
+      ensureForeground();
+      if (
+        progress &&
+        (Date.now() - lastIndexProgress >= 500 ||
+          progress.completed === progress.total)
+      ) {
+        phase('index', progress.completed, progress.total);
+        lastIndexProgress = Date.now();
+      }
+    });
+    ensureForeground();
+    phase('activate');
     await db.closeAsync();
     db = undefined;
+    const installedBytes = Number((await RNFS.stat(path)).size);
     ensureForeground();
-    useCatalogStore
-      .getState()
-      .setInstalled({
-        revision: m.revision,
-        file,
-        bytes: Number((await RNFS.stat(path)).size),
-        installedAt: Date.now(),
-      });
+    useCatalogStore.getState().setInstalled({
+      revision: m.revision,
+      file,
+      bytes: installedBytes,
+      installedAt: Date.now(),
+    });
     activated = true;
-    // Open the newly selected generation so retiring readers close and release
-    // their files. Failure of housekeeping must not roll back a valid pointer.
     await readCatalog(async active => {
       await active.getFirstAsync('SELECT key FROM metadata LIMIT 1');
     }).catch(() => {});
@@ -356,6 +584,12 @@ async function install() {
       .getState()
       .setTransfer({status: 'ready', bytes: 0, total: 0});
   } catch (error) {
+    retainSnapshot =
+      reusableSnapshot &&
+      error instanceof Error &&
+      ['catalog.preparationPaused', 'catalog.foregroundRequired'].includes(
+        error.message,
+      );
     if (
       !snapshot &&
       error instanceof Error &&
@@ -370,9 +604,15 @@ async function install() {
     }
     throw error;
   } finally {
-    await db?.closeAsync();
-    if (!activated && (await RNFS.exists(path))) {
-      await RNFS.unlink(path);
+    ended = true;
+    clearInterval(timer);
+    subscription.remove();
+    try {
+      await db?.closeAsync();
+    } finally {
+      if (!activated && !retainSnapshot && (await RNFS.exists(path))) {
+        await RNFS.unlink(path);
+      }
     }
   }
 }
@@ -381,23 +621,23 @@ export async function removeCatalog() {
     throw new Error('catalog.busy');
   }
   await catalogNative().cancel();
+  settingsStorage.setBool(PAUSED_KEY, false);
   await closeCatalog();
   useCatalogStore.getState().setInstalled(null);
-  useCatalogStore
-    .getState()
-    .setPreferences({
-      ...useCatalogStore.getState().preferences,
-      selected: false,
-    });
+  useCatalogStore.getState().setPreferences({
+    ...useCatalogStore.getState().preferences,
+    selected: false,
+  });
   await configureCatalogTransfer();
   const root = await catalogNative().root();
   for (const file of await RNFS.readDir(root)) {
     if (
-      /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|[a-f0-9]{64}\.gz(?:\.part)?|delta\.ndjson)$/.test(
+      /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|views-[a-f0-9]{64}-\d+\.sqlite(?:\.building)?(?:-journal)?|[a-f0-9]{64}\.gz(?:\.part)?|delta\.ndjson)$/.test(
         file.name,
       )
     ) {
       await RNFS.unlink(file.path);
     }
   }
+  useCatalogStore.getState().setTransfer({status: 'idle', bytes: 0, total: 0});
 }
