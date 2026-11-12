@@ -92,6 +92,7 @@ export type TransferState = {
     | 'index'
     | 'applyDelta'
     | 'verifyRevision'
+    | 'prepareRevision'
     | 'activate'
     | 'stopping';
   startedAt?: number;

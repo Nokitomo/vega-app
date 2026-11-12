@@ -104,9 +104,47 @@ La fase espone avanzamento e interruzione; un file `.building` incompleto non vi
 usato dai lettori. La cache e ricostruibile e viene eliminata insieme alla
 generazione ritirata. I cataloghi gia installati la preparano al primo accesso.
 
-La verifica della revisione di un delta proietta ID e hash in una tabella TEMP
-su disco e li legge in pagine ordinate. Evita milioni di accessi casuali ai
-payload originali senza cambiare l'algoritmo di revisione del publisher.
+La verifica della revisione di un delta proietta ID e hash in un database SQLite
+di lavoro `revision-hashes.sqlite`, separato dalla generazione attiva, e li legge
+in pagine ordinate. La proiezione usa blocchi da 10.000 righe e aggiorna la
+percentuale, lasciando intervenire la pausa tra i blocchi. Il controllo dello
+spazio include una riserva proporzionale al numero di record per questo file.
+Non usa tabelle TEMP: alcune build SQLite Android possono
+conservarle in memoria anche con `temp_store=FILE`. Il file di lavoro viene
+eliminato al termine della verifica e ricreato se un processo precedente si e
+interrotto. Evita milioni di accessi casuali ai payload originali senza
+cambiare l'algoritmo di revisione del publisher. Anche l'input temporaneo della
+cache delle liste e una tabella del file `.building`, rimossa prima di pubblicarlo.
+
+Le impostazioni Database sono divise in Archivio, Immagini e Home. La Home
+conserva almeno una sezione attiva; se una preferenza precedente aveva svuotato
+le sezioni, vengono ripristinate quelle predefinite. La scelta del riquadro
+principale attiva la sezione scelta e la disattivazione della sezione principale
+assegna il riquadro alla prima sezione ancora attiva. L'eliminazione chiede
+conferma. Nell'editor i generi vengono confrontati con quelli presenti nel
+catalogo; il titolo delle sezioni predefinite puo rimanere vuoto per usare la
+traduzione dell'app, mentre una nuova sezione richiede un titolo.
+
+Prova Android del 12 novembre 2026 su Medium_Phone_API_35: la verifica logica
+completa di 5.263.903 record del catalogo installato e terminata sia con 5 GiB
+sia con 3 GiB di RAM, con revisione SHA-256 valida e rimozione del file di lavoro.
+Il picco PSS osservato e stato circa 1,05 GiB con 5 GiB e circa 0,97 GiB con
+3 GiB, contro circa 4,9 GiB della precedente implementazione TEMP. Su 3 GiB
+e stata ricostruita anche la cache derivata delle liste dal catalogo completo:
+Home caricata, file `.building` sostituito dalla cache pronta e PSS osservato
+intorno a 0,53 GiB. Questo esercita le due fasi che causavano pressione di
+memoria, ma non sostituisce una prova end-to-end di un nuovo delta pubblicato.
+La variante finale a blocchi e stata riprovata sull'intero catalogo con 3 GiB:
+percentuale della proiezione visibile, 5.263.903 hash verificati, nessuna
+chiusura del processo, PSS massimo osservato circa 1,16 GiB e file di lavoro
+eliminato. L'emulatore ha richiesto circa undici minuti per questa verifica;
+non e una previsione dei tempi su dispositivi fisici.
+Nella schermata nuova sono state provate le tre schede, il salvataggio di una
+sezione predefinita senza titolo, la validazione di un genere assente, la
+conferma prima di scartare modifiche o eliminare una sezione, la creazione e
+successiva rimozione di una sezione di prova, il cambio qualita TMDB e
+l'espansione delle ulteriori fonti immagini. Le preferenze di prova sono state
+riportate ai valori iniziali. Nessun comando diagnostico resta nell'app.
 
 Tutte le connessioni del catalogo disabilitano finalizeUnusedStatementsBeforeClosing:
 la finalizzazione automatica di expo-sqlite 16.0.10 puo finalizzare statement interni

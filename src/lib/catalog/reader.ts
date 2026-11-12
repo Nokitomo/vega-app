@@ -129,6 +129,10 @@ export async function cleanupDormantCatalogs(): Promise<void> {
   }
   for (const file of await RNFS.readDir(root)) {
     const base = file.name.replace(/-journal$/, '').replace(/\.building$/, '');
+    if (/^revision-hashes\.sqlite(?:-journal)?$/.test(file.name)) {
+      await RNFS.unlink(file.path);
+      continue;
+    }
     if (
       /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|views-[a-f0-9]{64}-\d+\.sqlite(?:\.building)?(?:-journal)?)$/.test(
         file.name,
@@ -265,6 +269,18 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
       }
     });
     return result;
+  });
+}
+export async function catalogGenres(): Promise<string[]> {
+  return readCatalog(async db => {
+    const rows = await db.getAllAsync<{name: string}>(
+      `SELECT DISTINCT CASE WHEN g.type='object'
+        THEN json_extract(g.value,'$.name') ELSE g.value END name
+       FROM catalog_views.works c, json_each(c.genres) g
+       WHERE name IS NOT NULL AND trim(name)<>''
+       ORDER BY name COLLATE NOCASE`,
+    );
+    return rows.map(row => row.name);
   });
 }
 export async function catalogList(

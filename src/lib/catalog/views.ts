@@ -71,7 +71,7 @@ async function prepare(
       CREATE TABLE works(id TEXT PRIMARY KEY,type TEXT,year INTEGER,title,added,views REAL,genres TEXT);
       CREATE TABLE image_rules(field TEXT,scope TEXT,source TEXT,language TEXT);
       CREATE TABLE ready(revision TEXT,count INTEGER);
-      CREATE TEMP TABLE view_input(id TEXT PRIMARY KEY,payload TEXT);`);
+      CREATE TABLE view_input(id TEXT PRIMARY KEY,payload TEXT);`);
     await db.runAsync(
       'ATTACH DATABASE ? AS published',
       `${root}/${sourceFile}`,

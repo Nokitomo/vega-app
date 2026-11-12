@@ -233,10 +233,20 @@ const Settings = ({navigation}: Props) => {
                 </ScrollView>
               </View>
               {/* Extensions */}
-              <TouchableOpacity accessibilityRole="button" style={{minHeight: 56, padding: 16}} onPress={() => navigation.navigate('CatalogSettings')}>
-                <Text style={[settingsPresentation.body, {color: primary}]}>{t('catalog.title')}</Text>
-              </TouchableOpacity>
               <View className="bg-[#141519] rounded-none overflow-hidden mb-3">
+                <TouchableNativeFeedback
+                  onPress={() => navigation.navigate('CatalogSettings')}
+                  background={TouchableNativeFeedback.Ripple('#333333', false)}>
+                  <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
+                    <View className="flex-row items-center flex-1">
+                      <MaterialCommunityIcons name="database-outline" size={22} color={primary} />
+                      <Text style={[settingsPresentation.body, {flexShrink: 1}]} className="text-white ml-3 text-base">
+                        {t('catalog.title')}
+                      </Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="gray" />
+                  </View>
+                </TouchableNativeFeedback>
                 <TouchableNativeFeedback
                   onPress={() => navigation.navigate('Extensions')}
                   background={TouchableNativeFeedback.Ripple('#333333', false)}>

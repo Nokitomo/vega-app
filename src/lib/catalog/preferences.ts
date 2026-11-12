@@ -124,5 +124,14 @@ export function readCatalogPreferences(
   } catch {
     /* Invalid local preferences recover to defaults. */
   }
+  if (!defaults.sections.length) {
+    defaults.sections = defaultCatalogPreferences().sections;
+  }
+  if (!defaults.sections.some(section => section.enabled)) {
+    defaults.sections[0] = {...defaults.sections[0], enabled: true};
+  }
+  if (!defaults.sections.some(section => section.enabled && section.id === defaults.heroSection)) {
+    defaults.heroSection = defaults.sections.find(section => section.enabled)!.id;
+  }
   return defaults;
 }

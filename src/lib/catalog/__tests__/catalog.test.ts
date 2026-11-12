@@ -125,6 +125,21 @@ describe('catalog artwork contract', () => {
       'original',
     );
   });
+  test('repairs a Home emptied by older settings without changing image choices', () => {
+    const p = defaultCatalogPreferences();
+    p.order.poster = [];
+    p.sections = [];
+    expect(readCatalogPreferences(JSON.stringify(p))).toMatchObject({
+      order: {poster: []},
+      heroSection: 'popular',
+      sections: defaultCatalogPreferences().sections,
+    });
+    p.sections = [{...defaultCatalogPreferences().sections[0], enabled: false}];
+    p.heroSection = 'missing';
+    const repaired = readCatalogPreferences(JSON.stringify(p));
+    expect(repaired.sections[0].enabled).toBe(true);
+    expect(repaired.heroSection).toBe('movies');
+  });
 });
 describe('catalog publication and incremental planning', () => {
   test('accepts the published interface', () => {

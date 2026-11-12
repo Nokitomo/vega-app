@@ -243,6 +243,12 @@ describe('catalog installation safety', () => {
       expect(mockDb.withTransactionAsync).toHaveBeenCalledTimes(1);
       expect(finalize).toHaveBeenCalledTimes(1);
       expect(mockNative.appendHash.mock.calls).toEqual([[['1', '2']], [['3']]]);
+      expect(mockDb.runAsync).toHaveBeenCalledWith(
+        'INSERT INTO revision_hashes.rows SELECT id,hash FROM records NOT INDEXED WHERE rowid>? AND rowid<=?',
+        0,
+        10000,
+      );
+      expect(mockDb.execAsync).toHaveBeenCalledWith('DETACH DATABASE revision_hashes');
       expect(mockDb.getAllAsync).toHaveBeenCalledWith(
         expect.stringContaining('WHERE id COLLATE BINARY > ?'),
         'z',

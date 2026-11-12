@@ -105,11 +105,7 @@ async function verify(
   // Deltas preserve the verified base, validate each upsert hash, enforce FKs in
   // their transaction and verify the complete target logical revision below.
   if (logical) {
-    phase(
-      'verifyRevision',
-      0,
-      Object.values(expected.counts).reduce((n, count) => n + count, 0),
-    );
+    phase('prepareRevision');
     const counts = await db.getAllAsync<{kind: string; count: number}>(
       'SELECT kind,count(*) count FROM records GROUP BY kind',
     );
@@ -137,22 +133,45 @@ async function verify(
     await native.beginHash('cinema-schema-1');
     let after: string | undefined;
     let verified = 0;
-    // Project the hashes sequentially before paging. Following the published
-    // TEXT primary-key index directly would cause millions of random lookups
-    // into large JSON rows. TEMP stays on disk and never changes active data.
-    await db.execAsync(`CREATE TEMP TABLE catalog_revision_hashes(
-      id TEXT PRIMARY KEY COLLATE BINARY,hash TEXT NOT NULL) WITHOUT ROWID;
-      INSERT INTO catalog_revision_hashes SELECT id,hash FROM records NOT INDEXED ORDER BY id COLLATE BINARY;`);
+    // Android SQLite may keep TEMP tables in process memory regardless of the
+    // temp_store pragma. A full catalog has millions of hashes, so use an
+    // explicitly file-backed scratch database beside the staging copy.
+    const root = await native.root();
+    const scratch = `${root}/revision-hashes.sqlite`;
+    if (await RNFS.exists(scratch)) {
+      await RNFS.unlink(scratch);
+    }
+    await db.runAsync('ATTACH DATABASE ? AS revision_hashes', scratch);
     try {
+      await db.execAsync(`PRAGMA revision_hashes.cache_size=-4096;
+        CREATE TABLE revision_hashes.rows(
+          id TEXT PRIMARY KEY COLLATE BINARY,hash TEXT NOT NULL) WITHOUT ROWID;`);
+      const last = await db.getFirstAsync<{n: number}>(
+        'SELECT coalesce(max(rowid),0) n FROM records',
+      );
+      if (!last || !Number.isSafeInteger(last.n) || last.n < 1) {
+        throw new Error('catalog.invalidDatabase');
+      }
+      const batch = 10000;
+      for (let afterRow = 0; afterRow < last.n; afterRow += batch) {
+        ensureForeground();
+        await db.runAsync(
+          'INSERT INTO revision_hashes.rows SELECT id,hash FROM records NOT INDEXED WHERE rowid>? AND rowid<=?',
+          afterRow,
+          afterRow + batch,
+        );
+        phase('prepareRevision', Math.min(afterRow + batch, last.n), last.n);
+      }
+      phase('verifyRevision', 0, Object.values(expected.counts).reduce((n, count) => n + count, 0));
       for (;;) {
         ensureForeground();
         const rows: Array<{id: string; hash: string}> =
           after === undefined
             ? await db.getAllAsync(
-                'SELECT id,hash FROM catalog_revision_hashes ORDER BY id COLLATE BINARY LIMIT 2000',
+                'SELECT id,hash FROM revision_hashes.rows ORDER BY id COLLATE BINARY LIMIT 2000',
               )
             : await db.getAllAsync(
-                'SELECT id,hash FROM catalog_revision_hashes WHERE id COLLATE BINARY > ? ORDER BY id COLLATE BINARY LIMIT 2000',
+                'SELECT id,hash FROM revision_hashes.rows WHERE id COLLATE BINARY > ? ORDER BY id COLLATE BINARY LIMIT 2000',
                 after,
               );
         if (!rows.length) {
@@ -172,7 +191,10 @@ async function verify(
         throw new Error('catalog.invalidDatabase');
       }
     } finally {
-      await db.execAsync('DROP TABLE IF EXISTS temp.catalog_revision_hashes');
+      await db.execAsync('DETACH DATABASE revision_hashes');
+      if (await RNFS.exists(scratch)) {
+        await RNFS.unlink(scratch);
+      }
     }
   }
 }
@@ -465,7 +487,9 @@ async function install() {
     const required =
       (reusableSnapshot
         ? 0
-        : m.snapshot.uncompressedBytes * (snapshot ? 1 : 3)) + reserve;
+        : m.snapshot.uncompressedBytes * (snapshot ? 1 : 3)) +
+      reserve +
+      (snapshot ? 0 : Object.values(m.counts).reduce((n, count) => n + count, 0) * 224);
     if ((await RNFS.getFSInfo()).freeSpace < required) {
       throw new Error('catalog.noSpace');
     }
@@ -632,7 +656,7 @@ export async function removeCatalog() {
   const root = await catalogNative().root();
   for (const file of await RNFS.readDir(root)) {
     if (
-      /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|views-[a-f0-9]{64}-\d+\.sqlite(?:\.building)?(?:-journal)?|[a-f0-9]{64}\.gz(?:\.part)?|delta\.ndjson)$/.test(
+      /^(catalog-[a-f0-9-]+\.sqlite(?:-journal)?|views-[a-f0-9]{64}-\d+\.sqlite(?:\.building)?(?:-journal)?|revision-hashes\.sqlite(?:-journal)?|[a-f0-9]{64}\.gz(?:\.part)?|delta\.ndjson)$/.test(
         file.name,
       )
     ) {
