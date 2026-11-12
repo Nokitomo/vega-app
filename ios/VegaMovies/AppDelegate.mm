@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import "VegaCatalog.h"
 
 #import <React/RCTBundleURLProvider.h>
 
@@ -7,6 +8,7 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
   self.moduleName = @"VegaMovies";
+  [VegaCatalogBackground registerTasks];
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
@@ -17,6 +19,11 @@
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
 {
   return [self bundleURL];
+}
+
+- (void)application:(UIApplication *)application handleEventsForBackgroundURLSession:(NSString *)identifier completionHandler:(void (^)(void))completionHandler
+{
+  [VegaCatalogBackground handleEvents:identifier completion:completionHandler];
 }
 
 - (NSURL *)bundleURL

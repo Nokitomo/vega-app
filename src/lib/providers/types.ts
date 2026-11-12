@@ -250,6 +250,7 @@ export interface ExternalEpisodeMapping {
 }
 
 export interface Link {
+  catalogSeasonRef?: {workId: string; sourceId: string; seasonId: string};
   title: string;
   titleKey?: string;
   titleParams?: I18nParams;

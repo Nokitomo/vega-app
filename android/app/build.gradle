@@ -190,6 +190,10 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    // WorkManager's public API uses ListenableFuture. The empty conflict-avoidance
+    // artifact is selected transitively, so Guava must be on the compile path too.
+    implementation("com.google.guava:guava:33.3.1-android")
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     implementation 'org.libtorrent4j:libtorrent4j:2.1.0-39'
     implementation 'org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-39'

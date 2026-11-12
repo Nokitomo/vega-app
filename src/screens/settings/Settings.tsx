@@ -233,6 +233,9 @@ const Settings = ({navigation}: Props) => {
                 </ScrollView>
               </View>
               {/* Extensions */}
+              <TouchableOpacity accessibilityRole="button" style={{minHeight: 56, padding: 16}} onPress={() => navigation.navigate('CatalogSettings')}>
+                <Text style={[settingsPresentation.body, {color: primary}]}>{t('catalog.title')}</Text>
+              </TouchableOpacity>
               <View className="bg-[#141519] rounded-none overflow-hidden mb-3">
                 <TouchableNativeFeedback
                   onPress={() => navigation.navigate('Extensions')}

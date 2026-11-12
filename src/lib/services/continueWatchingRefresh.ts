@@ -220,7 +220,7 @@ export const checkContinueWatchingSeries = async (
     const now = Date.now();
     const checks = mainStorage.getObject<CheckTimes>(CHECK_KEY) || {};
     const candidates = history
-      .filter(item => item.isSeries && item.provider && item.link &&
+      .filter(item => !item.catalogRef && item.isSeries && item.provider && item.link &&
         !hidden.has(sharedWatchContentKey(item.link)))
       .filter(item => {
         return now - (checks[checkId(item)] || 0) >= checkInterval(item);

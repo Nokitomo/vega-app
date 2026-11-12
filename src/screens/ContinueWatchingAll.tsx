@@ -5,7 +5,8 @@ import {
 } from '../components/homePresentation';
 import usePosterGrid from '../components/usePosterGrid';
 import React, {useMemo} from 'react';
-import {Image, StatusBar, Text, TouchableOpacity, View} from 'react-native';
+import {StatusBar, Text, TouchableOpacity, View} from 'react-native';
+import CatalogSavedImage from '../components/catalog/CatalogSavedImage';
 import {FlashList} from '@shopify/flash-list';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -115,11 +116,13 @@ const ContinueWatchingAll = ({navigation}: Props) => {
                         link: infoLink as typeof item.link,
                         provider: item.provider,
                         poster: item.poster,
+                        catalogRef: item.catalogRef,
                         continueWatchingTarget: presentation.target,
                       })
                     }>
                     <View className="relative">
-                      <Image
+                      <CatalogSavedImage
+                        catalogRef={item.catalogRef}
                         source={{uri: item.poster}}
                         resizeMode="cover"
                         style={{

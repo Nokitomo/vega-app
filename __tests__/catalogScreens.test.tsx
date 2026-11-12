@@ -7,6 +7,10 @@ import {providerManager} from '../src/lib/services/ProviderManager';
 import ArchiveFilterModal from '../src/components/ArchiveFilterModal';
 import ProviderImage from '../src/components/ProviderImage';
 const mockNavigate = jest.fn();
+jest.mock('../src/components/catalog/CatalogViews', () => ({
+  CatalogBrowse: (props: any) =>
+    require('react').createElement('CatalogBrowse', props),
+}));
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: require('react-native').View,
 }));
@@ -53,6 +57,36 @@ const flush = async () => {
   });
 };
 describe('Catalog, archive and calendar presentation', () => {
+  it('routes a local section without requesting provider posts', async () => {
+    const section = {
+      id: 'movies',
+      title: '',
+      enabled: true,
+      type: 'movie',
+      genres: [],
+      sort: 'added',
+    };
+    let tree!: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <ScrollList
+          {...({
+            route: {params: {catalogSection: section, catalogSearch: 'test'}},
+          } as any)}
+        />,
+      );
+    });
+    expect(tree.root.findByType('CatalogBrowse' as any).props.section).toEqual(
+      section,
+    );
+    expect(tree.root.findByType('CatalogBrowse' as any).props.search).toBe(
+      'test',
+    );
+    expect(request).not.toHaveBeenCalled();
+    await act(async () => {
+      tree.unmount();
+    });
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -140,15 +174,13 @@ describe('Catalog, archive and calendar presentation', () => {
     });
   });
   it('groups calendar days, adapts its rows and retries a failed calendar request', async () => {
-    request
-      .mockRejectedValueOnce(new Error('network'))
-      .mockResolvedValue(
-        Array.from({length: 8}, (_, i) => ({
-          ...post,
-          link: '/' + i,
-          day: i < 7 ? 'monday' : 'tuesday',
-        })),
-      );
+    request.mockRejectedValueOnce(new Error('network')).mockResolvedValue(
+      Array.from({length: 8}, (_, i) => ({
+        ...post,
+        link: '/' + i,
+        day: i < 7 ? 'monday' : 'tuesday',
+      })),
+    );
     let tree!: renderer.ReactTestRenderer;
     await act(async () => {
       tree = renderer.create(<ScrollList {...props('calendar')} />);

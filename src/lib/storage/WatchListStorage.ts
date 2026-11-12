@@ -1,4 +1,5 @@
 import {mainStorage} from './StorageService';
+import {sameWatchContent} from './SharedAnimeWatchIdentity';
 
 /**
  * Storage key for watchlist
@@ -11,6 +12,7 @@ export enum WatchListKeys {
  * Interface for watchlist item
  */
 export interface WatchListItem {
+  catalogRef?: import('../catalog/types').CatalogRef;
   title: string;
   poster: string;
   link: string;
@@ -35,7 +37,7 @@ export class WatchListStorage {
     const watchList = this.getWatchList();
 
     // Filter out any existing item with the same link
-    const newWatchList = watchList.filter(i => i.link !== item.link);
+    const newWatchList = watchList.filter(i => !sameWatchContent(i.link, item.link) && !(item.catalogRef && i.catalogRef?.catalogId === item.catalogRef.catalogId && i.catalogRef.workId === item.catalogRef.workId));
 
     // Add the new item to the end
     newWatchList.push(item);

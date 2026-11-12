@@ -12,6 +12,7 @@ import {useTranslation} from 'react-i18next';
 import {SearchStackParamList} from '../App';
 import Slider from '../components/Slider';
 import {HOME_FONT} from '../components/homePresentation';
+import {CatalogSearchResults} from '../components/catalog/CatalogViews';
 import useThemeStore from '../lib/zustand/themeStore';
 import {providerManager} from '../lib/services/ProviderManager';
 import useContentStore from '../lib/zustand/contentStore';
@@ -160,6 +161,7 @@ export default function SearchResults({route}: Props) {
           </Text>
         )}
         <View style={{paddingHorizontal: 16}}>
+          <CatalogSearchResults search={query} />
           {installedProviders.map(provider => {
             const section = sections[provider.value];
             if (section?.status === 'ready' && section.result?.Posts.length) {

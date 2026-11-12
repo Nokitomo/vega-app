@@ -7,6 +7,9 @@ import Home from './screens/home/Home';
 import Info from './screens/home/Info';
 import Player from './screens/home/Player';
 import Settings from './screens/settings/Settings';
+import CatalogSettings from './screens/settings/CatalogSettings';
+import type {CatalogRef, CatalogSection} from './lib/catalog/types';
+import {useCatalogLifecycle} from './lib/catalog/lifecycle';
 import WatchList from './screens/WatchList';
 import Search from './screens/Search';
 import ScrollList from './screens/ScrollList';
@@ -89,6 +92,7 @@ enableFreeze(true);
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type InfoRouteParams = {
+  catalogRef?: CatalogRef;
   link: string;
   continueWatchingTarget?: ContinueWatchingTarget;
   provider?: string;
@@ -111,6 +115,8 @@ export type HomeStackParamList = {
   ContinueWatchingAll: undefined;
   Info: InfoRouteParams;
   ScrollList: {
+    catalogSection?: CatalogSection;
+    catalogSearch?: string;
     filter: string;
     title?: string;
     providerValue?: string;
@@ -133,6 +139,7 @@ export type RootStackParamList = {
       }
     | undefined;
   Player: {
+    catalogRef?: CatalogRef;
     linkIndex: number;
     episodeList: EpisodeLink[];
     directUrl?: string;
@@ -159,6 +166,8 @@ export type RootStackParamList = {
 export type SearchStackParamList = {
   Search: undefined;
   ScrollList: {
+    catalogSection?: CatalogSection;
+    catalogSearch?: string;
     filter: string;
     title?: string;
     providerValue?: string;
@@ -185,6 +194,7 @@ export type WatchHistoryStackParamList = {
 };
 
 export type SettingsStackParamList = {
+  CatalogSettings: undefined;
   Settings: undefined;
   DisableProviders: undefined;
   About: undefined;
@@ -267,6 +277,7 @@ function SettingsStackScreen() {
   return (
     <SettingsStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <SettingsStack.Screen name="Settings" component={Settings} />
+      <SettingsStack.Screen name="CatalogSettings" component={CatalogSettings} />
       {/* <SettingsStack.Screen
         name="DisableProviders"
         component={DisableProviders}
@@ -449,6 +460,7 @@ function TabStack() {
 }
 
 const AppContent = () => {
+  useCatalogLifecycle();
   const [homeFontsLoaded, homeFontError] = useFonts({
     VegaAtypBold: require('../assets/fonts/atyp_bold.ttf'),
     VegaDMSansRegular: require('../assets/fonts/dmsans_regular.ttf'),

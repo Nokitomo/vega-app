@@ -104,7 +104,7 @@ const syncDisplayTitleForLink = async ({
       return;
     }
 
-    if (!shouldResolveProviderCardTitle(targetItem.provider)) {
+    if (targetItem.catalogRef || !shouldResolveProviderCardTitle(targetItem.provider)) {
       return;
     }
 

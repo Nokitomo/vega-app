@@ -1,4 +1,5 @@
-import {View, Text, Image, FlatList, ScrollView} from 'react-native';
+import {View, Text, FlatList, ScrollView} from 'react-native';
+import CatalogSavedImage from '../components/catalog/CatalogSavedImage';
 import React from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {WatchListStackParamList} from '../App';
@@ -54,6 +55,7 @@ const WatchList = () => {
       accessibilityLabel={item.title}
       onPress={() =>
         navigation.navigate('Info', {
+          catalogRef: item.catalogRef,
           link: item.link,
           provider: item.provider,
           poster: item.poster,
@@ -64,7 +66,7 @@ const WatchList = () => {
         marginBottom: 20,
       }}>
       <View className="relative overflow-hidden">
-        <Image
+        <CatalogSavedImage catalogRef={item.catalogRef}
           resizeMode="cover"
           style={{
             width: itemWidth,

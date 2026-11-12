@@ -13,6 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {CatalogInfo} from '../../components/catalog/CatalogViews';
 import {
   NativeStackNavigationProp,
   NativeStackScreenProps,
@@ -81,7 +82,10 @@ const normalizeTrailerUrl = (value?: string): string => {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(normalized)}`;
 };
 
-export default function Info({route, navigation}: Props): React.JSX.Element {
+export default function Info(props: Props): React.JSX.Element {
+  return props.route.params.catalogRef ? <CatalogInfo {...props} /> : <ProviderInfoScreen {...props} />;
+}
+function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   const searchNavigation =
     useNavigation<NativeStackNavigationProp<TabStackParamList>>();
   const {primary} = useThemeStore(state => state);

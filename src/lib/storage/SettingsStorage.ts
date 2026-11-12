@@ -67,6 +67,22 @@ export enum SettingsKeys {
  * Settings storage manager
  */
 export class SettingsStorage {
+  getCatalogPreferences(): string | undefined {
+    return mainStorage.getString('catalogPreferences:cinema:v1');
+  }
+
+  setCatalogPreferences(value: string): void {
+    mainStorage.setString('catalogPreferences:cinema:v1', value);
+  }
+
+  getInstalledCatalog(): string | undefined {
+    return mainStorage.getString('catalogInstalled:cinema:v1');
+  }
+
+  setInstalledCatalog(value: string): void {
+    mainStorage.setString('catalogInstalled:cinema:v1', value);
+  }
+
   private getBoolWithDefault(key: SettingsKeys | string, defaultValue: boolean): boolean {
     const storedValue = mainStorage.getBool(key);
     return storedValue == null ? defaultValue : storedValue;

@@ -3,7 +3,6 @@ import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   FlatList,
   Pressable,
@@ -12,6 +11,7 @@ import {
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
 import {useNavigation} from '@react-navigation/native';
 import useThemeStore from '../lib/zustand/themeStore';
+import CatalogSavedImage from './catalog/CatalogSavedImage';
 import {getHomeCardWidth, HOME_FONT} from './homePresentation';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeStackParamList} from '../App';
@@ -116,6 +116,7 @@ const ContinueWatching = ({
       }
       // Navigate to Info screen
       navigation.navigate('Info', {
+        catalogRef: item.catalogRef,
         link: linkData,
         provider: item.provider,
         poster: item.poster,
@@ -297,7 +298,7 @@ const ContinueWatching = ({
               }}>
               <View className="relative">
                 {/* Poster Image */}
-                <Image
+                <CatalogSavedImage catalogRef={item.catalogRef}
                   source={{uri: item?.poster}}
                   style={{
                     width: cardWidth,

@@ -30,6 +30,7 @@ import {
   getHomeCardWidth,
 } from '../components/homePresentation';
 import ArchiveFilterModal from '../components/ArchiveFilterModal';
+import {CatalogBrowse} from '../components/catalog/CatalogViews';
 import {
   buildArchiveFilter,
   hasActiveArchiveFilters,
@@ -730,4 +731,6 @@ const ScrollList = ({route}: Props): React.ReactElement => {
     </SafeAreaView>
   );
 };
-export default ScrollList;
+export default function CatalogOrProviderList(props: Props) {
+  return props.route.params.catalogSection ? <CatalogBrowse section={props.route.params.catalogSection} search={props.route.params.catalogSearch} /> : <ScrollList {...props} />;
+}

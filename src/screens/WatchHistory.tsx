@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   StatusBar,
   Alert,
 } from 'react-native';
@@ -12,6 +11,7 @@ import {
   CATALOG_CARD_TITLE_STYLE,
 } from '../components/homePresentation';
 import usePosterGrid from '../components/usePosterGrid';
+import CatalogSavedImage from '../components/catalog/CatalogSavedImage';
 import React, {useEffect, useState} from 'react';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import useWatchHistoryStore from '../lib/zustand/watchHistrory';
@@ -136,6 +136,7 @@ const WatchHistory = ({navigation}: Props) => {
         link: linkData,
         provider: item.provider,
         poster: item.poster || '',
+        catalogRef: item.catalogRef,
       });
     } catch (error) {
       console.error('Navigation error:', error);
@@ -257,7 +258,8 @@ const WatchHistory = ({navigation}: Props) => {
                     }
                     activeOpacity={0.8}>
                     <View className="relative overflow-hidden">
-                      <Image
+                      <CatalogSavedImage
+                        catalogRef={item.catalogRef}
                         source={{uri: item.poster}}
                         resizeMode="cover"
                         style={{

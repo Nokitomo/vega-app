@@ -21,6 +21,7 @@ export enum WatchHistoryKeys {
  * Interface for watch history item
  */
 export interface WatchHistoryItem {
+  catalogRef?: import('../catalog/types').CatalogRef;
   id: string;
   title: string;
   displayTitle?: string;

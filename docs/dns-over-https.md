@@ -87,3 +87,8 @@ latenza e numero di indirizzi restituiti.
 Quando cambia provider, le connessioni HTTP inattive vengono eliminate dal pool. Le
 richieste gia in corso non vengono interrotte; le nuove connessioni usano subito il
 resolver selezionato.
+
+Il trasferimento nativo del catalogo Cinema su Android riutilizza il client
+OkHttp dell'app, compreso il resolver e il selettore proxy. Questo non estende
+la copertura DoH a iOS, WebView, cast o applicazioni esterne. I dettagli di
+installazione e aggiornamento sono in `docs/catalog-database.md`.

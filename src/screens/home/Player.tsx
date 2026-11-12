@@ -881,6 +881,12 @@ const Player = ({route}: Props): React.JSX.Element => {
       if (!season) {
         return [];
       }
+      if (season.catalogSeasonRef) {
+        try {
+          const {loadCatalogSeason} = await import('../../lib/catalog/content');
+          return await loadCatalogSeason(season.catalogSeasonRef);
+        } catch {return [];}
+      }
       if (Array.isArray(season?.directLinks) && season.directLinks.length > 0) {
         return normalizeEpisodeList(season.directLinks);
       }
@@ -1070,6 +1076,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         file: route.params?.file,
         providerValue: route.params?.providerValue,
         infoUrl: route.params?.infoUrl,
+        catalogRef: route.params?.catalogRef,
         doNotTrack: route.params?.doNotTrack,
         seasons: route.params?.seasons,
         seasonIndex:
@@ -1154,7 +1161,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       let nextSeasonEpisodeList = nextSeasonInfo.episodeList || [];
       if (
         nextSeasonEpisodeList.length === 0 &&
-        nextSeasonInfo.season?.episodesLink
+        (nextSeasonInfo.season?.episodesLink || nextSeasonInfo.season?.catalogSeasonRef)
       ) {
         nextSeasonEpisodeList = await loadSeasonEpisodes(nextSeasonInfo.season);
       }
@@ -2017,6 +2024,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
+          catalogRef: route.params?.catalogRef,
           link: historyKey,
           title: resolvedPrimaryTitle,
           poster:
@@ -2089,6 +2097,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       providerValue,
       route.params?.episodeNumber,
       route.params?.infoUrl,
+      route.params?.catalogRef,
       route.params?.poster?.background,
       route.params?.poster?.poster,
       route.params?.seasonEpisodesLink,
@@ -2205,6 +2214,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       if (!hasHistoryEntry) {
         addItem({
           id: historyKey,
+          catalogRef: route.params?.catalogRef,
           link: historyKey,
           title: resolvedPrimaryTitle,
           poster:
@@ -2267,6 +2277,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       route.params?.episodeNumber,
       route.params?.seasonEpisodesLink,
       route.params?.infoUrl,
+      route.params?.catalogRef,
       route.params?.poster?.background,
       route.params?.poster?.poster,
       route.params?.providerValue,
@@ -2882,6 +2893,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         : undefined;
       addItem({
         id: route.params.infoUrl || activeEpisode.link,
+        catalogRef: route.params?.catalogRef,
         title: resolvedPrimaryTitle,
         poster:
           route.params.poster?.poster || route.params.poster?.background || '',

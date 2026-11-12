@@ -8,6 +8,8 @@ import {
   AppState,
 } from 'react-native';
 import Slider from '../../components/Slider';
+import {CatalogHome} from '../../components/catalog/CatalogViews';
+import {useCatalogStore} from '../../lib/catalog/store';
 import HomeRowState from '../../components/HomeRowState';
 import HomeHeader from '../../components/HomeHeader';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -613,4 +615,8 @@ const Home = ({}: Props) => {
   );
 };
 
-export default React.memo(Home);
+function HomeSelection(props: Props) {
+  const selected = useCatalogStore(s => s.preferences.selected && !!s.installed);
+  return selected ? <CatalogHome /> : <Home {...props} />;
+}
+export default React.memo(HomeSelection);
