@@ -61,6 +61,8 @@ prima della prova non si e ripetuto durante la navigazione della scheda.
 Metadata compatti con font Home; sinossi limitata a tre righe nella scheda.
 Altri dettagli apre una vista scorrevole con sinossi integrale, cast, premi
 e informazioni aggiuntive alle stesse condizioni di disponibilita precedenti.
+L'intestazione resta fissa e la vista scorrevole occupa soltanto lo spazio
+disponibile sotto di essa, anche con sinossi lunghe o testo ingrandito.
 Premi e cast non vengono piu troncati nel dettaglio. Varianti, trailer,
 preferiti e menu restano disponibili; selezione e preferenze metadata invariate.
 

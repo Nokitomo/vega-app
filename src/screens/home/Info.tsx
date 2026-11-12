@@ -1119,14 +1119,14 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                   </TouchableOpacity>
                   <InfoDialog visible={readMore} onClose={() => setReadMore(false)}>
                     <View style={{flex: 1}}>
-                      <View style={{flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12}}>
+                      <View style={{flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12, backgroundColor: isTabletDevice ? '#23252b' : 'black', zIndex: 1}}>
                         <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
                           onPress={() => setReadMore(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
                           <Ionicons name="close" size={28} color="white" />
                         </TouchableOpacity>
                         <Text style={{flex: 1, color: 'white', fontFamily: HOME_FONT.heading, fontSize: 22}}>{t('More details')}</Text>
                       </View>
-                      <ScrollView contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
+                      <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
                         <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 24}}>{displayTitle}</Text>
                         <Text style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 16, lineHeight: 24}}>{synopsis}</Text>
                         {/* Awards */}
