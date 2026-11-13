@@ -267,3 +267,34 @@ su un dispositivo reale.
 Gli output di build e i log di questa sessione sono conservati fuori repository
 in `D:/codex-temp/vega-catalog`. Un successivo dev client x86_64 e stato compilato
 con il modulo di preparazione interrompibile, senza prebuild.
+
+## Cinema SQLite Lite
+
+Vega scarica gli snapshot completi del formato `vega-cinema-lite-v1` dal
+manifest `cinema-sqlite-lite`. Android e iOS continuano a leggere le
+installazioni del formato precedente fino all'attivazione di uno snapshot
+Lite verificato. Home, ricerca e preferenze delle immagini leggono dal
+catalogo locale. La scheda carica il JSON originale dell'opera dal commit
+indicato nel manifest e controlla dimensione e SHA-256 prima di usarlo.
+
+La cache dei dettagli conserva il JSON completo per opera, comprese le
+stagioni, senza scadenza. In Database si può cambiare il limite predefinito
+di 200 MB (1 MB = 1.000.000 byte). Alla riduzione del limite o all'aggiunta
+di un documento, Vega rimuove prima i dettagli consultati meno di recente.
+Un documento più grande del limite si può consultare durante il caricamento
+online. I file immagine seguono la cache immagini dell'app.
+
+### Confini del download Lite
+
+Il manifest e gli asset provengono dalla pubblicazione GitHub di Cinema.
+Il downloader costruisce il percorso dei dettagli da commit e ID opera
+validati. Un file locale viene accettato solo se dimensione, SHA-256 e ID
+coincidono con quelli dello snapshot. Il JSON viene interpretato come dati
+del catalogo. L'autenticità di manifest e hash dipende dal controllo della
+repo di pubblicazione e da HTTPS.
+
+Una risposta incompleta o alterata può rendere indisponibili i dettagli
+dell'opera. La scheda locale resta consultabile. La scrittura temporanea,
+il controllo del trasferimento rispetto alla dimensione attesa e il limite
+di spazio riducono l'impatto sul dispositivo. I riferimenti di riproduzione
+verificati passano al resolver StreamingUnity già installato.

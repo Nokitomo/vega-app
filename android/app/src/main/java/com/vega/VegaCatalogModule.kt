@@ -23,9 +23,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.GZIPInputStream
 
-private const val MANIFEST = "https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite/manifest.json"
+private const val MANIFEST = "https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite-lite/manifest.json"
 private val SHA = Regex("[a-f0-9]{64}")
-private val ASSET_URL = Regex("https://github.com/Nokitomo/database/releases/download/cinema-sqlite-v1-[a-f0-9]{64}/[a-zA-Z0-9._-]+\\.gz")
+private val ASSET_URL = Regex("https://github.com/Nokitomo/database/releases/download/cinema-sqlite(?:-lite)?-v1-[a-f0-9]{64}/[a-zA-Z0-9._-]+\\.gz")
 internal object CatalogFiles {
   val transferMutex = Object()
   fun root(c: Context) = File(c.noBackupFilesDir, "catalogs/cinema").apply { mkdirs() }
@@ -56,13 +56,14 @@ internal object CatalogFiles {
     return hash.digest().joinToString("") { "%02x".format(it) }
   }
   fun assets(manifest: JSONObject, revision: String): List<JSONObject> {
+    val lite = manifest.optString("format") == "vega-cinema-lite-v1"
     require(manifest.getString("catalogId") == "cinema" && manifest.getInt("schemaVersion") == 1 &&
-      manifest.getInt("minimumReaderVersion") == 1 && !manifest.getBoolean("validationOnly") &&
+      (lite || manifest.getInt("minimumReaderVersion") == 1 && !manifest.getBoolean("validationOnly")) &&
       SHA.matches(manifest.getString("revision"))) { "catalog.invalidManifest" }
     val snapshot = manifest.getJSONObject("snapshot")
     val raw = snapshot.getLong("uncompressedBytes")
     require(raw in 1..(32L * 1024 * 1024 * 1024) && SHA.matches(snapshot.getString("uncompressedSha256")))
-    val deltas = manifest.getJSONArray("deltas")
+    val deltas = if (lite) JSONArray() else manifest.getJSONArray("deltas")
     require(deltas.length() <= 100)
     fun valid(a: JSONObject) {
       require(ASSET_URL.matches(a.getString("url")) && SHA.matches(a.getString("sha256")) &&
@@ -70,6 +71,7 @@ internal object CatalogFiles {
         a.getString("url").endsWith("/" + a.getString("name")))
     }
     valid(snapshot)
+    if (lite) require(snapshot.getString("name") == "cinema.sqlite.gz" && snapshot.getString("url").contains("/cinema-sqlite-lite-v1-"))
     if (revision == manifest.getString("revision")) return emptyList()
     var start = -1
     for (i in 0 until deltas.length()) {

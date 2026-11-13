@@ -6,6 +6,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useCatalogStore} from '../../lib/catalog/store';
+import {trimCatalogDetailCache} from '../../lib/catalog/detailCache';
 import {catalogNative} from '../../lib/catalog/native';
 import {
   configureCatalogTransfer,
@@ -20,6 +21,7 @@ import {catalogGenres, catalogImageRules} from '../../lib/catalog/reader';
 import {
   defaultCatalogPreferences,
   imageFields,
+  isDetailCacheLimit,
   tmdbSizes,
 } from '../../lib/catalog/preferences';
 import type {CatalogSection, ImageField} from '../../lib/catalog/types';
@@ -44,6 +46,10 @@ export default function CatalogSettings() {
   } = useCatalogStore();
   const primary = useThemeStore(s => s.primary);
   const [busy, setBusy] = useState(false);
+  const [cacheLimit, setCacheLimit] = useState(String(prefs.detailCacheMb));
+  useEffect(() => {
+    setCacheLimit(String(prefs.detailCacheMb));
+  }, [prefs.detailCacheMb]);
   const [pending, setPending] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [field, setField] = useState<ImageField>('poster');
@@ -396,6 +402,29 @@ export default function CatalogSettings() {
         <Text style={catalogStyles.text}>
           {t('catalog.backgroundExplanation')}
         </Text>
+        <Text style={catalogStyles.title}>{t('catalog.detailCache')}</Text>
+        <Text style={catalogStyles.text}>{t('catalog.detailCacheExplanation')}</Text>
+        <View style={catalogStyles.row}>
+          <TextInput
+            accessibilityLabel={t('catalog.detailCache')}
+            keyboardType="number-pad"
+            value={cacheLimit}
+            onChangeText={setCacheLimit}
+            selectTextOnFocus
+            style={[catalogStyles.text, {minWidth: 96, padding: 12, backgroundColor: '#141519'}]}
+          />
+          <Text style={catalogStyles.text}>{t('catalog.cacheMegabytes')}</Text>
+          <CatalogButton
+            label={t('catalog.saveCacheLimit')}
+            disabled={!/^\d+$/.test(cacheLimit) ||
+              !isDetailCacheLimit(Number(cacheLimit)) ||
+              Number(cacheLimit) === prefs.detailCacheMb}
+            onPress={() => {
+              setPreferences({...prefs, detailCacheMb: Number(cacheLimit)});
+              run(trimCatalogDetailCache);
+            }}
+          />
+        </View>
         </>}
         {pane === 'images' && <>
         <Text style={catalogStyles.title}>{t('catalog.images')}</Text>

@@ -20,6 +20,7 @@ export type CatalogPreferences = {
   selected: boolean;
   automatic: boolean;
   cellular: boolean;
+  detailCacheMb: number;
   order: Record<ImageField, string[]>;
   quality: Record<ImageField, string>;
   sections: CatalogSection[];
@@ -29,6 +30,9 @@ export type Asset = {name: string; url: string; bytes: number; sha256: string};
 export type DeltaAsset = Asset & {fromRevision: string; toRevision: string};
 export type CatalogManifest = {
   catalogId: 'cinema';
+  format?: 'vega-cinema-lite-v1';
+  sourceCommit?: string;
+  origins?: Record<string, string>;
   schemaVersion: 1;
   minimumReaderVersion: number;
   revision: string;
@@ -65,6 +69,9 @@ export type Work = {
   metadataPolicy?: Record<string, unknown>;
 };
 export type InstalledCatalog = {
+  format?: CatalogManifest['format'];
+  sourceCommit?: string;
+  origins?: Record<string, string>;
   revision: string;
   file: string;
   bytes: number;

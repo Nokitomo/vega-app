@@ -51,10 +51,29 @@ async function metadata(db: SQLiteDatabase): Promise<Record<string, any>> {
 }
 async function verify(
   db: SQLiteDatabase,
-  expected: Pick<CatalogManifest, 'revision' | 'counts' | 'activeCount'>,
+  expected: Pick<CatalogManifest, 'revision' | 'counts' | 'activeCount' | 'format' | 'sourceCommit' | 'origins'>,
   logical: boolean,
 ) {
   const meta = await metadata(db);
+  if (expected.format === 'vega-cinema-lite-v1') {
+    const counts = await db.getFirstAsync<Record<string, number>>(
+      'SELECT (SELECT count(*) FROM works) works, (SELECT count(*) FROM artwork) artwork, ' +
+      '(SELECT count(*) FROM image_rules) image_rules, (SELECT count(*) FROM search) active',
+    );
+    const integrity = await db.getFirstAsync<{quick_check: string}>('PRAGMA quick_check(1)');
+    const relation = await db.getFirstAsync('PRAGMA foreign_key_check');
+    const version = await db.getFirstAsync<{user_version: number}>('PRAGMA user_version');
+    if (meta.catalogId !== 'cinema' || meta.format !== expected.format ||
+        meta.schemaVersion !== 1 || version?.user_version !== 1 ||
+        meta.revision !== expected.revision || meta.sourceCommit !== expected.sourceCommit ||
+        meta.activeCount !== expected.activeCount || counts?.active !== expected.activeCount ||
+        integrity?.quick_check !== 'ok' || relation ||
+        ['works', 'artwork', 'image_rules'].some(k => counts?.[k] !== expected.counts[k]) ||
+        JSON.stringify(meta.origins) !== JSON.stringify(expected.origins)) {
+      throw new Error('catalog.invalidDatabase');
+    }
+    return;
+  }
   if (
     meta.catalogId !== 'cinema' ||
     meta.schemaVersion !== 1 ||
@@ -573,19 +592,21 @@ async function install() {
       await verify(db, m, false);
     }
     ensureForeground();
-    phase('index');
-    let lastIndexProgress = 0;
-    await ensureCatalogViews(file, root, m.revision, progress => {
-      ensureForeground();
-      if (
-        progress &&
-        (Date.now() - lastIndexProgress >= 500 ||
-          progress.completed === progress.total)
-      ) {
-        phase('index', progress.completed, progress.total);
-        lastIndexProgress = Date.now();
-      }
-    });
+    if (!m.format) {
+      phase('index');
+      let lastIndexProgress = 0;
+      await ensureCatalogViews(file, root, m.revision, progress => {
+        ensureForeground();
+        if (
+          progress &&
+          (Date.now() - lastIndexProgress >= 500 ||
+            progress.completed === progress.total)
+        ) {
+          phase('index', progress.completed, progress.total);
+          lastIndexProgress = Date.now();
+        }
+      });
+    }
     ensureForeground();
     phase('activate');
     await db.closeAsync();
@@ -597,6 +618,9 @@ async function install() {
       file,
       bytes: installedBytes,
       installedAt: Date.now(),
+      format: m.format,
+      sourceCommit: m.sourceCommit,
+      origins: m.origins,
     });
     activated = true;
     await readCatalog(async active => {

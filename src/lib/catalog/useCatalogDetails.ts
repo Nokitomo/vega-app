@@ -5,7 +5,7 @@ import useContentStore from '../zustand/contentStore';
 import type {Info, Link} from '../providers/types';
 import type {CatalogRef} from './types';
 import {useCatalogStore} from './store';
-import {catalogChildren, catalogWork, catalogEpisodeCount} from './reader';
+import {catalogChildren, catalogWork, catalogDetailWork, catalogEpisodeCount} from './reader';
 import {type CatalogSource, sourceLink, syncCatalogSeries, workImages, workTitle} from './content';
 import {registerCatalogIdentity, sourceIdentity} from './identity';
 
@@ -21,11 +21,24 @@ export function useCatalogDetails(ref: CatalogRef | undefined, sourceHint: strin
   const generation = useCatalogStore(s => s.generation);
   const installedProviders = useContentStore(s => s.installedProviders);
   const [selection, setSelection] = useState({workId: '', sourceId: ''});
+  const summary = useQuery({
+    queryKey: ['catalog-summary', installed?.revision, generation, ref?.workId],
+    enabled: !!ref && !!installed?.format,
+    queryFn: async () => {
+      const work = await catalogWork(ref!.workId);
+      const [poster, background, logo] = await Promise.all(
+        (['poster', 'background', 'logo'] as const).map(field => workImages(work, field)),
+      );
+      return {work, artwork: {poster, background, logo}};
+    },
+  });
   const query = useQuery({
     queryKey: ['catalog-details', installed?.revision, generation, ref?.workId, i18n.language],
     enabled: !!ref && !!installed,
+    networkMode: installed?.format ? 'always' : 'online',
+    refetchOnMount: installed?.format ? 'always' : true,
     queryFn: async () => {
-      const work = await catalogWork(ref!.workId);
+      const work = installed?.format ? await catalogDetailWork(ref!.workId) : await catalogWork(ref!.workId);
       const [sources, seasons, poster, background, logo, episodesCount] = await Promise.all([
         catalogChildren<CatalogSource>('source', work.id),
         catalogChildren<{number: number}>('season', work.id),
@@ -49,8 +62,10 @@ export function useCatalogDetails(ref: CatalogRef | undefined, sourceHint: strin
     }
   }, [query.data, source]);
   const info = useMemo<Info | undefined>(() => {
-    if (!query.data) {return undefined;}
-    const {work, seasons, artwork} = query.data;
+    const data = query.data || summary.data;
+    if (!data) {return undefined;}
+    const {work, artwork} = data;
+    const seasons = query.data?.seasons || [];
     const raw = work.payload.info;
     const ids = work.payload.sourceIds || {};
     const movie = raw.type === 'movie';
@@ -70,7 +85,7 @@ export function useCatalogDetails(ref: CatalogRef | undefined, sourceHint: strin
       background: artwork.background[0], logo: artwork.logo[0],
       year: text(raw.year), runtime: /^\d+(?:\.\d+)?$/.test(text(raw.runtime))
         ? i18n.t('catalog.runtimeMinutes', {count: Number(raw.runtime)}) : text(raw.runtime),
-      rating: text(raw.rating), episodesCount: movie ? undefined : query.data.episodesCount,
+      rating: text(raw.rating), episodesCount: movie ? undefined : query.data?.episodesCount,
       genres: labels(raw.genres), cast: labels(raw.cast),
       country: text(raw.country), director: text(raw.director),
       trailers: labels(raw.trailers), linkList,
@@ -82,14 +97,15 @@ export function useCatalogDetails(ref: CatalogRef | undefined, sourceHint: strin
         tmdbShowIds: numberId(ids.tmdb || ids.tmdb_id), tvdbShowIds: numberId(ids.tvdb || ids.tvdb_id),
       }},
     };
-  }, [query.data, source]);
+  }, [query.data, summary.data, source]);
   return {
-    info, sources, source, artwork: query.data?.artwork,
+    info, sources, source, artwork: query.data?.artwork || summary.data?.artwork,
     link: source ? sourceLink(source.payload) : ref?.workId || '',
     provider: source?.payload.provider || '',
     selectSource: (sourceId: string) => setSelection({workId: ref?.workId || '', sourceId}),
     isLoading: query.isLoading,
-    error: query.error || (ref && !installed ? new Error('catalog.notInstalled') : undefined),
+    detailError: summary.data ? query.error : undefined,
+    error: (!summary.data && query.error) || (ref && !installed ? new Error('catalog.notInstalled') : undefined),
     refetch: query.refetch,
   };
 }

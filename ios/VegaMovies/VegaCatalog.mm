@@ -6,7 +6,7 @@
 
 static NSString *const TaskID = @"com.vega.catalog.refresh";
 static NSString *const SessionID = @"com.vega.catalog.transfer";
-static NSString *const ManifestURL = @"https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite/manifest.json";
+static NSString *const ManifestURL = @"https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite-lite/manifest.json";
 static NSUserDefaults *Prefs(void) { return [[NSUserDefaults alloc] initWithSuiteName:@"vega-catalog"]; }
 static NSString *Root(void) {
   NSString *path = [NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"VegaCatalog/cinema"];
@@ -27,18 +27,20 @@ static void State(NSString *status, NSNumber *bytes, NSNumber *total, NSString *
 static NSArray *Assets(NSDictionary *m, NSString *revision) {
   if (![m isKindOfClass:NSDictionary.class] || ![m[@"snapshot"] isKindOfClass:NSDictionary.class]) return nil;
   NSDictionary *snapshot = m[@"snapshot"];
+  BOOL lite = [m[@"format"] isEqual:@"vega-cinema-lite-v1"];
   if (![m[@"catalogId"] isEqual:@"cinema"] || [m[@"schemaVersion"] intValue] != 1 ||
-      [m[@"minimumReaderVersion"] intValue] != 1 || ![m[@"validationOnly"] isEqual:@NO] ||
+      (!lite && ([m[@"minimumReaderVersion"] intValue] != 1 || ![m[@"validationOnly"] isEqual:@NO])) ||
       !Matches(m[@"revision"], @"^[a-f0-9]{64}$") || [snapshot[@"uncompressedBytes"] doubleValue] <= 0 ||
       [snapshot[@"uncompressedBytes"] doubleValue] > 34359738368.0 || !Matches(snapshot[@"uncompressedSha256"], @"^[a-f0-9]{64}$") ||
-      ![m[@"deltas"] isKindOfClass:NSArray.class] || [m[@"deltas"] count] > 100) return nil;
-  NSArray *deltas = m[@"deltas"];
+      (!lite && (![m[@"deltas"] isKindOfClass:NSArray.class] || [m[@"deltas"] count] > 100))) return nil;
+  NSArray *deltas = lite ? @[] : m[@"deltas"];
   for (NSDictionary *a in [@[snapshot] arrayByAddingObjectsFromArray:deltas]) {
     if (![a isKindOfClass:NSDictionary.class] || ![a[@"name"] isKindOfClass:NSString.class]) return nil;
-    if (!Matches(a[@"url"], @"^https://github\\.com/Nokitomo/database/releases/download/cinema-sqlite-v1-[a-f0-9]{64}/[a-zA-Z0-9._-]+\\.gz$") ||
+    if (!Matches(a[@"url"], @"^https://github\\.com/Nokitomo/database/releases/download/cinema-sqlite(?:-lite)?-v1-[a-f0-9]{64}/[a-zA-Z0-9._-]+\\.gz$") ||
         !Matches(a[@"sha256"], @"^[a-f0-9]{64}$") || [a[@"bytes"] doubleValue] <= 0 || [a[@"bytes"] doubleValue] > 17179869184.0 ||
         ![a[@"url"] hasSuffix:[@"/" stringByAppendingString:a[@"name"] ?: @""]]) return nil;
   }
+  if (lite && (![snapshot[@"name"] isEqual:@"cinema.sqlite.gz"] || ![snapshot[@"url"] containsString:@"/cinema-sqlite-lite-v1-"])) return nil;
   if ([revision isEqual:m[@"revision"]]) return @[];
   NSInteger start = -1;
   for (NSUInteger i=0; i<deltas.count; i++) if ([deltas[i][@"fromRevision"] isEqual:revision]) start = i;

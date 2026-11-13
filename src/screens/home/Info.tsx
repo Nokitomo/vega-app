@@ -1108,6 +1108,13 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                       }
                     </View>
                   </View>
+                  {isCatalog && catalog.detailError && (
+                    <TouchableOpacity accessibilityRole="button" onPress={handleRefresh}
+                      style={{minHeight: 48, justifyContent: 'center'}}>
+                      <Text style={{color: '#dadada'}}>{t('catalog.detailUnavailable')}</Text>
+                      <Text style={{color: primary, fontFamily: HOME_FONT.bold}}>{t('Try Again')}</Text>
+                    </TouchableOpacity>
+                  )}
                   <SkeletonLoader show={infoLoading} height={85} width={'100%'}>
                     <Text numberOfLines={3} style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14, lineHeight: 21}}>
                       {synopsis}

@@ -1,6 +1,6 @@
 import type {Asset, CatalogManifest, DeltaAsset} from './types';
 export const CATALOG_MANIFEST_URL =
-  'https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite/manifest.json';
+  'https://raw.githubusercontent.com/Nokitomo/database/cinema-sqlite-lite/manifest.json';
 const sha = /^[a-f0-9]{64}$/;
 const kinds = [
   'alias',
@@ -31,7 +31,7 @@ export function isCatalogAssetUrl(value: unknown): value is string {
       !u.search &&
       !u.hash &&
       u.hostname === 'github.com' &&
-      /^\/Nokitomo\/database\/releases\/download\/cinema-sqlite-v1-[a-f0-9]{64}\/[^/]+\.gz$/.test(
+      /^\/Nokitomo\/database\/releases\/download\/cinema-sqlite(?:-lite)?-v1-[a-f0-9]{64}\/[^/]+\.gz$/.test(
         u.pathname,
       )
     );
@@ -53,14 +53,51 @@ function asset(value: any): value is Asset {
 }
 export function parseManifest(value: unknown): CatalogManifest {
   const m = value as CatalogManifest;
+  const lite = m?.format === 'vega-cinema-lite-v1';
+  if (lite) {
+    const raw = value as CatalogManifest & {detailPath?: string};
+    if (
+      raw.catalogId !== 'cinema' ||
+      raw.schemaVersion !== 1 ||
+      !/^[a-f0-9]{40}$/.test(raw.sourceCommit || '') ||
+      raw.detailPath !== 'cinema/data/items/{workId}.json' ||
+      !raw.origins ||
+      typeof raw.origins !== 'object' ||
+      Array.isArray(raw.origins) ||
+      !Object.values(raw.origins).every(
+        origin =>
+          typeof origin === 'string' && /^https:\/\/[^/]+$/.test(origin),
+      ) ||
+      !sha.test(raw.revision) ||
+      !asset(raw.snapshot) ||
+      !new URL(raw.snapshot.url).pathname.includes('/cinema-sqlite-lite-v1-') ||
+      raw.snapshot.name !== 'cinema.sqlite.gz' ||
+      !sha.test(raw.snapshot.uncompressedSha256) ||
+      !Number.isSafeInteger(raw.snapshot.uncompressedBytes) ||
+      raw.snapshot.uncompressedBytes <= 0 ||
+      raw.snapshot.uncompressedBytes > 32 * 1024 ** 3 ||
+      !raw.counts ||
+      !['works', 'artwork', 'image_rules'].every(
+        k => Number.isSafeInteger(raw.counts[k]) && raw.counts[k] >= 0,
+      ) ||
+      !Number.isSafeInteger(raw.activeCount) ||
+      raw.activeCount < 0 ||
+      raw.activeCount > raw.counts.works
+    ) {
+      throw new Error('catalog.invalidManifest');
+    }
+    return {...raw, minimumReaderVersion: 1, validationOnly: false, deltas: []};
+  }
   if (
     !m ||
+    m.format !== undefined ||
     m.catalogId !== 'cinema' ||
     m.schemaVersion !== 1 ||
     m.minimumReaderVersion !== 1 ||
     m.validationOnly !== false ||
     !sha.test(m.revision) ||
     !asset(m.snapshot) ||
+    new URL(m.snapshot.url).pathname.includes('/cinema-sqlite-lite-v1-') ||
     !sha.test(m.snapshot.uncompressedSha256) ||
     !Number.isSafeInteger(m.snapshot.uncompressedBytes) ||
     m.snapshot.uncompressedBytes <= 0 ||
@@ -76,7 +113,11 @@ export function parseManifest(value: unknown): CatalogManifest {
     !Array.isArray(m.deltas) ||
     m.deltas.length > 100 ||
     !m.deltas.every(
-      d => asset(d) && sha.test(d.fromRevision) && sha.test(d.toRevision),
+      d =>
+        asset(d) &&
+        !new URL(d.url).pathname.includes('/cinema-sqlite-lite-v1-') &&
+        sha.test(d.fromRevision) &&
+        sha.test(d.toRevision),
     )
   ) {
     throw new Error('catalog.invalidManifest');

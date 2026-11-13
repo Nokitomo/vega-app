@@ -1,5 +1,7 @@
 import {type SQLiteDatabase, type SQLiteBindValue} from 'expo-sqlite';
 import {openCatalogDatabase} from './connection';
+import {loadCatalogDetail} from './detailCache';
+import {detailRows, detailArtwork} from './liteDetails';
 import {catalogNative} from './native';
 import {useCatalogStore} from './store';
 import * as RNFS from '@dr.pogodin/react-native-fs';
@@ -16,7 +18,7 @@ import type {
 
 type Connection = {
   file: string;
-  viewsFile: string;
+  viewsFile?: string;
   db: Promise<SQLiteDatabase>;
 };
 let connection: Connection | undefined;
@@ -34,17 +36,17 @@ async function acquire(): Promise<SQLiteDatabase> {
     const db = catalogNative()
       .root()
       .then(async directory => {
-        const viewsFile = await ensureCatalogViews(
+        const viewsFile = installed.format ? undefined : await ensureCatalogViews(
           installed.file,
           directory,
           installed.revision,
         );
         const opened = await openCatalogDatabase(installed.file, directory);
         try {
-          await opened.runAsync(
+          if (viewsFile) {await opened.runAsync(
             'ATTACH DATABASE ? AS catalog_views',
             `${directory}/${viewsFile}`,
-          );
+          );}
           await opened.execAsync(
             'PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-8192;',
           );
@@ -56,7 +58,7 @@ async function acquire(): Promise<SQLiteDatabase> {
       });
     connection = {
       file: installed.file,
-      viewsFile: catalogViewsFile(installed.revision),
+      viewsFile: installed.format ? undefined : catalogViewsFile(installed.revision),
       db,
     };
     db.catch(() => {
@@ -86,6 +88,7 @@ export async function readCatalog<T>(
           if (await RNFS.exists(path)) {
             await RNFS.unlink(path);
           }
+          if (!p.viewsFile) {return;}
           const views = `${await catalogNative().root()}/${p.viewsFile}`;
           if (
             p.viewsFile !== connection?.viewsFile &&
@@ -152,18 +155,21 @@ export async function catalogWork(id: string): Promise<CatalogRecord<Work>> {
     const seen = new Set<string>();
     while (!seen.has(id) && seen.size < 32) {
       seen.add(id);
-      const r = await db.getFirstAsync<{id: string; payload: string}>(
-        "SELECT id,payload FROM records WHERE id=? AND kind='work'",
-        id,
-      );
-      if (!r) {
-        break;
-      }
+      const lite = useCatalogStore.getState().installed?.format;
+      const key = lite ? id.replace(/^cinema:/, '') : id;
+      const r = lite
+        ? await db.getFirstAsync<{id: string; payload: string}>(
+            "SELECT 'cinema:' || id id,json_object('active',active,'replacedBy',replaced_by,'info',json(info)) payload FROM works WHERE id=?", key,
+          )
+        : await db.getFirstAsync<{id: string; payload: string}>(
+            "SELECT id,payload FROM records WHERE id=? AND kind='work'", key,
+          );
+      if (!r) {break;}
       const work = unpack<Work>(r);
       if (!work.payload.replacedBy) {
         if (seen.size > 1) {
           registerCatalogIdentity(
-            {catalogId: 'cinema', workId: id},
+            {catalogId: 'cinema', workId: work.id},
             [...seen],
             [],
           );
@@ -177,11 +183,34 @@ export async function catalogWork(id: string): Promise<CatalogRecord<Work>> {
     throw new Error('catalog.missingWork');
   });
 }
+async function liteDetail(work: string) {
+  const installed = useCatalogStore.getState().installed;
+  if (!installed?.format || !installed.sourceCommit) {throw new Error('catalog.invalidDatabase');}
+  const workId = work.replace(/^cinema:/, '');
+  const row = await readCatalog(db => db.getFirstAsync<{hash: string; bytes: number}>(
+    `SELECT detail_sha256 hash,detail_bytes bytes FROM works WHERE id=? AND
+      (SELECT value FROM metadata WHERE key='revision')=?`, workId, JSON.stringify(installed.revision),
+  ));
+  if (!row) {throw new Error('catalog.missingWork');}
+  return {detail: await loadCatalogDetail({workId, sourceCommit: installed.sourceCommit, ...row}),
+    origins: installed.origins || {}};
+}
+
+export async function catalogDetailWork(id: string): Promise<CatalogRecord<Work>> {
+  const work = await catalogWork(id);
+  if (!useCatalogStore.getState().installed?.format) {return work;}
+  const {detail} = await liteDetail(work.id);
+  return {id: work.id, payload: detail as Work};
+}
+
 export async function catalogChildren<T>(
   kind: 'season' | 'episode' | 'source' | 'source_season' | 'source_episode',
   work: string,
   parent?: string,
 ): Promise<CatalogRecord<T>[]> {
+  if (useCatalogStore.getState().installed?.format) {
+    return detailRows((await liteDetail(work)).detail, work, kind, parent) as CatalogRecord<T>[];
+  }
   return readCatalog(async db =>
     (
       await db.getAllAsync<{id: string; payload: string}>(
@@ -192,6 +221,11 @@ export async function catalogChildren<T>(
   );
 }
 export async function catalogEpisodeCount(work: string): Promise<number> {
+  if (useCatalogStore.getState().installed?.format) {
+    const {detail} = await liteDetail(work);
+    return detailRows(detail, work, 'season').filter(row => Number(row.payload.number) > 0)
+      .reduce((sum, row) => sum + detailRows(detail, work, 'episode', row.id).length, 0);
+  }
   return readCatalog(async db => {
     const row = await db.getFirstAsync<{total: number}>(
       `SELECT count(*) total FROM records e JOIN records s ON s.id=e.parent_id
@@ -220,6 +254,16 @@ export async function catalogImages(
       : field === 'episodeThumbnail'
         ? 'thumbnail'
         : field;
+  if (useCatalogStore.getState().installed?.format) {
+    if (scope !== 'work') {
+      const {detail, origins} = await liteDetail(work);
+      return detailArtwork(detail, origins, scope, role, season, episode);
+    }
+    return readCatalog(async db => (await db.getAllAsync<Artwork>(
+      'SELECT id,url,source,field,language,forced,rank,width,height FROM artwork WHERE work_id=? AND field=?',
+      work.replace(/^cinema:/, ''), role,
+    )).map(row => ({...row, forced: Boolean(row.forced), eligible: true, scope, season: null, episode: null})));
+  }
   return readCatalog(async db =>
     (
       await db.getAllAsync<{id: string; payload: string; url: string}>(
@@ -243,7 +287,9 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
       scope: string;
       source: string;
       language: string | null;
-    }>('SELECT field,scope,source,language FROM catalog_views.image_rules');
+    }>(useCatalogStore.getState().installed?.format
+      ? 'SELECT field,scope,source,language FROM image_rules'
+      : 'SELECT field,scope,source,language FROM catalog_views.image_rules');
     const result: Record<string, string[]> = {};
     rows.forEach(r => {
       const field =
@@ -271,12 +317,19 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
     return result;
   });
 }
+const liteWorks = `SELECT id,info,json_extract(info,'$.type') type,
+  CAST(json_extract(info,'$.year') AS INTEGER) year,
+  coalesce(json_extract(info,'$.title'),json_extract(info,'$.name')) title,
+  json_extract(info,'$.created_at') added,
+  CAST(coalesce(json_extract(info,'$.views'),json_extract(info,'$.views_count'),0) AS REAL) views,
+  coalesce(json_extract(info,'$.genres'),'[]') genres FROM works WHERE active=1`;
+
 export async function catalogGenres(): Promise<string[]> {
   return readCatalog(async db => {
     const rows = await db.getAllAsync<{name: string}>(
       `SELECT DISTINCT CASE WHEN g.type='object'
         THEN json_extract(g.value,'$.name') ELSE g.value END name
-       FROM catalog_views.works c, json_each(c.genres) g
+       FROM ${useCatalogStore.getState().installed?.format ? `(${liteWorks})` : 'catalog_views.works'} c, json_each(c.genres) g
        WHERE name IS NOT NULL AND trim(name)<>''
        ORDER BY name COLLATE NOCASE`,
     );
@@ -324,6 +377,13 @@ export async function catalogList(
     added: 'c.added DESC',
     views: 'c.views DESC',
   }[section.sort];
+  if (useCatalogStore.getState().installed?.format) {
+    return readCatalog(async db => (await db.getAllAsync<{id: string; payload: string}>(
+      `SELECT 'cinema:' || c.id id,json_object('active',1,'info',json(c.info)) payload
+        FROM (${liteWorks}) c WHERE ${where.join(' AND ')} ORDER BY ${order},c.id LIMIT 30 OFFSET ?`,
+      ...params, Math.max(0, Math.floor(offset)),
+    )).map(unpack<Work>));
+  }
   return readCatalog(async db =>
     (
       await db.getAllAsync<{id: string; payload: string}>(

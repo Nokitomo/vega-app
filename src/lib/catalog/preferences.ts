@@ -1,5 +1,12 @@
 import type {CatalogPreferences, ImageField} from './types';
 
+export const DEFAULT_DETAIL_CACHE_MB = 200;
+
+export function isDetailCacheLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) &&
+    value >= 1 && Number.isSafeInteger(value * 1_000_000);
+}
+
 export const imageFields: ImageField[] = [
   'poster',
   'background',
@@ -20,6 +27,7 @@ export function defaultCatalogPreferences(): CatalogPreferences {
     selected: false,
     automatic: true,
     cellular: false,
+    detailCacheMb: DEFAULT_DETAIL_CACHE_MB,
     order: {
       poster: [
         'tmdb:it',
@@ -99,6 +107,9 @@ export function readCatalogPreferences(
       if (typeof value[key] === 'boolean') {
         defaults[key] = value[key];
       }
+    }
+    if (isDetailCacheLimit(value.detailCacheMb)) {
+      defaults.detailCacheMb = value.detailCacheMb;
     }
     if (Array.isArray(value.sections)) {
       defaults.sections = value.sections
