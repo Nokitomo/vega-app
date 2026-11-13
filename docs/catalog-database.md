@@ -298,3 +298,12 @@ dell'opera. La scheda locale resta consultabile. La scrittura temporanea,
 il controllo del trasferimento rispetto alla dimensione attesa e il limite
 di spazio riducono l'impatto sul dispositivo. I riferimenti di riproduzione
 verificati passano al resolver StreamingUnity già installato.
+
+Per Cinema Lite Vega prepara anche le liste indicizzate da `works` durante
+l'installazione. Per gli snapshot già installati crea il file derivato al
+primo accesso, senza riscaricare il catalogo. Home e ricerca usano gli
+indici delle liste per filtri e ordinamenti. Per ogni pagina Lite i
+candidati poster vengono letti insieme e passati al selettore immagini
+esistente.
+Le righe Cinema ricevono i poster già risolti dal catalogo e saltano il
+tracciamento di visibilità usato dalle righe provider per l'artwork remoto.

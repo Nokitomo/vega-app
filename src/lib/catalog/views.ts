@@ -12,6 +12,7 @@ export function ensureCatalogViews(
   root: string,
   revision: string,
   checkpoint: Checkpoint = () => {},
+  lite = false,
 ): Promise<string> {
   const file = catalogViewsFile(revision);
   const key = `${root}/${file}`;
@@ -19,7 +20,7 @@ export function ensureCatalogViews(
   if (existing) {
     return existing;
   }
-  const task = prepare(sourceFile, root, revision, checkpoint).finally(() =>
+  const task = prepare(sourceFile, root, revision, checkpoint, lite).finally(() =>
     building.delete(key),
   );
   building.set(key, task);
@@ -31,6 +32,7 @@ async function prepare(
   root: string,
   revision: string,
   checkpoint: Checkpoint,
+  lite: boolean,
 ) {
   const file = catalogViewsFile(revision);
   const target = `${root}/${file}`;
@@ -86,43 +88,57 @@ async function prepare(
       throw new Error('catalog.invalidDatabase');
     }
     checkpoint();
-    const maximum = await db.getFirstAsync<{n: number}>(
-      'SELECT coalesce(max(rowid),0) n FROM published.records',
-    );
-    if (!maximum || !Number.isSafeInteger(maximum.n) || maximum.n < 0) {
-      throw new Error('catalog.invalidDatabase');
-    }
-    const batch = 5000;
-    const total = Math.ceil(maximum.n / batch) + 1;
-    // One sequential pass over physical rows. Sparse kind indexes otherwise
-    // cause expensive random I/O on a large mobile database. Each bounded batch
-    // yields to JS so cancellation and foreground checks remain responsive.
-    for (let after = 0; after < maximum.n; after += batch) {
-      checkpoint({completed: Math.floor(after / batch), total});
-      await db.runAsync(
-        `INSERT OR IGNORE INTO view_input SELECT
-        CASE WHEN kind='work' THEN id ELSE 'rule:' || json_array(json_extract(payload,'$.field'),json_extract(payload,'$.scope'),json_extract(payload,'$.source'),json_extract(payload,'$.language')) END,
-        CASE WHEN kind='work' THEN json_array(
-          json_extract(payload,'$.info.type'),CAST(json_extract(payload,'$.info.year') AS INTEGER),
-          coalesce(json_extract(payload,'$.info.title'),json_extract(payload,'$.info.name')),
-          json_extract(payload,'$.info.created_at'),
-          CAST(coalesce(json_extract(payload,'$.info.views'),json_extract(payload,'$.info.views_count'),0) AS REAL),
-          coalesce(json_extract(payload,'$.info.genres'),'[]') || '') END
-        FROM published.records NOT INDEXED WHERE rowid>? AND rowid<=? AND
-        ((kind='work' AND json_extract(payload,'$.active')=1) OR
-         (kind='artwork_assignment' AND json_extract(payload,'$.eligible')=1))`,
-        after,
-        after + batch,
+    let total = 1;
+    if (lite) {
+      await db.execAsync(`INSERT INTO works
+        SELECT id,json_extract(info,'$.type'),CAST(json_extract(info,'$.year') AS INTEGER),
+          coalesce(json_extract(info,'$.title'),json_extract(info,'$.name')),
+          json_extract(info,'$.created_at'),
+          CAST(coalesce(json_extract(info,'$.views'),json_extract(info,'$.views_count'),0) AS REAL),
+          coalesce(json_extract(info,'$.genres'),'[]')
+        FROM published.works WHERE active=1;
+        INSERT INTO image_rules SELECT field,scope,source,language FROM published.image_rules;
+        DROP TABLE view_input;`);
+    } else {
+      const maximum = await db.getFirstAsync<{n: number}>(
+        'SELECT coalesce(max(rowid),0) n FROM published.records',
       );
+      if (!maximum || !Number.isSafeInteger(maximum.n) || maximum.n < 0) {
+        throw new Error('catalog.invalidDatabase');
+      }
+      const batch = 5000;
+      total = Math.ceil(maximum.n / batch) + 1;
+      // One sequential pass over physical rows. Sparse kind indexes otherwise
+      // cause expensive random I/O on a large mobile database. Each bounded batch
+      // yields to JS so cancellation and foreground checks remain responsive.
+      for (let after = 0; after < maximum.n; after += batch) {
+        checkpoint({completed: Math.floor(after / batch), total});
+        await db.runAsync(
+          `INSERT OR IGNORE INTO view_input SELECT
+          CASE WHEN kind='work' THEN id ELSE 'rule:' || json_array(json_extract(payload,'$.field'),json_extract(payload,'$.scope'),json_extract(payload,'$.source'),json_extract(payload,'$.language')) END,
+          CASE WHEN kind='work' THEN json_array(
+            json_extract(payload,'$.info.type'),CAST(json_extract(payload,'$.info.year') AS INTEGER),
+            coalesce(json_extract(payload,'$.info.title'),json_extract(payload,'$.info.name')),
+            json_extract(payload,'$.info.created_at'),
+            CAST(coalesce(json_extract(payload,'$.info.views'),json_extract(payload,'$.info.views_count'),0) AS REAL),
+            coalesce(json_extract(payload,'$.info.genres'),'[]') || '') END
+          FROM published.records NOT INDEXED WHERE rowid>? AND rowid<=? AND
+          ((kind='work' AND json_extract(payload,'$.active')=1) OR
+           (kind='artwork_assignment' AND json_extract(payload,'$.eligible')=1))`,
+          after,
+          after + batch,
+        );
+      }
+      checkpoint({completed: total - 1, total});
+      await db.execAsync(`INSERT INTO works SELECT id,
+        json_extract(payload,'$[0]'),json_extract(payload,'$[1]'),json_extract(payload,'$[2]'),
+        json_extract(payload,'$[3]'),json_extract(payload,'$[4]'),json_extract(payload,'$[5]')
+        FROM view_input WHERE payload IS NOT NULL;
+        INSERT INTO image_rules SELECT json_extract(substr(id,6),'$[0]'),json_extract(substr(id,6),'$[1]'),
+          json_extract(substr(id,6),'$[2]'),json_extract(substr(id,6),'$[3]') FROM view_input WHERE payload IS NULL;
+        DROP TABLE view_input;`);
     }
-    checkpoint({completed: total - 1, total});
-    await db.execAsync(`INSERT INTO works SELECT id,
-      json_extract(payload,'$[0]'),json_extract(payload,'$[1]'),json_extract(payload,'$[2]'),
-      json_extract(payload,'$[3]'),json_extract(payload,'$[4]'),json_extract(payload,'$[5]')
-      FROM view_input WHERE payload IS NOT NULL;
-      INSERT INTO image_rules SELECT json_extract(substr(id,6),'$[0]'),json_extract(substr(id,6),'$[1]'),
-        json_extract(substr(id,6),'$[2]'),json_extract(substr(id,6),'$[3]') FROM view_input WHERE payload IS NULL;
-      DROP TABLE view_input;
+    await db.execAsync(`
       CREATE INDEX works_added ON works(added DESC,id);
       CREATE INDEX works_type_added ON works(type,added DESC,id);
       CREATE INDEX works_views ON works(views DESC,id);

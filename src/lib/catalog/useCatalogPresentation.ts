@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react';
+import {useCallback, useMemo, useRef, useState} from 'react';
 import {useQueries, useQuery} from '@tanstack/react-query';
 import {useCatalogStore} from './store';
 import {catalogList, catalogWork} from './reader';
@@ -24,6 +24,11 @@ export function useCatalogHome(enabled: boolean) {
     queryFn: async () => loadCatalogPosts(await catalogList(section)),
     staleTime: Infinity,
   }))});
+  const refresh = useRef<() => Promise<unknown>>(async () => {});
+  refresh.current = () => Promise.all(queries.filter((_, index) =>
+    index < 4 || sections[index] === heroSection || activated.includes(sections[index].id),
+  ).map(query => query.refetch()));
+  const refetch = useCallback(() => refresh.current(), []);
   const activateCategories = useCallback((ids: string[]) => {
     setActivated(previous => ids.every(id => previous.includes(id)) ? previous : [...new Set([...previous, ...ids])]);
   }, []);
@@ -43,7 +48,7 @@ export function useCatalogHome(enabled: boolean) {
     isRefetching: queries.some(q => q.isRefetching),
     error: queries.find(q => q.error)?.error,
     activateCategories,
-    refetch: async () => Promise.all(queries.filter((_, index) => index < 4 || sections[index] === heroSection || activated.includes(sections[index].id)).map(q => q.refetch())),
+    refetch,
   };
 }
 

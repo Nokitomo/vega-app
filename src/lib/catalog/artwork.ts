@@ -32,29 +32,34 @@ export function selectImages(
   }
   const eligible = rows.filter(a => a.eligible);
   const forced = eligible.filter(a => a.forced);
-  const priority = (a: Artwork) =>
-    prefs.order[field].findIndex(rule => {
-      const [source, language] = rule.split(':');
-      const resolved =
-        language === 'original' ? options.originalLanguage : language;
-      return (
-        source === a.source &&
-        (resolved === '*' || resolved === (a.language ?? 'unknown'))
-      );
-    });
-  const pool = forced.length ? forced : eligible.filter(a => priority(a) >= 0);
+  const rules = prefs.order[field].map(rule => {
+    const [source, language] = rule.split(':');
+    return {
+      source,
+      language: language === 'original' ? options.originalLanguage : language,
+    };
+  });
+  const pool = forced.length
+    ? forced.map(art => ({art, priority: 0}))
+    : eligible.map(art => ({
+        art,
+        priority: rules.findIndex(rule =>
+          rule.source === art.source &&
+          (rule.language === '*' || rule.language === (art.language ?? 'unknown')),
+        ),
+      })).filter(candidate => candidate.priority >= 0);
   return [
     ...new Set(
       pool
         .sort(
-          (a, b) =>
-            (forced.length ? 0 : priority(a) - priority(b)) ||
+          ({art: a, priority: priorityA}, {art: b, priority: priorityB}) =>
+            priorityA - priorityB ||
             a.rank - b.rank ||
             (b.width || 0) * (b.height || 0) -
               (a.width || 0) * (a.height || 0) ||
             a.id.localeCompare(b.id),
         )
-        .map(a => imageUrl(a, field, prefs.quality[field])),
+        .map(({art}) => imageUrl(art, field, prefs.quality[field])),
     ),
   ];
 }

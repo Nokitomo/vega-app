@@ -592,21 +592,19 @@ async function install() {
       await verify(db, m, false);
     }
     ensureForeground();
-    if (!m.format) {
-      phase('index');
-      let lastIndexProgress = 0;
-      await ensureCatalogViews(file, root, m.revision, progress => {
-        ensureForeground();
-        if (
-          progress &&
-          (Date.now() - lastIndexProgress >= 500 ||
-            progress.completed === progress.total)
-        ) {
-          phase('index', progress.completed, progress.total);
-          lastIndexProgress = Date.now();
-        }
-      });
-    }
+    phase('index');
+    let lastIndexProgress = 0;
+    await ensureCatalogViews(file, root, m.revision, progress => {
+      ensureForeground();
+      if (
+        progress &&
+        (Date.now() - lastIndexProgress >= 500 ||
+          progress.completed === progress.total)
+      ) {
+        phase('index', progress.completed, progress.total);
+        lastIndexProgress = Date.now();
+      }
+    }, !!m.format);
     ensureForeground();
     phase('activate');
     await db.closeAsync();

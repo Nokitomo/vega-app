@@ -99,3 +99,12 @@ test('a count mismatch cannot publish a cache and a later attempt can retry', as
     file,
   );
 });
+
+test('Lite builds indexed lists directly from the published works', async () => {
+  await expect(
+    ensureCatalogViews(source, '/catalog', revision, undefined, true),
+  ).resolves.toBe(file);
+  expect(db.execAsync).toHaveBeenCalledWith(expect.stringContaining('FROM published.works WHERE active=1'));
+  expect(db.execAsync).toHaveBeenCalledWith(expect.stringContaining('CREATE INDEX works_type_added'));
+  expect(db.getFirstAsync).not.toHaveBeenCalledWith(expect.stringContaining('published.records'));
+});

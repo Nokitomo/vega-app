@@ -330,7 +330,7 @@ const Slider = ({
           data={posts}
           extraData={listExtraData}
           horizontal
-          onViewableItemsChanged={handleViewableItemsChanged}
+          onViewableItemsChanged={catalogSection ? undefined : handleViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onScrollBeginDrag={onHorizontalDragStart}
           onMomentumScrollBegin={onHorizontalDragStart}

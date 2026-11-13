@@ -1,5 +1,8 @@
 import type {Post} from '../providers/types';
 import type {CatalogRecord, Work} from './types';
+import {catalogLitePosters} from './reader';
+import {selectImages} from './artwork';
+import {useCatalogStore} from './store';
 import {workImages, workTitle} from './content';
 
 /** Keep catalog identity separate from provider playback coordinates. */
@@ -20,6 +23,16 @@ export function catalogPost(
 export async function loadCatalogPosts(
   works: readonly CatalogRecord<Work>[],
 ): Promise<Post[]> {
+  const {installed, preferences} = useCatalogStore.getState();
+  if (installed?.format) {
+    const posters = await catalogLitePosters(works.map(work => work.id));
+    return works.map(work => catalogPost(work, selectImages(
+      posters.get(work.id) ?? [],
+      'poster',
+      preferences,
+      {originalLanguage: String(work.payload.info.original_language || '')},
+    )));
+  }
   const posts: Post[] = [];
   // Bound concurrent SQLite reads when filling several Home sections.
   for (let offset = 0; offset < works.length; offset += 4) {

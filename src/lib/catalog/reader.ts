@@ -36,17 +36,19 @@ async function acquire(): Promise<SQLiteDatabase> {
     const db = catalogNative()
       .root()
       .then(async directory => {
-        const viewsFile = installed.format ? undefined : await ensureCatalogViews(
+        const viewsFile = await ensureCatalogViews(
           installed.file,
           directory,
           installed.revision,
+          undefined,
+          !!installed.format,
         );
         const opened = await openCatalogDatabase(installed.file, directory);
         try {
-          if (viewsFile) {await opened.runAsync(
+          await opened.runAsync(
             'ATTACH DATABASE ? AS catalog_views',
             `${directory}/${viewsFile}`,
-          );}
+          );
           await opened.execAsync(
             'PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA cache_size=-8192;',
           );
@@ -58,7 +60,7 @@ async function acquire(): Promise<SQLiteDatabase> {
       });
     connection = {
       file: installed.file,
-      viewsFile: installed.format ? undefined : catalogViewsFile(installed.revision),
+      viewsFile: catalogViewsFile(installed.revision),
       db,
     };
     db.catch(() => {
@@ -280,6 +282,25 @@ export async function catalogImages(
     ).map(r => ({...JSON.parse(r.payload), id: r.id, url: r.url})),
   );
 }
+export async function catalogLitePosters(workIds: readonly string[]) {
+  const posters = new Map<string, Artwork[]>();
+  if (!workIds.length) {
+    return posters;
+  }
+  const rows = await readCatalog(db => db.getAllAsync<Artwork & {work_id: string}>(
+    `SELECT work_id,id,url,source,field,language,forced,rank,width,height
+     FROM artwork WHERE field='poster' AND work_id IN (${workIds.map(() => '?').join(',')})`,
+    ...workIds.map(id => id.replace(/^cinema:/, '')),
+  ));
+  for (const {work_id, ...row} of rows) {
+    const id = 'cinema:' + work_id;
+    const candidates = posters.get(id) ?? [];
+    candidates.push({...row, forced: Boolean(row.forced), eligible: true, scope: 'work', season: null, episode: null});
+    posters.set(id, candidates);
+  }
+  return posters;
+}
+
 export async function catalogImageRules(): Promise<Record<string, string[]>> {
   return readCatalog(async db => {
     const rows = await db.getAllAsync<{
@@ -317,19 +338,12 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
     return result;
   });
 }
-const liteWorks = `SELECT id,info,json_extract(info,'$.type') type,
-  CAST(json_extract(info,'$.year') AS INTEGER) year,
-  coalesce(json_extract(info,'$.title'),json_extract(info,'$.name')) title,
-  json_extract(info,'$.created_at') added,
-  CAST(coalesce(json_extract(info,'$.views'),json_extract(info,'$.views_count'),0) AS REAL) views,
-  coalesce(json_extract(info,'$.genres'),'[]') genres FROM works WHERE active=1`;
-
 export async function catalogGenres(): Promise<string[]> {
   return readCatalog(async db => {
     const rows = await db.getAllAsync<{name: string}>(
       `SELECT DISTINCT CASE WHEN g.type='object'
         THEN json_extract(g.value,'$.name') ELSE g.value END name
-       FROM ${useCatalogStore.getState().installed?.format ? `(${liteWorks})` : 'catalog_views.works'} c, json_each(c.genres) g
+       FROM catalog_views.works c, json_each(c.genres) g
        WHERE name IS NOT NULL AND trim(name)<>''
        ORDER BY name COLLATE NOCASE`,
     );
@@ -379,8 +393,11 @@ export async function catalogList(
   }[section.sort];
   if (useCatalogStore.getState().installed?.format) {
     return readCatalog(async db => (await db.getAllAsync<{id: string; payload: string}>(
-      `SELECT 'cinema:' || c.id id,json_object('active',1,'info',json(c.info)) payload
-        FROM (${liteWorks}) c WHERE ${where.join(' AND ')} ORDER BY ${order},c.id LIMIT 30 OFFSET ?`,
+      `SELECT 'cinema:' || c.id id,json_object('active',1,'info',json(w.info)) payload
+        FROM (
+          SELECT c.* FROM catalog_views.works c WHERE ${where.join(' AND ')}
+          ORDER BY ${order},c.id LIMIT 30 OFFSET ?
+        ) c JOIN works w ON w.id=c.id ORDER BY ${order},c.id`,
       ...params, Math.max(0, Math.floor(offset)),
     )).map(unpack<Work>));
   }
