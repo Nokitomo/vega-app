@@ -23,6 +23,20 @@ Archivio porta il campo e il pulsante di salvataggio sopra la tastiera.
 Nell'editor delle sezioni Home scorrono i campi, con Salva e Annulla in fondo
 alla finestra.
 
+I preset Home di Cinema includono Aggiunti di recente, Film, Serie, Archivio
+e una sezione per ciascun genere della Home di StreamingUnity. Le sezioni per
+genere usano l'ordine locale per data di aggiunta. Tendenze, Top 10 di oggi,
+prossime uscite e nuovi episodi dipendono da dati o classifiche del sito.
+I preset si applicano alle nuove configurazioni e al precedente layout
+predefinito intatto. Le Home personalizzate conservano le sezioni salvate.
+
+L'editor elenca i generi del catalogo installato per il tipo scelto. Senza
+generi selezionati non applica alcun filtro di genere. Film e serie senza
+generi né limiti di anno includono tutte le opere attive, sfogliabili a pagine
+da Altro. Se si selezionano più generi, l'opera deve avere tutti quelli
+selezionati. Le sezioni salvate senza direzione usano il criterio precedente
+(titolo crescente, anno, aggiunta e visualizzazioni decrescenti).
+
 La dimensione TMDB predefinita per poster opera e poster stagionale e `w342`
 su smartphone e `w780` su tablet (lato corto dello schermo di almeno 600 dp).
 Le dimensioni valide gia salvate vengono rispettate.

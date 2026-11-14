@@ -1,6 +1,48 @@
 import {Dimensions, Platform} from 'react-native';
 import {isTabletScreen} from '../utils/adaptiveNavigation';
-import type {CatalogPreferences, ImageField} from './types';
+import type {CatalogPreferences, CatalogSection, ImageField} from './types';
+
+const homeGenres = [
+  'Azione', 'Action & Adventure', 'Avventura', 'Animazione', 'Commedia',
+  'Crime', 'Documentario', 'Dramma', 'Famiglia', 'Fantasy', 'Storia', 'Horror',
+  'Kids', 'Korean drama', 'Musica', 'Mistero', 'Reality', 'Romance',
+  'Sci-Fi & Fantasy', 'Fantascienza', 'Soap', 'Thriller', 'televisione film',
+  'Guerra', 'War & Politics', 'Western',
+];
+
+export function catalogSortDirection(section: CatalogSection) {
+  return section.direction ?? (section.sort === 'title' ? 'asc' : 'desc');
+}
+
+export const MAX_CATALOG_SECTIONS = 60;
+
+function defaultSections(): CatalogSection[] {
+  return [
+    {id: 'latest', title: '', enabled: true, type: '', genres: [], sort: 'added'},
+    {id: 'movies', title: '', enabled: true, type: 'movie', genres: [], sort: 'added'},
+    {id: 'series', title: '', enabled: true, type: 'tv', genres: [], sort: 'added'},
+    {id: 'archive', title: '', enabled: true, type: '', genres: [], sort: 'title'},
+    ...homeGenres.map((genre): CatalogSection => ({
+      id: `genre-${genre.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      title: genre,
+      enabled: true,
+      type: '',
+      genres: [genre],
+      sort: 'added',
+    })),
+  ];
+}
+
+function hasLegacyDefaultSections(sections: CatalogSection[], hero: unknown) {
+  return hero === 'popular' && sections.length === 3 &&
+    sections.every((section, index) =>
+      section.id === ['movies', 'series', 'popular'][index] &&
+      section.type === ['movie', 'tv', ''][index] &&
+      section.sort === (index === 2 ? 'views' : 'added') && section.enabled &&
+      !section.title && !section.genres.length && section.fromYear === undefined &&
+      section.toYear === undefined && section.direction === undefined,
+    );
+}
 
 export const DEFAULT_DETAIL_CACHE_MB = 200;
 
@@ -53,33 +95,8 @@ export function defaultCatalogPreferences(): CatalogPreferences {
       seasonPoster: posterQuality,
       episodeThumbnail: 'original',
     },
-    sections: [
-      {
-        id: 'movies',
-        title: '',
-        enabled: true,
-        type: 'movie',
-        genres: [],
-        sort: 'added',
-      },
-      {
-        id: 'series',
-        title: '',
-        enabled: true,
-        type: 'tv',
-        genres: [],
-        sort: 'added',
-      },
-      {
-        id: 'popular',
-        title: '',
-        enabled: true,
-        type: '',
-        genres: [],
-        sort: 'views',
-      },
-    ],
-    heroSection: 'popular',
+    sections: defaultSections(),
+    heroSection: 'latest',
   };
 }
 
@@ -131,7 +148,14 @@ export function readCatalogPreferences(
               y => y === undefined || Number.isInteger(y),
             ),
         )
-        .slice(0, 30);
+        .slice(0, MAX_CATALOG_SECTIONS)
+        .map((section: CatalogSection) => ({...section,
+          direction: section.direction === 'asc' || section.direction === 'desc'
+            ? section.direction : undefined,
+        }));
+      if (hasLegacyDefaultSections(defaults.sections, value.heroSection)) {
+        return {...defaults, sections: defaultSections()};
+      }
     }
     if (typeof value.heroSection === 'string') {
       defaults.heroSection = value.heroSection;
@@ -140,7 +164,7 @@ export function readCatalogPreferences(
     /* Invalid local preferences recover to defaults. */
   }
   if (!defaults.sections.length) {
-    defaults.sections = defaultCatalogPreferences().sections;
+    defaults.sections = defaultSections();
   }
   if (!defaults.sections.some(section => section.enabled)) {
     defaults.sections[0] = {...defaults.sections[0], enabled: true};

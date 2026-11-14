@@ -14,6 +14,7 @@ export type CatalogSection = {
   fromYear?: number;
   toYear?: number;
   sort: 'title' | 'year' | 'added' | 'views';
+  direction?: 'asc' | 'desc';
 };
 export type CatalogPreferences = {
   version: 1;

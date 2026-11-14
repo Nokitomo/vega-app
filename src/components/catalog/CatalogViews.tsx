@@ -30,7 +30,7 @@ export function CatalogButton({
   onPress,
   disabled = false,
   icon,
-  selected = false,
+  selected,
   destructive = false,
 }: {
   label: string;
@@ -45,6 +45,7 @@ export function CatalogButton({
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{disabled, selected}}
       disabled={disabled}
       onPress={onPress}
       style={[

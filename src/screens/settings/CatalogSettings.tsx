@@ -19,7 +19,9 @@ import {
 } from '../../lib/catalog/installer';
 import {catalogGenres, catalogImageRules} from '../../lib/catalog/reader';
 import {
+  catalogSortDirection,
   defaultCatalogPreferences,
+  MAX_CATALOG_SECTIONS,
   imageFields,
   isDetailCacheLimit,
   tmdbSizes,
@@ -55,7 +57,6 @@ export default function CatalogSettings() {
   const [field, setField] = useState<ImageField>('poster');
   const [edit, setEdit] = useState<CatalogSection>();
   const [editInitial, setEditInitial] = useState('');
-  const [genreText, setGenreText] = useState('');
   const [pane, setPane] = useState<'database' | 'images' | 'home'>('database');
   const paneScroll = useRef<ScrollView>(null);
   const cacheInput = useRef<TextInput>(null);
@@ -95,9 +96,9 @@ export default function CatalogSettings() {
     },
   });
   const genres = useQuery({
-    queryKey: ['catalog-genres', installed?.revision],
-    enabled: !!installed,
-    queryFn: catalogGenres,
+    queryKey: ['catalog-genres', installed?.revision, edit?.type],
+    enabled: !!installed && !!edit,
+    queryFn: () => catalogGenres(edit?.type),
     staleTime: Infinity,
   });
   useEffect(() => {
@@ -187,7 +188,6 @@ export default function CatalogSettings() {
         : prefs.heroSection,
     });
   const openEditor = (section: CatalogSection) => {
-    setGenreText(section.genres.join(', '));
     setEditInitial(JSON.stringify(section));
     setEdit({...section});
   };
@@ -217,10 +217,6 @@ export default function CatalogSettings() {
       }},
     ]);
   };
-  const invalidGenre = genres.data && edit?.genres.find(genre =>
-    !genres.data?.some(available => available.toLocaleLowerCase() === genre.toLocaleLowerCase()),
-  );
-  const genreValidationPending = !!installed && !!edit?.genres.length && !genres.data;
   const languageLabel = (rule: string) => {
     const [source, lang] = rule.split(':');
     return `${source === 'tmdb' ? 'TMDB' : source === 'tvdb' ? 'TVDB' : source === 'streamingunity' ? 'StreamingUnity' : source} · ${t(`catalog.language.${lang}`, {defaultValue: lang})}`;
@@ -629,7 +625,7 @@ export default function CatalogSettings() {
         ))}
         <CatalogButton
           label={t('catalog.addSection')}
-          disabled={prefs.sections.length >= 30}
+          disabled={prefs.sections.length >= MAX_CATALOG_SECTIONS}
           onPress={() =>
             openEditor({
               id: `custom-${Date.now()}`,
@@ -680,30 +676,25 @@ export default function CatalogSettings() {
               ))}
             </View>
             <Text style={[catalogStyles.text, {marginTop: 16}]}>{t('catalog.genres')}</Text>
-            <TextInput
-              key={edit.id}
-              accessibilityLabel={t('catalog.genres')}
-              placeholder={t('catalog.genres')}
-              placeholderTextColor="#999"
-              style={input}
-              value={genreText}
-              onChangeText={v => {
-                setGenreText(v);
-                setEdit({
-                  ...edit,
-                  genres: v
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(Boolean),
-                });
-              }}
-            />
-            {!!invalidGenre && <Text style={{color: '#ff8d88', fontFamily: HOME_FONT.regular}}>
-              {t('catalog.invalidGenre', {genre: invalidGenre})}
-            </Text>}
-            {genreValidationPending && <Text style={{color: '#ff8d88', fontFamily: HOME_FONT.regular}}>
-              {t('catalog.genreValidationPending')}
-            </Text>}
+            <View style={catalogStyles.row}>
+              <CatalogButton
+                label={t('catalog.allGenres')}
+                selected={!edit.genres.length}
+                onPress={() => setEdit({...edit, genres: []})}
+              />
+              {[...new Set([...(genres.data ?? []), ...edit.genres])].map(genre => (
+                <CatalogButton
+                  key={genre}
+                  label={genre}
+                  selected={edit.genres.includes(genre)}
+                  onPress={() => setEdit({...edit, genres: edit.genres.includes(genre)
+                    ? edit.genres.filter(value => value !== genre)
+                    : [...edit.genres, genre]})}
+                />
+              ))}
+            </View>
+            {genres.isLoading && <Text style={catalogStyles.text}>{t('catalog.genreValidationPending')}</Text>}
+            {genres.isError && <CatalogButton label={t('Retry')} onPress={() => {genres.refetch();}} />}
             {(['fromYear', 'toYear'] as const).map(key => (
               <TextInput
                 key={key}
@@ -732,6 +723,17 @@ export default function CatalogSettings() {
                 />
               ))}
             </View>
+            <Text style={[catalogStyles.text, {marginTop: 16}]}>{t('catalog.sortDirection')}</Text>
+            <View style={catalogStyles.row}>
+              {(['asc', 'desc'] as const).map(direction => (
+                <CatalogButton
+                  key={direction}
+                  label={t(`catalog.direction.${direction}`)}
+                  selected={catalogSortDirection(edit) === direction}
+                  onPress={() => setEdit({...edit, direction})}
+                />
+              ))}
+            </View>
           </>}
           </ScrollView>
           {edit && <View style={{paddingHorizontal: 20, paddingTop: 8, borderTopWidth: 1, borderColor: '#23252b'}}>
@@ -739,15 +741,10 @@ export default function CatalogSettings() {
               label={t('catalog.saveSection')}
               disabled={
                 (!prefs.sections.some(s => s.id === edit.id) && !edit.title.trim()) ||
-                !!invalidGenre ||
-                genreValidationPending ||
                 !!(edit.fromYear && edit.toYear && edit.fromYear > edit.toYear)
               }
               onPress={() => {
-                const normalized = {...edit,
-                  title: edit.title.trim(),
-                  genres: edit.genres.map(genre => genres.data?.find(available =>
-                    available.toLocaleLowerCase() === genre.toLocaleLowerCase()) || genre)};
+                const normalized = {...edit, title: edit.title.trim()};
                 setPreferences({
                   ...prefs,
                   sections: prefs.sections.some(s => s.id === edit.id)

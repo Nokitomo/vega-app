@@ -1,4 +1,5 @@
 import {
+  catalogSortDirection,
   defaultCatalogPreferences,
   readCatalogPreferences,
 } from '../preferences';
@@ -149,14 +150,34 @@ describe('catalog artwork contract', () => {
     p.sections = [];
     expect(readCatalogPreferences(JSON.stringify(p))).toMatchObject({
       order: {poster: []},
-      heroSection: 'popular',
+      heroSection: 'latest',
       sections: defaultCatalogPreferences().sections,
     });
     p.sections = [{...defaultCatalogPreferences().sections[0], enabled: false}];
     p.heroSection = 'missing';
     const repaired = readCatalogPreferences(JSON.stringify(p));
     expect(repaired.sections[0].enabled).toBe(true);
-    expect(repaired.heroSection).toBe('movies');
+    expect(repaired.heroSection).toBe('latest');
+  });
+  test('upgrades the old default Home and preserves customized sections', () => {
+    const p = defaultCatalogPreferences();
+    const [latest, movies, series] = p.sections;
+    const popular = {...latest, id: 'popular', sort: 'views' as const};
+    const legacy = {...p, heroSection: 'popular', sections: [movies, series, popular]};
+    const upgraded = readCatalogPreferences(JSON.stringify(legacy));
+    expect(upgraded.sections).toEqual(p.sections);
+    expect(upgraded.heroSection).toBe('latest');
+    const customized = {...legacy, sections: [movies, series, {...popular, enabled: false}]};
+    expect(readCatalogPreferences(JSON.stringify(customized)).sections).toEqual(customized.sections);
+  });
+  test('keeps Archive unfiltered and preserves explicit and legacy sort directions', () => {
+    const p = defaultCatalogPreferences();
+    const archive = p.sections.find(section => section.id === 'archive')!;
+    expect(archive).toMatchObject({type: '', genres: [], sort: 'title'});
+    expect(catalogSortDirection(archive)).toBe('asc');
+    expect(catalogSortDirection(p.sections[0])).toBe('desc');
+    const saved = readCatalogPreferences(JSON.stringify({...p, sections: [{...archive, direction: 'desc'}]}));
+    expect(catalogSortDirection(saved.sections[0])).toBe('desc');
   });
 });
 describe('catalog publication and incremental planning', () => {

@@ -8,6 +8,7 @@ import * as RNFS from '@dr.pogodin/react-native-fs';
 import {registerCatalogIdentity} from './identity';
 import {parseManifest} from './manifest';
 import {catalogViewsFile, ensureCatalogViews} from './views';
+import {catalogSortDirection} from './preferences';
 import type {
   Artwork,
   CatalogRecord,
@@ -338,14 +339,15 @@ export async function catalogImageRules(): Promise<Record<string, string[]>> {
     return result;
   });
 }
-export async function catalogGenres(): Promise<string[]> {
+export async function catalogGenres(type: CatalogSection['type'] = ''): Promise<string[]> {
   return readCatalog(async db => {
     const rows = await db.getAllAsync<{name: string}>(
       `SELECT DISTINCT CASE WHEN g.type='object'
         THEN json_extract(g.value,'$.name') ELSE g.value END name
        FROM catalog_views.works c, json_each(c.genres) g
-       WHERE name IS NOT NULL AND trim(name)<>''
+       WHERE name IS NOT NULL AND trim(name)<>'' ${type ? 'AND c.type=?' : ''}
        ORDER BY name COLLATE NOCASE`,
+      ...(type ? [type] : []),
     );
     return rows.map(row => row.name);
   });
@@ -385,12 +387,13 @@ export async function catalogList(
       tokens.map(t => '"' + t.replace(/"/g, '""') + '"*').join(' AND '),
     );
   }
-  const order = {
+  const column = {
     title: 'c.title COLLATE NOCASE',
-    year: 'c.year DESC',
-    added: 'c.added DESC',
-    views: 'c.views DESC',
+    year: 'c.year',
+    added: 'c.added',
+    views: 'c.views',
   }[section.sort];
+  const order = `${column} ${catalogSortDirection(section) === 'desc' ? 'DESC' : 'ASC'}`;
   if (useCatalogStore.getState().installed?.format) {
     return readCatalog(async db => (await db.getAllAsync<{id: string; payload: string}>(
       `SELECT 'cinema:' || c.id id,json_object('active',1,'info',json(w.info)) payload
