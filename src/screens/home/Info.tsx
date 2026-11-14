@@ -188,6 +188,7 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
   // UI state
   const [threeDotsMenuOpen, setThreeDotsMenuOpen] = useState(false);
   const [readMore, setReadMore] = useState(false);
+  const [detailsShown, setDetailsShown] = useState(false);
   const [menuPosition, setMenuPosition] = useState({top: -1000, right: 0});
   const [backgroundCandidateIndex, setBackgroundCandidateIndex] = useState(0);
   const [infoView, setInfoView] = useState<'episodes' | 'related'>('episodes');
@@ -1120,86 +1121,13 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                       {synopsis}
                     </Text>
                   </SkeletonLoader>
-                  <TouchableOpacity accessibilityRole="button" onPress={() => setReadMore(true)}
+                  <TouchableOpacity accessibilityRole="button" onPress={() => {
+                    setDetailsShown(false);
+                    setReadMore(true);
+                  }}
                     style={{minHeight: 48, justifyContent: 'center', alignSelf: isTabletDevice ? 'center' : 'flex-start'}}>
                     <Text style={{color: primary, fontFamily: HOME_FONT.bold, fontSize: 14}}>{t('More details')}</Text>
                   </TouchableOpacity>
-                  <InfoDialog visible={readMore} onClose={() => setReadMore(false)}>
-                    <View style={{flex: 1}}>
-                      <View style={{flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12, backgroundColor: isTabletDevice ? '#23252b' : 'black', zIndex: 1}}>
-                        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
-                          onPress={() => setReadMore(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
-                          <Ionicons name="close" size={28} color="white" />
-                        </TouchableOpacity>
-                        <Text style={{flex: 1, color: 'white', fontFamily: HOME_FONT.heading, fontSize: 22}}>{t('More details')}</Text>
-                      </View>
-                      <ScrollView style={{flex: 1}} contentContainerStyle={{padding: 24, gap: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
-                        <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 24}}>{displayTitle}</Text>
-                        <Text style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 16, lineHeight: 24}}>{synopsis}</Text>
-                        {/* Awards */}
-                        {meta?.awards && (
-                          <View className="mb-2 w-full flex-row items-baseline gap-2">
-                            <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
-                              {t('Awards:')}
-                            </Text>
-                            <Text style={{flex: 1, color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
-                              {meta.awards}
-                            </Text>
-                          </View>
-                        )}
-                        {/* cast  */}
-                        {hasCast && (
-                          <View className="mb-2 w-full flex-row items-start gap-2">
-                            <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
-                              {t('Cast')}
-                            </Text>
-                            <View className="flex-1 flex-row gap-1 flex-wrap">
-                              {displayCast
-                                .map((actor: string, index: number) => (
-                                  <Text
-                                    key={`${actor}-${index}`}
-                                    style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
-                                    {`${index > 0 ? ' · ' : ''}${actor}`}
-                                  </Text>
-                                ))}
-                            </View>
-                          </View>
-                        )}
-                        {showInfoDetails ? (
-                          <View className="mt-2">
-                            {allowProviderStudio ? (
-                              <Text className="text-gray-400 text-xs">
-                                {t('Studio: {{name}}', {name: info.studio})}
-                              </Text>
-                            ) : null}
-                            {allowProviderGenres &&
-                            info?.genres &&
-                            info.genres.length > 0 ? (
-                              <Text className="text-gray-400 text-xs mt-1">
-                                {t('Genres: {{list}}', {
-                                  list: localizedGenres.join(' · '),
-                                })}
-                              </Text>
-                            ) : null}
-                            {showProviderFallback &&
-                            !hasAnimeExternalIds &&
-                            info?.country ? (
-                              <Text className="text-gray-400 text-xs mt-1">
-                                {t('Country: {{name}}', {name: info.country})}
-                              </Text>
-                            ) : null}
-                            {showProviderFallback &&
-                            !hasAnimeExternalIds &&
-                            info?.director ? (
-                              <Text className="text-gray-400 text-xs mt-1">
-                                {t('Director: {{name}}', {name: info.director})}
-                              </Text>
-                            ) : null}
-                          </View>
-                        ) : null}
-                      </ScrollView>
-                    </View>
-                  </InfoDialog>
                   {/* cast */}
                 </View>
                 </View>
@@ -1381,6 +1309,84 @@ function ProviderInfoScreen({route, navigation}: Props): React.JSX.Element {
                 </View>
 
           </InfoAdaptiveLayout>
+          <InfoDialog visible={readMore} onClose={() => setReadMore(false)} onShow={() => setDetailsShown(true)}>
+            <View style={{flex: 1}}>
+              <View style={{flexDirection: isTabletDevice ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12, backgroundColor: isTabletDevice ? '#23252b' : 'black', zIndex: 1}}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Close')}
+                  onPress={() => setReadMore(false)} style={{minWidth: 48, minHeight: 56, justifyContent: 'center'}}>
+                  <Ionicons name="close" size={28} color="white" />
+                </TouchableOpacity>
+                <Text style={{flex: 1, color: 'white', fontFamily: HOME_FONT.heading, fontSize: 22}}>{t('More details')}</Text>
+              </View>
+              {detailsShown && <ScrollView testID="info-details-scroll" style={{flex: 1, minHeight: 0}}>
+                <View style={{padding: 24, gap: 16, width: '100%', maxWidth: isTabletDevice ? undefined : 840, alignSelf: 'center'}}>
+                  <Text style={{color: 'white', fontFamily: HOME_FONT.heading, fontSize: 24}}>{displayTitle}</Text>
+                  <Text style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 16, lineHeight: 24}}>{synopsis}</Text>
+                  {/* Awards */}
+                  {meta?.awards && (
+                    <View className="mb-2 w-full flex-row items-baseline gap-2">
+                      <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
+                        {t('Awards:')}
+                      </Text>
+                      <Text style={{flex: 1, color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
+                        {meta.awards}
+                      </Text>
+                    </View>
+                  )}
+                  {/* cast  */}
+                  {hasCast && (
+                    <View className="mb-2 w-full flex-row items-start gap-2">
+                      <Text style={{color: 'white', fontFamily: HOME_FONT.bold, fontSize: 14}}>
+                        {t('Cast')}
+                      </Text>
+                      <View className="flex-1 flex-row gap-1 flex-wrap">
+                        {displayCast
+                          .map((actor: string, index: number) => (
+                            <Text
+                              key={`${actor}-${index}`}
+                              style={{color: '#dadada', fontFamily: HOME_FONT.regular, fontSize: 14}}>
+                              {`${index > 0 ? ' · ' : ''}${actor}`}
+                            </Text>
+                          ))}
+                      </View>
+                    </View>
+                  )}
+                  {showInfoDetails ? (
+                    <View className="mt-2">
+                      {allowProviderStudio ? (
+                        <Text className="text-gray-400 text-xs">
+                          {t('Studio: {{name}}', {name: info.studio})}
+                        </Text>
+                      ) : null}
+                      {allowProviderGenres &&
+                      info?.genres &&
+                      info.genres.length > 0 ? (
+                        <Text className="text-gray-400 text-xs mt-1">
+                          {t('Genres: {{list}}', {
+                            list: localizedGenres.join(' · '),
+                          })}
+                        </Text>
+                      ) : null}
+                      {showProviderFallback &&
+                      !hasAnimeExternalIds &&
+                      info?.country ? (
+                        <Text className="text-gray-400 text-xs mt-1">
+                          {t('Country: {{name}}', {name: info.country})}
+                        </Text>
+                      ) : null}
+                      {showProviderFallback &&
+                      !hasAnimeExternalIds &&
+                      info?.director ? (
+                        <Text className="text-gray-400 text-xs mt-1">
+                          {t('Director: {{name}}', {name: info.director})}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>}
+            </View>
+          </InfoDialog>
         </View>
       </View>
     </QueryErrorBoundary>

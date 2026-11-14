@@ -63,6 +63,8 @@ Altri dettagli apre una vista scorrevole con sinossi integrale, cast, premi
 e informazioni aggiuntive alle stesse condizioni di disponibilita precedenti.
 L'intestazione resta fissa e la vista scorrevole occupa soltanto lo spazio
 disponibile sotto di essa, anche con sinossi lunghe o testo ingrandito.
+Il dialogo e montato fuori dallo scroll della scheda. Il corpo usa un
+contenitore interno per misurare la sinossi e scorrere fino al cast.
 Premi e cast non vengono piu troncati nel dettaglio. Varianti, trailer,
 preferiti e menu restano disponibili; selezione e preferenze metadata invariate.
 

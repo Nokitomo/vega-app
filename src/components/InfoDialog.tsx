@@ -3,14 +3,14 @@ import {Modal, View, useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import useAdaptiveNavigation from '../lib/hooks/useAdaptiveNavigation';
 
-export default function InfoDialog({visible, onClose, children, width: dialogWidth = 460}: {
-  width?: number; visible: boolean; onClose: () => void; children: React.ReactNode;
+export default function InfoDialog({visible, onClose, onShow, children, width: dialogWidth = 460}: {
+  width?: number; visible: boolean; onClose: () => void; onShow?: () => void; children: React.ReactNode;
 }) {
   const {isTabletDevice} = useAdaptiveNavigation();
   const {width, height} = useWindowDimensions();
   const insets = useSafeAreaInsets();
   return <Modal visible={visible} transparent={isTabletDevice}
-    animationType={isTabletDevice ? 'fade' : 'slide'} onRequestClose={onClose}>
+    animationType={isTabletDevice ? 'fade' : 'slide'} onRequestClose={onClose} onShow={onShow}>
     <View style={{flex: 1, justifyContent: 'center', alignItems: 'center',
       paddingTop: insets.top, paddingBottom: insets.bottom,
       backgroundColor: isTabletDevice ? 'rgba(0,0,0,0.65)' : 'black'}}>
