@@ -284,13 +284,18 @@ export async function catalogImages(
   );
 }
 export async function catalogLitePosters(workIds: readonly string[]) {
+  return catalogLiteArtwork(workIds, ['poster']);
+}
+
+export async function catalogLiteArtwork(workIds: readonly string[], fields: readonly ImageField[]) {
   const posters = new Map<string, Artwork[]>();
-  if (!workIds.length) {
+  if (!workIds.length || !fields.length) {
     return posters;
   }
   const rows = await readCatalog(db => db.getAllAsync<Artwork & {work_id: string}>(
     `SELECT work_id,id,url,source,field,language,forced,rank,width,height
-     FROM artwork WHERE field='poster' AND work_id IN (${workIds.map(() => '?').join(',')})`,
+     FROM artwork WHERE field IN (${fields.map(() => '?').join(',')}) AND work_id IN (${workIds.map(() => '?').join(',')})`,
+    ...fields,
     ...workIds.map(id => id.replace(/^cinema:/, '')),
   ));
   for (const {work_id, ...row} of rows) {
@@ -300,6 +305,23 @@ export async function catalogLitePosters(workIds: readonly string[]) {
     posters.set(id, candidates);
   }
   return posters;
+}
+
+export function catalogRandomActiveIds(excluded: Iterable<string>, limit: number) {
+  return readCatalog(async db => (await db.getAllAsync<{id: string}>(
+    `SELECT 'cinema:' || id id FROM catalog_views.works
+     WHERE id NOT IN (SELECT value FROM json_each(?)) ORDER BY random() LIMIT ?`,
+    JSON.stringify(Array.from(excluded, id => id.replace(/^cinema:/, ''))), limit,
+  )).map(row => row.id));
+}
+
+export function catalogHeroSummaries(ids: string[]) {
+  return readCatalog(db => db.getAllAsync<{id: string; title: string; language: string | null}>(
+    `SELECT 'cinema:' || id id, coalesce(json_extract(info,'$.title'),json_extract(info,'$.name'),'') title,
+       json_extract(info,'$.original_language') language
+     FROM works WHERE active=1 AND id IN (${ids.map(() => '?').join(',')})`,
+    ...ids.map(id => id.replace(/^cinema:/, '')),
+  ));
 }
 
 export async function catalogImageRules(): Promise<Record<string, string[]>> {

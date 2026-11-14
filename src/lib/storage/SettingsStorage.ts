@@ -67,6 +67,14 @@ export enum SettingsKeys {
  * Settings storage manager
  */
 export class SettingsStorage {
+  getCinemaHeroRotation(): string | undefined {
+    return mainStorage.getString('catalogHero:cinema:v1');
+  }
+
+  setCinemaHeroRotation(value: string): void {
+    mainStorage.setString('catalogHero:cinema:v1', value);
+  }
+
   getCatalogPreferences(): string | undefined {
     return mainStorage.getString('catalogPreferences:cinema:v1');
   }

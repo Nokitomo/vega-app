@@ -1,5 +1,10 @@
 # Profilazione Home e Info
 
+Per Cinema Lite, `cinema_hero_selection` misura la scelta locale e distingue
+estrazione e riapertura dalla selezione persistita tramite `cached`.
+`hero_ready` misura invece la preparazione della slide, incluso il caricamento
+delle immagini. Ripetere a cache fredda e alla riapertura nello stesso giorno.
+
 Sui dispositivi Android mobili, le card Cinema della Home richiedono il
 ridimensionamento dei poster durante la decodifica in base alla vista nativa.
 Per verificarne l'effetto, confrontare la stessa Home con qualita `original`,

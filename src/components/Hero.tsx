@@ -25,6 +25,7 @@ import useHeroStore from '../lib/zustand/herostore';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useHeroMetadata} from '../lib/hooks/useHomePageData';
 import {useCatalogHero} from '../lib/catalog/useCatalogPresentation';
+import {useCatalogStore} from '../lib/catalog/store';
 import {useTranslation} from 'react-i18next';
 import RemoteLogo from './RemoteLogo';
 import type {ArtworkCandidates} from '../lib/services/artworkSelection';
@@ -53,6 +54,7 @@ type HeroCardProps = {
 
 const HeroCard = memo(
   ({hero, provider, reducedMotion, onFailure, onReady, layout, onContentHeight}: HeroCardProps) => {
+    const requiresCatalogLogo = useCatalogStore(state => !!hero.catalogRef && !!state.installed?.format);
     const {t} = useTranslation();
     const primary = useThemeStore(state => state.primary);
     const onPrimary = foregroundOnPrimary(primary);
@@ -112,8 +114,10 @@ const HeroCard = memo(
     ]);
 
     const backgroundCandidates = React.useMemo(() => {
-      const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
-        ?.artworkCandidates?.background;
+      const artwork = (heroData as {artworkCandidates?: ArtworkCandidates})?.artworkCandidates;
+      const candidates = hero.catalogRef && artwork
+        ? [...(artwork.background ?? []), ...(artwork.poster ?? [])]
+        : artwork?.background;
       const values = candidates?.length
         ? candidates
         : [heroData?.background, heroData?.image, heroData?.poster];
@@ -124,7 +128,7 @@ const HeroCard = memo(
           ),
         ),
       );
-    }, [heroData, hero?.image]);
+    }, [heroData, hero?.image, hero.catalogRef]);
 
     const logoCandidates = React.useMemo(() => {
       const candidates = (heroData as {artworkCandidates?: ArtworkCandidates})
@@ -211,6 +215,12 @@ const HeroCard = memo(
       link: hero.catalogRef ? '' : hero?.link || '',
       candidates: logoCandidates,
     });
+
+    useEffect(() => {
+      if (requiresCatalogLogo && logoCandidates.length && !logoUri && !resolvingLogo) {
+        onFailure(hero.link);
+      }
+    }, [requiresCatalogLogo, hero.link, logoCandidates.length, logoUri, onFailure, resolvingLogo]);
 
     const ready =
       artworkEligible &&

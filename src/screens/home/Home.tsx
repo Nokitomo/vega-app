@@ -562,7 +562,7 @@ const Home = ({}: Props) => {
               ListHeaderComponent={
                 <>
                   <HeroOptimized
-                    key={`${catalogSelected ? `cinema:${catalogGeneration}` : providerCacheScope}:${heroRefreshNonce}`}
+                    key={`${catalogSelected ? `cinema:${catalogGeneration}:${catalogHome.heroDay}` : providerCacheScope}:${heroRefreshNonce}`}
                     catalogMode={catalogSelected}
                     posts={catalogSelected ? catalogHome.heroPosts : homeData
                       .flatMap(section => section.Posts)

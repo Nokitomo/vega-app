@@ -18,6 +18,13 @@ non richiede un nuovo download. Sono configurabili sezioni Home, visibilita,
 ordine, tipo, generi, intervallo di anni, ordinamento e sezione del riquadro Hero.
 I contatori rappresentano lo snapshot, non una classifica in tempo reale.
 
+Con Cinema Lite il riquadro Hero estrae fino a sei opere attive da tutto il
+catalogo, con logo e sfondo o poster ammessi dalle preferenze. La selezione
+si conserva per il giorno locale e, se il catalogo lo permette, evita le
+opere selezionate nei due giorni di calendario precedenti. Quattro riserve
+possono sostituire le opere con immagini non raggiungibili. I cataloghi Full
+gia installati mantengono la selezione per sezione.
+
 In Impostazioni → Database → Cinema, la barra inferiore usa il margine di sistema
 gestito dalla navigazione. Quando si apre la tastiera sul limite della cache,
 Archivio porta il campo e il pulsante di salvataggio sopra la tastiera.

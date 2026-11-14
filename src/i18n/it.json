@@ -23,6 +23,7 @@
   "catalog.pane.images": "Immagini",
   "catalog.pane.home": "Home",
   "catalog.homeExplanation": "Scegli le sezioni, il loro ordine e quale mostrare nel riquadro principale. Almeno una sezione deve restare attiva.",
+  "catalog.homeDailyHeroExplanation": "Scegli le sezioni e il loro ordine. Il riquadro principale sceglie ogni giorno opere da tutto Cinema. Almeno una sezione deve restare attiva.",
   "catalog.keepOneSection": "Deve rimanere almeno una sezione.",
   "catalog.deleteSectionConfirm": "Eliminare la sezione “{{title}}”?",
   "catalog.editSection": "Modifica sezione",

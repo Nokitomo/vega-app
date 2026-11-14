@@ -23,6 +23,7 @@
   "catalog.pane.images": "Images",
   "catalog.pane.home": "Home",
   "catalog.homeExplanation": "Choose the sections, their order and which one appears in the hero. At least one section must remain enabled.",
+  "catalog.homeDailyHeroExplanation": "Choose the sections and their order. The hero picks titles from all of Cinema each day. At least one section must remain enabled.",
   "catalog.keepOneSection": "At least one section must remain.",
   "catalog.deleteSectionConfirm": "Delete the “{{title}}” section?",
   "catalog.editSection": "Edit section",

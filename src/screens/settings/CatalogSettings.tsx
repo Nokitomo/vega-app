@@ -555,10 +555,10 @@ export default function CatalogSettings() {
         </>}
         {pane === 'home' && <>
         <Text style={catalogStyles.title}>{t('catalog.home')}</Text>
-        <Text style={[catalogStyles.text, {color: '#aaa', fontSize: 14, marginBottom: 18}]}>{t('catalog.homeExplanation')}</Text>
+        <Text style={[catalogStyles.text, {color: '#aaa', fontSize: 14, marginBottom: 18}]}>{t(installed?.format || !installed ? 'catalog.homeDailyHeroExplanation' : 'catalog.homeExplanation')}</Text>
         {prefs.sections.map((s, index) => (
           <View key={s.id} style={{backgroundColor: '#141519', padding: 14, marginBottom: 12, borderLeftWidth: 3,
-            borderLeftColor: prefs.heroSection === s.id ? primary : '#23252b'}}>
+            borderLeftColor: installed && !installed.format && prefs.heroSection === s.id ? primary : '#23252b'}}>
             <View style={[catalogStyles.row, {justifyContent: 'space-between', marginBottom: 8}]}>
               <View style={{flex: 1}}>
                 <Text style={[catalogStyles.text, {color: 'white', fontFamily: HOME_FONT.medium}]}>
@@ -577,14 +577,14 @@ export default function CatalogSettings() {
                 onValueChange={enabled => changeSection({...s, enabled})}
               />
             </View>
-            <View style={catalogStyles.row}>
+            {installed && !installed.format && <View style={catalogStyles.row}>
               <CatalogButton
                 label={t('catalog.hero')}
                 selected={prefs.heroSection === s.id}
                 onPress={() => setPreferences({...prefs, heroSection: s.id,
                   sections: prefs.sections.map(row => row.id === s.id ? {...row, enabled: true} : row)})}
               />
-            </View>
+            </View>}
             <View style={catalogStyles.row}>
               <CatalogButton
                 label={t('catalog.edit')}
