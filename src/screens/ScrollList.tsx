@@ -579,6 +579,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                               <ProviderImage
                                 uri={item.image}
                                 candidates={item.imageCandidates}
+                                nextCandidate={item.nextImageCandidate}
                                 link={item.link}
                                 providerValue={
                                   item.catalogRef ? undefined : route.params.providerValue || provider.value
@@ -682,6 +683,7 @@ const ScrollList = ({route}: Props): React.ReactElement => {
                   <ProviderImage
                     uri={item.image}
                     candidates={item.imageCandidates}
+                    nextCandidate={item.nextImageCandidate}
                     link={item.link}
                     providerValue={item.catalogRef ? undefined : route.params.providerValue || provider.value}
                     artworkHints={item.artworkHints}

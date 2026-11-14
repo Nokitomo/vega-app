@@ -1,7 +1,7 @@
 import type {Post} from '../providers/types';
 import type {CatalogRecord, Work} from './types';
 import {catalogLitePosters} from './reader';
-import {selectImages} from './artwork';
+import {selectCardPoster} from './artwork';
 import {useCatalogStore} from './store';
 import {workImages, workTitle} from './content';
 
@@ -26,12 +26,16 @@ export async function loadCatalogPosts(
   const {installed, preferences} = useCatalogStore.getState();
   if (installed?.format) {
     const posters = await catalogLitePosters(works.map(work => work.id));
-    return works.map(work => catalogPost(work, selectImages(
-      posters.get(work.id) ?? [],
-      'poster',
-      preferences,
-      {originalLanguage: String(work.payload.info.original_language || '')},
-    )));
+    return works.map(work => ({
+      catalogRef: {catalogId: 'cinema', workId: work.id},
+      link: work.id,
+      title: workTitle(work.payload),
+      ...selectCardPoster(
+        posters.get(work.id) ?? [],
+        preferences,
+        String(work.payload.info.original_language || ''),
+      ),
+    }));
   }
   const posts: Post[] = [];
   // Bound concurrent SQLite reads when filling several Home sections.

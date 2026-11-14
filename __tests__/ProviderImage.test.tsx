@@ -251,3 +251,21 @@ it('uses the catalog image after a cached lookup found no preferred poster', asy
 
   await act(async () => component.unmount());
 });
+
+it('asks for the next Lite poster only on error and resets when the resolver changes', async () => {
+  const first = 'https://example.test/first.jpg';
+  const second = 'https://example.test/second.jpg';
+  const next = jest.fn((uri: string) => uri === first ? second : undefined);
+  let component!: renderer.ReactTestRenderer;
+  await act(async () => {
+    component = renderer.create(<ProviderImage uri={first} nextCandidate={next} />);
+  });
+  expect(component.root.findByType(Image).props.source.uri).toBe(first);
+  expect(next).not.toHaveBeenCalled();
+  await act(async () => component.root.findByType(Image).props.onError({nativeEvent: {error: '404'}}));
+  expect(next).toHaveBeenCalledWith(first);
+  expect(component.root.findByType(Image).props.source.uri).toBe(second);
+  await act(async () => component.update(<ProviderImage uri={first} nextCandidate={() => undefined} />));
+  expect(component.root.findByType(Image).props.source.uri).toBe(first);
+  await act(async () => component.unmount());
+});

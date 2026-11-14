@@ -307,3 +307,9 @@ candidati poster vengono letti insieme e passati al selettore immagini
 esistente.
 Le righe Cinema ricevono i poster già risolti dal catalogo e saltano il
 tracciamento di visibilità usato dalle righe provider per l'artwork remoto.
+
+Le card di Cinema Lite in Home e nelle liste risolvono subito il primo
+poster. Dopo un errore di caricamento, il selettore ordina le alternative
+e risolve gli URL successivi uno alla volta. L'ordine delle preferenze,
+gli override, la deduplicazione e la qualità TMDB seguono le stesse regole
+usate dal selettore completo.

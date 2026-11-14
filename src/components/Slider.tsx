@@ -177,6 +177,7 @@ const Slider = ({
               className={catalogAppearance ? undefined : 'rounded-md'}
               uri={item?.image}
               candidates={item.imageCandidates}
+              nextCandidate={item.nextImageCandidate}
               link={item.link}
               providerValue={item.catalogRef ? undefined : item.provider || providerValue || provider?.value}
               artworkHints={item.artworkHints}

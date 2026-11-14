@@ -16,6 +16,7 @@ export interface ProvidersList {
 export interface Post {
   catalogRef?: CatalogRef;
   imageCandidates?: string[];
+  nextImageCandidate?: (current: string) => string | undefined;
   title: string;
   link: string;
   image: string;

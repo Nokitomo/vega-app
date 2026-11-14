@@ -39,6 +39,7 @@ const getInitialSourceUri = (
 type ProviderImageProps = Omit<ImageProps, 'source'> & {
   uri?: string;
   candidates?: readonly string[];
+  nextCandidate?: Post['nextImageCandidate'];
   link?: string;
   providerValue?: string;
   artworkHints?: Post['artworkHints'];
@@ -48,6 +49,7 @@ type ProviderImageProps = Omit<ImageProps, 'source'> & {
 const ProviderImage = ({
   uri,
   candidates,
+  nextCandidate,
   link,
   providerValue,
   artworkHints,
@@ -58,13 +60,14 @@ const ProviderImage = ({
   ...rest
 }: ProviderImageProps): React.JSX.Element => {
   const providerCacheScope = getProviderCacheScope(providerValue || '');
-  const sourceIdentity = JSON.stringify([
+  const sourceKey = JSON.stringify([
     providerCacheScope,
     providerValue,
     link,
     uri,
     candidates,
   ]);
+  const sourceIdentity = useMemo(() => ({sourceKey, nextCandidate}), [sourceKey, nextCandidate]);
   const initialSourceUri = useMemo(
     () => getInitialSourceUri(uri, link, providerValue),
     [sourceIdentity],
@@ -144,8 +147,9 @@ const ProviderImage = ({
 
   const resolveFallback = useCallback(async () => {
     const candidateIndex = candidates?.indexOf(sourceUri) ?? -1;
-    if (candidateIndex >= 0 && candidates?.[candidateIndex + 1]) {
-      updateSourceUri(candidates[candidateIndex + 1]);
+    const next = nextCandidate?.(sourceUri) ?? (candidateIndex >= 0 ? candidates?.[candidateIndex + 1] : undefined);
+    if (next) {
+      updateSourceUri(next);
       return;
     }
     if (hasTriedFallback) {
@@ -187,6 +191,7 @@ const ProviderImage = ({
   }, [
     artworkHints,
     candidates,
+    nextCandidate,
     hasTriedFallback,
     link,
     providerCacheScope,

@@ -64,9 +64,10 @@ describe('catalog posts for shared presentation', () => {
       const posts = await loadCatalogPosts([work, second]);
       expect(batch).toHaveBeenCalledTimes(1);
       expect(batch).toHaveBeenCalledWith([work.id, second.id]);
-      expect(posts.map(post => post.imageCandidates)).toEqual([
-        [], ['https://example.com/first.jpg', 'https://example.com/fallback.jpg'],
-      ]);
+      expect(posts.map(post => post.image)).toEqual(['', 'https://example.com/first.jpg']);
+      expect(posts[1].imageCandidates).toBeUndefined();
+      expect(posts[1].nextImageCandidate?.(posts[1].image)).toBe('https://example.com/fallback.jpg');
+      expect(posts[1].nextImageCandidate?.('https://example.com/fallback.jpg')).toBeUndefined();
     } finally {
       useCatalogStore.setState({installed: previous});
     }
