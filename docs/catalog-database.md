@@ -17,6 +17,12 @@ non richiede un nuovo download. Sono configurabili sezioni Home, visibilita,
 ordine, tipo, generi, intervallo di anni, ordinamento e sezione del riquadro Hero.
 I contatori rappresentano lo snapshot, non una classifica in tempo reale.
 
+In Impostazioni → Database, la barra inferiore usa il margine di sistema
+gestito dalla navigazione. Quando si apre la tastiera sul limite della cache,
+Archivio porta il campo e il pulsante di salvataggio sopra la tastiera.
+Nell'editor delle sezioni Home scorrono i campi, con Salva e Annulla in fondo
+alla finestra.
+
 La dimensione TMDB predefinita per poster opera e poster stagionale e `w342`
 su smartphone e `w780` su tablet (lato corto dello schermo di almeno 600 dp).
 Le dimensioni valide gia salvate vengono rispettate.

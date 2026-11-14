@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -57,6 +57,24 @@ export default function CatalogSettings() {
   const [editInitial, setEditInitial] = useState('');
   const [genreText, setGenreText] = useState('');
   const [pane, setPane] = useState<'database' | 'images' | 'home'>('database');
+  const paneScroll = useRef<ScrollView>(null);
+  const cacheInput = useRef<TextInput>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (pane !== 'database') {
+      return;
+    }
+    const show = Keyboard.addListener('keyboardDidShow', event => {
+      if (cacheInput.current?.isFocused()) {
+        setKeyboardHeight(event.endCoordinates.height);
+      }
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [pane]);
   const [showAvailable, setShowAvailable] = useState(false);
   const rules = useQuery({
     queryKey: ['catalog-image-rules', installed?.revision],
@@ -218,7 +236,7 @@ export default function CatalogSettings() {
     fontFamily: HOME_FONT.regular,
   };
   return (
-    <SafeAreaView style={catalogStyles.page}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={catalogStyles.page}>
       <View style={{paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderColor: '#23252b'}}>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('Back')} onPress={() => navigation.goBack()}
@@ -230,7 +248,13 @@ export default function CatalogSettings() {
         <View style={{flexDirection: 'row', gap: 8}}>
           {(['database', 'images', 'home'] as const).map(value => (
             <TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{selected: pane === value}}
-              onPress={() => setPane(value)}
+              onPress={() => {
+                if (value !== pane) {
+                  Keyboard.dismiss();
+                  setKeyboardHeight(0);
+                  setPane(value);
+                }
+              }}
               style={{flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2,
                 borderColor: pane === value ? primary : 'transparent'}}>
               <Text style={{color: pane === value ? primary : '#aaa', fontFamily: HOME_FONT.medium, fontSize: 15}}>
@@ -240,7 +264,16 @@ export default function CatalogSettings() {
           ))}
         </View>
       </View>
-      <ScrollView key={pane} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 20, paddingBottom: 100}}>
+      <ScrollView
+        key={pane}
+        ref={paneScroll}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => {
+          if (keyboardHeight > 0) {
+            paneScroll.current?.scrollToEnd({animated: true});
+          }
+        }}
+        contentContainerStyle={{padding: 20, paddingBottom: 20 + keyboardHeight}}>
         {pane === 'database' && <>
         <View style={{backgroundColor: '#141519', padding: 16, marginBottom: 16}}>
         <Text style={[catalogStyles.text, {color: 'white', fontFamily: HOME_FONT.medium, fontSize: 18}]}>
@@ -406,6 +439,7 @@ export default function CatalogSettings() {
         <Text style={catalogStyles.text}>{t('catalog.detailCacheExplanation')}</Text>
         <View style={catalogStyles.row}>
           <TextInput
+            ref={cacheInput}
             accessibilityLabel={t('catalog.detailCache')}
             keyboardType="number-pad"
             value={cacheLimit}
@@ -420,6 +454,7 @@ export default function CatalogSettings() {
               !isDetailCacheLimit(Number(cacheLimit)) ||
               Number(cacheLimit) === prefs.detailCacheMb}
             onPress={() => {
+              Keyboard.dismiss();
               setPreferences({...prefs, detailCacheMb: Number(cacheLimit)});
               run(trimCatalogDetailCache);
             }}
@@ -618,7 +653,11 @@ export default function CatalogSettings() {
               </TouchableOpacity>
               <Text style={[catalogStyles.title, {flex: 1, marginVertical: 0}]}>{t('catalog.editSection')}</Text>
             </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding: 20, paddingBottom: 80}}>
+          <ScrollView
+            key={edit?.id}
+            style={{flex: 1}}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{padding: 20}}>
           {edit && <>
             <Text style={catalogStyles.text}>{t('catalog.sectionTitle')}</Text>
             <TextInput
@@ -693,6 +732,9 @@ export default function CatalogSettings() {
                 />
               ))}
             </View>
+          </>}
+          </ScrollView>
+          {edit && <View style={{paddingHorizontal: 20, paddingTop: 8, borderTopWidth: 1, borderColor: '#23252b'}}>
             <CatalogButton
               label={t('catalog.saveSection')}
               disabled={
@@ -719,8 +761,7 @@ export default function CatalogSettings() {
               label={t('Cancel')}
               onPress={closeEditor}
             />
-          </>}
-          </ScrollView>
+          </View>}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
