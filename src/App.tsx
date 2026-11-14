@@ -8,6 +8,7 @@ import Info from './screens/home/Info';
 import Player from './screens/home/Player';
 import Settings from './screens/settings/Settings';
 import CatalogSettings from './screens/settings/CatalogSettings';
+import DatabaseSettings from './screens/settings/DatabaseSettings';
 import type {CatalogRef, CatalogSection} from './lib/catalog/types';
 import {useCatalogLifecycle} from './lib/catalog/lifecycle';
 import WatchList from './screens/WatchList';
@@ -195,6 +196,7 @@ export type WatchHistoryStackParamList = {
 };
 
 export type SettingsStackParamList = {
+  DatabaseSettings: undefined;
   CatalogSettings: undefined;
   Settings: undefined;
   DisableProviders: undefined;
@@ -278,6 +280,7 @@ function SettingsStackScreen() {
   return (
     <SettingsStack.Navigator screenOptions={STACK_SCREEN_OPTIONS}>
       <SettingsStack.Screen name="Settings" component={Settings} />
+      <SettingsStack.Screen name="DatabaseSettings" component={DatabaseSettings} />
       <SettingsStack.Screen name="CatalogSettings" component={CatalogSettings} />
       {/* <SettingsStack.Screen
         name="DisableProviders"

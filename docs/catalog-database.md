@@ -5,7 +5,8 @@ Implementazione sul branch `cruncy-ui`. Il catalogo scaricato e la cache
 
 ## Uso
 
-Impostazioni → Database consente installazione manuale, controllo aggiornamenti,
+Impostazioni → Database elenca i cataloghi disponibili. Aprendo Cinema si accede
+a installazione manuale, controllo aggiornamenti,
 pausa/ripresa, annullamento, attivazione del download pronto e rimozione. La scelta
 "Usa Cinema nella Home" non cambia il provider selezionato. La ricerca globale
 mantiene tutti i provider installati e aggiunge una sezione locale quando Cinema
@@ -17,7 +18,7 @@ non richiede un nuovo download. Sono configurabili sezioni Home, visibilita,
 ordine, tipo, generi, intervallo di anni, ordinamento e sezione del riquadro Hero.
 I contatori rappresentano lo snapshot, non una classifica in tempo reale.
 
-In Impostazioni → Database, la barra inferiore usa il margine di sistema
+In Impostazioni → Database → Cinema, la barra inferiore usa il margine di sistema
 gestito dalla navigazione. Quando si apre la tastiera sul limite della cache,
 Archivio porta il campo e il pulsante di salvataggio sopra la tastiera.
 Nell'editor delle sezioni Home scorrono i campi, con Salva e Annulla in fondo

@@ -235,7 +235,7 @@ const Settings = ({navigation}: Props) => {
               {/* Extensions */}
               <View className="bg-[#141519] rounded-none overflow-hidden mb-3">
                 <TouchableNativeFeedback
-                  onPress={() => navigation.navigate('CatalogSettings')}
+                  onPress={() => navigation.navigate('DatabaseSettings')}
                   background={TouchableNativeFeedback.Ripple('#333333', false)}>
                   <View className="flex-row items-center justify-between p-4 border-b border-[#23252b]">
                     <View className="flex-row items-center flex-1">
