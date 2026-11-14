@@ -1,4 +1,5 @@
 import {
+  Platform,
   Pressable,
   Text,
   TouchableOpacity,
@@ -78,6 +79,7 @@ const Slider = ({
   const {t} = useTranslation();
   const {width: windowWidth} = useWindowDimensions();
   const catalogAppearance = homeAppearance || isSearch;
+  const resizeCatalogPosters = homeAppearance && !isSearch && Platform.OS === 'android' && !Platform.isTV;
   const cardWidth = catalogAppearance
     ? getHomeCardWidth(windowWidth)
     : CARD_TITLE_WIDTH;
@@ -175,6 +177,7 @@ const Slider = ({
           <View className="relative">
             <ProviderImage
               className={catalogAppearance ? undefined : 'rounded-md'}
+              resizeMethod={resizeCatalogPosters && item.catalogRef ? 'resize' : undefined}
               uri={item?.image}
               candidates={item.imageCandidates}
               nextCandidate={item.nextImageCandidate}
@@ -224,6 +227,7 @@ const Slider = ({
       imageWidth,
       imageHeight,
       catalogAppearance,
+      resizeCatalogPosters,
       handleItemPress,
       primary,
       provider?.value,

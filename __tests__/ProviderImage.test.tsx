@@ -35,10 +35,11 @@ beforeEach(() => {
 it('tries ordered catalog candidates and resets after a preference change without provider requests', async () => {
   let component!: renderer.ReactTestRenderer;
   await act(async () => {
-    component = renderer.create(<ProviderImage uri="https://example.test/first.jpg" candidates={['https://example.test/first.jpg', 'https://example.test/second.jpg']} />);
+    component = renderer.create(<ProviderImage resizeMethod="resize" uri="https://example.test/first.jpg" candidates={['https://example.test/first.jpg', 'https://example.test/second.jpg']} />);
   });
   await act(async () => component.root.findByType(Image).props.onError({nativeEvent: {error: '404'}}));
   expect(component.root.findByType(Image).props.source.uri).toBe('https://example.test/second.jpg');
+  expect(component.root.findByType(Image).props.resizeMethod).toBe('resize');
   await act(async () => component.root.findByType(Image).props.onError({nativeEvent: {error: '404'}}));
   expect(component.root.findByType(Image).props.source.uri).toContain('placehold.jp');
   await act(async () => {

@@ -1,5 +1,12 @@
 # Profilazione Home e Info
 
+Sui dispositivi Android mobili, le card Cinema della Home richiedono il
+ridimensionamento dei poster durante la decodifica in base alla vista nativa.
+Per verificarne l'effetto, confrontare la stessa Home con qualita `original`,
+piu fonti e cache fredda e calda. Misurare i frame durante lo scroll verticale
+e orizzontale e controllare nitidezza, fallback e rientro da Ricerca e
+Impostazioni. Usare la schermata Altro come controllo.
+
 La traccia diagnostica e disattivata per impostazione predefinita e non ha un
 interruttore nella UI. Per abilitarla nel dev client o in un APK release locale,
 impostare `EXPO_PUBLIC_PERF_TRACE=1` **prima** di avviare Metro o Gradle. Il
