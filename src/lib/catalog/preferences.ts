@@ -1,3 +1,5 @@
+import {Dimensions, Platform} from 'react-native';
+import {isTabletScreen} from '../utils/adaptiveNavigation';
 import type {CatalogPreferences, ImageField} from './types';
 
 export const DEFAULT_DETAIL_CACHE_MB = 200;
@@ -22,6 +24,8 @@ export const tmdbSizes: Record<ImageField, string[]> = {
   episodeThumbnail: ['w92', 'w185', 'w300', 'original'],
 };
 export function defaultCatalogPreferences(): CatalogPreferences {
+  const {width, height} = Dimensions.get('screen');
+  const posterQuality = Platform.isTV ? 'original' : isTabletScreen(width, height) ? 'w780' : 'w342';
   return {
     version: 1,
     selected: false,
@@ -43,10 +47,10 @@ export function defaultCatalogPreferences(): CatalogPreferences {
       episodeThumbnail: ['streamingunity:*', 'tmdb:*', 'tvdb:*'],
     },
     quality: {
-      poster: 'original',
+      poster: posterQuality,
       background: 'original',
       logo: 'original',
-      seasonPoster: 'original',
+      seasonPoster: posterQuality,
       episodeThumbnail: 'original',
     },
     sections: [

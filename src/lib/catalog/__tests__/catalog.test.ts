@@ -2,7 +2,8 @@ import {
   defaultCatalogPreferences,
   readCatalogPreferences,
 } from '../preferences';
-import {describe, test, expect} from '@jest/globals';
+import {describe, test, expect, jest} from '@jest/globals';
+import {Dimensions} from 'react-native';
 import {selectImages, imageUrl} from '../artwork';
 import {parseManifest, planDownload, recordKinds} from '../manifest';
 import type {Artwork, CatalogManifest, DeltaAsset} from '../types';
@@ -58,6 +59,7 @@ const art = (
 describe('catalog artwork contract', () => {
   test('uses configured languages, original language and deterministic fallback', () => {
     const p = defaultCatalogPreferences();
+    p.quality.poster = 'original';
     const rows = [
       art('streamingunity', 'it'),
       art('tvdb', null),
@@ -122,8 +124,24 @@ describe('catalog artwork contract', () => {
     const p = defaultCatalogPreferences();
     p.quality.poster = 'w999';
     expect(readCatalogPreferences(JSON.stringify(p)).quality.poster).toBe(
-      'original',
+      defaultCatalogPreferences().quality.poster,
     );
+  });
+  test.each([
+    [390, 844, 'w342'],
+    [600, 960, 'w780'],
+    [960, 600, 'w780'],
+  ])('defaults both posters on a %i × %i screen to %s', (width, height, size) => {
+    const dimensions = jest.spyOn(Dimensions, 'get').mockReturnValue({width, height, scale: 2, fontScale: 1});
+    try {
+      expect(readCatalogPreferences().quality).toMatchObject({poster: size, seasonPoster: size});
+      expect(readCatalogPreferences(JSON.stringify({
+        version: 1,
+        quality: {poster: 'original', seasonPoster: 'w500'},
+      })).quality).toMatchObject({poster: 'original', seasonPoster: 'w500'});
+    } finally {
+      dimensions.mockRestore();
+    }
   });
   test('repairs a Home emptied by older settings without changing image choices', () => {
     const p = defaultCatalogPreferences();

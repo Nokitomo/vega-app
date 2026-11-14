@@ -1,3 +1,7 @@
+export function isTabletScreen(screenWidth: number, screenHeight: number) {
+  return Math.min(screenWidth, screenHeight) >= 600;
+}
+
 // Device classification must not change when the keyboard shrinks the window.
 // All orientations use bottom tabs; tablet items occupy a centered group.
 export function getAdaptiveNavigation(
@@ -6,7 +10,7 @@ export function getAdaptiveNavigation(
   screenHeight: number,
   fontScale = 1,
 ) {
-  const isTabletDevice = Math.min(screenWidth, screenHeight) >= 600;
+  const isTabletDevice = isTabletScreen(screenWidth, screenHeight);
   return {
     isTabletDevice,
     useSideTabLayout: false,

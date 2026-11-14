@@ -17,6 +17,10 @@ non richiede un nuovo download. Sono configurabili sezioni Home, visibilita,
 ordine, tipo, generi, intervallo di anni, ordinamento e sezione del riquadro Hero.
 I contatori rappresentano lo snapshot, non una classifica in tempo reale.
 
+La dimensione TMDB predefinita per poster opera e poster stagionale e `w342`
+su smartphone e `w780` su tablet (lato corto dello schermo di almeno 600 dp).
+Le dimensioni valide gia salvate vengono rispettate.
+
 Poster: TMDB it/en/original/xx, TVDB, StreamingUnity it. Background: TMDB xx,
 TVDB, StreamingUnity. Logo: TMDB it/en/xx, StreamingUnity, TVDB. Poster stagionale:
 TMDB it/en, TVDB, TMDB xx; fallback al poster dell'opera. Miniature: StreamingUnity,
